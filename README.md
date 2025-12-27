@@ -1,56 +1,66 @@
-**Moon_NFT_Exchange** — дипломный проект, посвящённый созданию децентрализованной платформы для обмена NFT-токенами. Проект реализует функционал безопасной торговли, верификации токенов и взаимодействия с блокчейном, объединяя современные веб-технологии, смарт-контракты и передовые практики разработки.
+# Moon_NFT_Exchange
+
+**Moon_NFT_Exchange** is a diploma project dedicated to building a decentralized platform for trading NFT tokens. The project implements secure trading functionality, token verification, and blockchain interaction by combining modern web technologies, smart contracts, and advanced software development practices.
 
 ---
 
-**Цель проекта** — разработать и протестировать полнофункциональную NFT-биржу с поддержкой нескольких блокчейнов, обеспечивающую прозрачность, безопасность и удобство для пользователей.
+## 🎯 Project Goal
+
+To design, develop, and test a fully functional multi-chain NFT exchange that ensures transparency, security, and user-friendly experience.
 
 ---
 
-### 🔧 Основные функции:
-- **Создание и продажа подарков** (minting, listing)
-- **Аукционы и фиксированные цены**
-- **Кошельки пользователей** (интеграция с MetaMask и другими)
-- **Поиск и фильтрация подарков**
-- **Смарт-контракты** на Solidity
-- **Интеграция с Ethereum/Polygon/BNB Chain**
-- **Админ-панель** для модерации
-- **История транзакций и статистика**
+## 🔧 Core Features
+
+- **Minting and listing NFTs** (creating and selling digital gifts)
+- **Auctions and fixed-price listings**
+- **User wallets** (integrated with MetaMask and other Web3 providers)
+- **Search and filtering of NFTs**
+- **Smart contracts** written in Solidity
+- **Multi-chain support**: Ethereum, Polygon, BNB Chain
+- **Admin dashboard** for content moderation
+- **Transaction history and analytics**
 
 ---
 
-### 🛠 Используемые технологии:
-- **Frontend**: Vue.js, Web3.js, Ethers.js
-- **Backend**: Node.js, Express/FastAPI
-- **Блокчейн**: Solidity, Hardhat/Truffle
-- **База данных**: Supabase
-- **Деплой**: Docker
+## 🛠 Technologies Used
+
+- **Frontend**: React, Web3.js, Ethers.js  
+- **Backend**: Node.js, Express / FastAPI  
+- **Blockchain**: Solidity, Hardhat / Truffle  
+- **Database**: MySQL  
+- **Deployment**: Docker  
 
 ---
 
-### 📋 Структура:
-- `contracts/` — смарт-контракты
-- `frontend/` — веб-интерфейс
-- `backend/` — API и логика
-- `docs/` — документация и ТЗ
-- `tests/` — юнит-тесты и интеграционные тесты
+## 📋 Project Structure
+
+- `contracts/` — Smart contracts  
+- `frontend/` — Web interface  
+- `backend/` — API and business logic  
+- `docs/` — Project documentation and technical specification  
+- `tests/` — Unit and integration tests  
 
 ---
 
-### 🎓 Цель диплома:
-Разработка и защита дипломного проекта, посвящённого применению блокчейн-технологий в сфере цифровых активов, с акцентом на безопасность, децентрализацию и пользовательский опыт.
+## 🎓 Diploma Objective
+
+Development and defense of a graduation project focused on applying blockchain technologies in the digital asset space, with an emphasis on security, decentralization, and user experience.
 
 ---
 
-### ⚠️ Статус:
-В разработке
----
+## ⚠️ Status
 
-### 📬 Контакты:
-- Email: 2016Elektronik123@gmail.com
-- GitHub: [KishlakEnjoyer](https://github.com/KishlakEnjoyer)
+Under development
 
 ---
 
-> *Проект выполнен в рамках дипломного задания по специальности «Информационные системы и технологии» (Программист).*  
-> *© 2025 — Файзуллин Эрик
+## 📬 Contact
+
+- **Email**: 2016Elektronik123@gmail.com  
+- **GitHub**: [KishlakEnjoyer](https://github.com/KishlakEnjoyer)
+
 ---
+
+> *This project is submitted as part of the final diploma requirements for the specialty "Information Systems and Technologies" (Software Engineering).*  
+> *© 2025 — Erik Fayzullin*
