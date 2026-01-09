@@ -1,15 +1,5 @@
 from fastapi import FastAPI
 
-app = FastAPI(
-    title="Moon NFT Exchange API",
-    description="Backend for decentralized NFT trading platform",
-    version="0.1.0"
-)
+app = FastAPI(title="Moon TG Presents API",
+              description="API by MoonExchange")
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to Moon NFT Exchange API!"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
