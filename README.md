@@ -25,7 +25,7 @@ To design, develop, and test a fully functional multi-chain NFT exchange that en
 
 ## 🛠 Technologies Used
 
-- **Frontend**: React, Web3.js, Ethers.js  
+- **Frontend**: React, AntDesign
 - **Backend**: Node.js, Express / FastAPI  
 - **Blockchain**: Solidity, Hardhat / Truffle  
 - **Database**: MySQL  
@@ -39,7 +39,8 @@ To design, develop, and test a fully functional multi-chain NFT exchange that en
 - `frontend/` — Web interface  
 - `backend/` — API and business logic  
 - `docs/` — Project documentation and technical specification  
-- `tests/` — Unit and integration tests  
+- `tests/` — Unit and integration tests
+- `tg-bot/` — Telegram bot logic  
 
 ---
 
@@ -63,4 +64,4 @@ Under development
 ---
 
 > *This project is submitted as part of the final diploma requirements for the specialty "Information Systems and Technologies" (Software Engineering).*  
-> *© 2025 — Erik Fayzullin*
+> *© 2026 — Erik Fayzullin*
