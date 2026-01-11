@@ -1,14 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
+@import './Variables.css';
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   outline: none;
-  transition: all 0.1s ease;
+  transition: all 0.6s ease;
   text-decoration: none;
 }
 
 body {
   height: 100vh;
   overflow: hidden;
-  background-color: var(--black-100);
+}
+
+.App {
+  min-height: 100vh;
 }

@@ -1,0 +1,45 @@
+:root {
+    --black-100: #000000;
+    --black-90: #131313;
+    --black-80: #1f1f1f;
+    --black-70: #303030;
+    --black-60: #3f3f3f;
+
+    --black-transparent: #00000080;
+
+    --white-100: #ffffff;
+    --white-90: #f3f3f3;
+    --white-80: #e7e7e7;
+    --white-70: #dbdbdb;
+    --white-60: #9e9e9e;
+    --white-50: #ffffff80;
+
+    --accent-100: #006eff;
+    --accent-50: #006eff50;
+    --accent-20: #006eff20;
+
+    --blue-main: #1689FE;
+    --blue-hovered: #168afe79;
+
+    --font-ultralight: 200;
+    --font-extralight: 300;
+    --font-light:      350;
+    --font-regular:    400; 
+    --font-medium:     500;
+    --font-semibold:   600;
+    --font-bold:       700; 
+    --font-extrabold:  800;
+    --font-black:      900;
+    --font-ultrablack: 950;
+
+    --size-4xl: 64px;
+    --size-3xl: 48px;
+    --size-2xl: 32px;
+    --size-xl: 24px;
+    --size-lg: 20px;
+    --size-base: 16px;
+    --size-sm: 12px;
+    --size-xs: 8px;
+    --size-2xs: 4px;
+    --size-3xs: 2px;
+}
