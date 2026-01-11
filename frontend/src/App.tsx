@@ -3,7 +3,6 @@ import './styles/App.css';
 import { ConfigProvider, Layout, theme } from 'antd';
 import { Routes, Route } from 'react-router-dom';
 import MainView from './views/MainView';
-import { Content } from 'antd/es/layout/layout';
 
 
 function App() {
@@ -14,9 +13,17 @@ function App() {
       token: {
         fontFamily: 'Geist, sans-serif',
       },
+      components: {
+        Pagination: {
+          borderRadius: 999,
+        },
+        Card: {
+          borderRadius: 12,
+        }
+      }
     }}>
       <Layout className='App'>
-          <Routes>
+          <Routes> 
             <Route path="/" element={<MainView />} />
             <Route path="*" element={<div>404 — Страница не найдена</div>} />
           </Routes>

@@ -30,6 +30,29 @@
 
 }
 
+.main-list {
+    padding: 0;
+}
+
+
+
+.listing-card {
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--size-2xs);
+    width: "100%";
+    max-width: 240px;
+    overflow: hidden;
+}
+
+.listing-card .ant-card-body {
+    padding-bottom: 0;
+    padding-top: 8px;
+}
+
+
 
 
 .footer-container {
