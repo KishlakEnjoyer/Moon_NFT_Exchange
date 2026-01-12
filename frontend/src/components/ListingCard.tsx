@@ -1,6 +1,7 @@
 import { Button, Card, Space, Typography } from "antd";
 import cardImage from "./card.png";
 import { ShoppingCartOutlined } from "@ant-design/icons";
+import TONIcon from "./icons/TONIcon";
 
 const { Text } = Typography;
 
@@ -9,6 +10,14 @@ const ListingCard = () => {
     <Card
       className="listing-card"
       hoverable
+      styles={{
+        body: {
+          padding: 'var(--size-sm)', 
+        },
+        cover: {
+          padding: 0,
+        },
+      }}
       cover={
         <img
           alt="Mighty Arm"
@@ -16,23 +25,78 @@ const ListingCard = () => {
           src={cardImage}
           style={{
             width: "100%",
-            objectFit: "cover", 
+            height: "var(--size-5xl)",
+            objectFit: "cover",
             objectPosition: "center",
           }}
         />
       }
     >
-      <Space orientation="vertical" size={0}>
-        <Text strong>Mighty Arm</Text>
-        <Text type="secondary" style={{fontSize: 'var(--size-sm)'}}>#277</Text>
-
-        <Space orientation="horizontal">
-          <Button type="primary" icon={<ShoppingCartOutlined />} block>
-            <img src="/icons/ton-icon.png" alt="TON" style={{ width: 16, height: 16 }} />
-            70.2
-          </Button>
-        </Space>
+      <Space orientation="horizontal" size={10}>
+        <Text
+          strong
+          style={{
+            fontSize: 'var(--size-base)', 
+            fontWeight: 'var(--font-semibold)', 
+          }}
+        >
+          Mighty Arm
+        </Text>
+        <Text
+          type="secondary"
+          style={{
+            fontSize: 'var(--size-sm)', 
+            fontWeight: 'var(--font-light)', 
+          }}
+        >
+          #277
+        </Text>
       </Space>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--size-xs)', 
+          marginTop: 'var(--size-sm)', 
+        }}
+      >
+        <Button
+          type="primary"
+          icon={<TONIcon/>}
+          size="small"
+          block
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--size-xs)', 
+            fontSize: 'var(--size-sm)', 
+            height: 'var(--size-lg)', 
+            backgroundColor: 'var(--blue-main)', 
+            borderRadius: 'var(--size-xs)', 
+            fontWeight: 'var(--font-medium)', 
+          }}
+        >
+          
+          70.2
+        </Button>
+
+        <Button
+          type="default"
+          icon={<ShoppingCartOutlined />}
+          size="small"
+          style={{
+            height: 'var(--size-lg)', 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 var(--size-xs)', 
+            borderColor: 'var(--black-60)', 
+            borderRadius: 'var(--size-xs)', 
+            fontSize: 'var(--size-sm)', 
+          }}
+        />
+      </div>
     </Card>
   );
 };
