@@ -1,52 +1,69 @@
-import { Row, Col, Pagination, Space } from "antd";
+import { Row, Col, Space } from "antd";
 import ListingCard from "./ListingCard";
-import { useState } from "react";
-
-const PAGE_SIZE = 16;
+import { useState, useEffect, useRef } from "react";
 
 const MainList = () => {
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(36); 
+  const items = Array.from({ length: 152 }); 
 
-  // фейковые данные
-  const items = Array.from({ length: 152 });
+  const sentinelRef = useRef(null);
 
-  const start = (page - 1) * PAGE_SIZE;
-  const currentItems = items.slice(start, start + PAGE_SIZE);
+  const loadMore = () => {
+    setVisibleCount((prev) => Math.min(prev + 12, items.length));
+  };
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleCount < items.length) {
+          loadMore();
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => {
+      if (sentinelRef.current) {
+        observer.unobserve(sentinelRef.current);
+      }
+    };
+  }, [visibleCount, items.length]);
 
   return (
-    <Space className="main-list" orientation="vertical" size={12} >
-      <Row gutter={[12, 12]} justify="start"> 
-        {currentItems.map((_, index) => (
+    <Space className="main-list" orientation="vertical" size={12}>
+      <Row gutter={[12, 12]} justify="start">
+        {items.slice(0, visibleCount).map((_, index) => (
           <Col
             key={index}
-            xs={12}     // 2 в ряд на мобильных
-            sm={8}      // 3 в ряд на маленьких планшетах
-            md={6}      // 4 в ряд на больших планшетах
-            lg={4}      // 3 в ряд на десктопах (ноутбуках)
-            xl={3}      // 4 в ряд на больших экранах
+            xs={12}
+            sm={8}
+            md={6}
+            lg={4}
+            xl={3}
           >
-            <div style={{ width: "100%", height: '100%', display: "flex", justifyContent: "center" }}>
-              <ListingCard />
-            </div>
+            <ListingCard />
           </Col>
         ))}
       </Row>
 
-      <Pagination
-        current={page}
-        total={items.length}
-        pageSize={PAGE_SIZE}
-        onChange={setPage}
-        showSizeChanger={false}
-        align="center"
-        style={{
-          marginTop: 'auto',
-          position:'fixed',
-          bottom: 'var(--size-4xl)',
-          left: '50%',
-          transform: 'translateX(-50%)'
-        }}
-      />
+      {visibleCount < items.length && (
+        <div
+          ref={sentinelRef}
+          style={{
+            height: "20px",
+            width: "100%",
+            textAlign: "center",
+            fontSize: "14px",
+            color: "#999",
+          }}
+        >
+          Загрузка...
+        </div>
+      )}
     </Space>
   );
 };

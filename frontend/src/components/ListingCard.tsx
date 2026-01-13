@@ -13,6 +13,7 @@ const ListingCard = () => {
       styles={{
         body: {
           padding: 'var(--size-sm)', 
+          width: '100%'
         },
         cover: {
           padding: 0,
@@ -25,14 +26,14 @@ const ListingCard = () => {
           src={cardImage}
           style={{
             width: "100%",
-            height: "var(--size-5xl)",
+            height: "100%",
             objectFit: "cover",
             objectPosition: "center",
           }}
         />
       }
     >
-      <Space orientation="horizontal" size={10}>
+      <Space orientation="vertical" size={1}>
         <Text
           strong
           style={{
