@@ -53,7 +53,7 @@ const MainHeader = () => {
         </Title>
       </div>
 
-      <Button color="default" variant="outlined">
+      <Button color="default" variant="outlined" size="large">
         Connect TG
         <Image
           src="/icons/tg-icon-png.png"

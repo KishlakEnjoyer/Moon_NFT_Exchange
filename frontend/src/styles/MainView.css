@@ -5,7 +5,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #000000;
+    background-color: var(--black-100);
 }
 
 .header-title {
@@ -21,9 +21,19 @@
 .logo {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: var(--size-base);
     cursor: pointer;
 }
+
+.filter-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--ant-color-bg-layout);
+  padding: 12px 0;
+  height: auto;
+}
+
 
 .main-container {
     padding: var(--size-2xs) var(--size-4xl);
@@ -31,28 +41,31 @@
 }
 
 .main-list {
-    padding: 0;
+    padding: 0 0 10px 0;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    max-width: var(--size-max-width);
+    margin: 0 auto;
 }
 
 
 
 .listing-card {
-    border-radius: 12px;
+    border-radius: var(--size-sm);
     display: flex;
     flex-direction: column;
-    align-items: center;
     padding: var(--size-2xs);
-    width: "100%";
+    width: 100%;
     overflow: hidden;
 }
 
-.listing-card .ant-card-body {
-    padding-bottom: 0;
-    padding-top: 8px;
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
 }
 
 
@@ -71,4 +84,20 @@
 .footer-container span {
     opacity: 0.5;
     font-size: var(--size-sm);
+}
+
+
+.button-up {
+    position: fixed;
+    bottom: var(--size-xl);
+    right: var(--size-s);
+    width: var(--size-3xl) !important;
+    height: var(--size-3xl) !important;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
 }

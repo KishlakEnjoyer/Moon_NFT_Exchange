@@ -34,6 +34,7 @@
     --font-black:      900;
     --font-ultrablack: 950;
 
+    --size-max-width: 2000px;
     --size-5xl: 128px;
     --size-4xl: 64px;
     --size-3xl: 48px;
@@ -42,6 +43,7 @@
     --size-lg: 20px;
     --size-base: 16px;
     --size-sm: 12px;
+    --size-s: 10px;
     --size-xs: 8px;
     --size-2xs: 4px;
     --size-3xs: 2px;

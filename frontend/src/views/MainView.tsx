@@ -1,13 +1,13 @@
 // MainView.tsx
 import "../styles/MainView.css";
 import useDocumentTitle from "../hooks/useDocumentTitle";
-import { Button, Layout, Space } from "antd";
+import { Button, Layout } from "antd";
 import { Content } from "antd/es/layout/layout";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
 import MainList from "../components/MainList";
 import FilterBar from "../components/FilterBar";
-import { useEffect, useState } from "react"; // ← добавили
+import { useEffect, useState } from "react";
 import { UpOutlined } from "@ant-design/icons";
 
 const MainView = () => {
@@ -34,46 +34,21 @@ const MainView = () => {
     <Layout style={{ minHeight: "100vh" }}>
       <MainHeader />
       <Content className="main-container">
-        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-          {/* 👇 Прилипающий фильтр */}
-          <div
-            style={{
-              position: "sticky",
-              top: 64, // высота MainHeader (если он fixed), иначе 0
-              zIndex: 10,
-              background: "var(--bg-layout)", // или белый/тёмный фон
-              padding: "12px 0", // чтобы не "прыгало"
-            }}
-          >
-            <FilterBar />
-          </div>
+        <div className="filter-sticky">
+          <FilterBar />
+        </div>
 
-          <MainList />
-        </Space>
+        <MainList />
 
-        {/* 👇 Кнопка "вверх" */}
         {showScrollTop && (
           <Button
             onClick={scrollToTop}
-            style={{
-              position: "fixed",
-              bottom: "24px",
-              right: "10px",
-              width: "48px",
-              height: "48px",
-              borderRadius: "50%",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              zIndex: 100,
-            }}
+            className="button-up"
             icon={<UpOutlined />}
           />
         )}
       </Content>
+
       <MainFooter />
     </Layout>
   );
