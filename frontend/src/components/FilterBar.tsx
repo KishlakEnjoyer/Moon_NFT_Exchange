@@ -12,48 +12,54 @@ import {
 const FilterBar = () => {
   const popupContainer = () => document.body;
   return (
-    <Row gutter={[12, 12]} align="middle">
-      <Col flex="auto">
-        <Input.Search placeholder="Search" allowClear size="large"/>
+    <Row gutter={[12, 12]} align="middle" 
+          style={{ width: '100%' }}
+    >
+      <Col flex="auto" >
+        <Input.Search placeholder="Search"
+                      allowClear
+                      size="large"
+                      style={{ width: '100%' }}
+                      />
       </Col>
 
-      <Col>
+      <Col flex="auto">
         <Select
           placeholder="Collection"
-          style={{ width: 250 }}
+          style={{ width: '100%' }}
           getPopupContainer={popupContainer}
           size="large"
         />
       </Col>
 
-      <Col>
+      <Col flex="auto">
         <Select
           placeholder="Model"
-          style={{ width: 250 }}
+          style={{ width: '100%' }}
           getPopupContainer={popupContainer}
           size="large"
         />
       </Col>
 
-      <Col>
+      <Col flex="auto">
         <Select
           placeholder="Background"
-          style={{ width: 250 }}
+          style={{ width: '100%' }}
           getPopupContainer={popupContainer}
           size="large"
         />
       </Col>
 
-      <Col>
+      <Col flex="auto">
         <Select
           placeholder="Symbol"
-          style={{ width: 250 }}
+          style={{ width: '100%' }}
           getPopupContainer={popupContainer}
           size="large"
         />
       </Col>
 
-      <Col>
+      <Col style={{ maxWidth: '40px'}}>
         <Dropdown
           trigger={['click']}
           getPopupContainer={popupContainer}
