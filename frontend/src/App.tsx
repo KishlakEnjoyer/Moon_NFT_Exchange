@@ -3,6 +3,7 @@ import './styles/App.css';
 import { ConfigProvider, Layout, theme } from 'antd';
 import { Routes, Route } from 'react-router-dom';
 import MainView from './views/MainView';
+import AccountView from './views/AccountView';
 
 
 function App() {
@@ -25,7 +26,7 @@ function App() {
       <Layout className='App'>
           <Routes> 
             <Route path="/" element={<MainView />} />
-            <Route path="*" element={<div>404 — Страница не найдена</div>} />
+            <Route path="/account" element={<AccountView/>} />
           </Routes>
       </Layout>
     </ConfigProvider>

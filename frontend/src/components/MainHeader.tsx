@@ -1,10 +1,19 @@
 import { Header } from "antd/es/layout/layout";
 import { Button, Image } from "antd";
 import Title from "antd/es/typography/Title";
+import { Link, useNavigate } from "react-router-dom";
 
 const MainHeader = () => {
+  const navigate = useNavigate(); 
+
+  const handleConnectClick = () => {
+    navigate("/account"); 
+  };
+  const handleHomeClick = () => {
+    navigate("/"); 
+  };
   return (
-    <Header className="header-container">
+    <Header className="header-container" onClick={handleHomeClick}>
       <div className="logo">
         <svg
           width="69"
@@ -53,12 +62,13 @@ const MainHeader = () => {
         </Title>
       </div>
 
-      <Button color="default" variant="outlined" size="large">
+      <Button color="default" variant="outlined" size="large" onClick={handleConnectClick}>
         Connect TG
         <Image
           src="/icons/tg-icon-png.png"
           alt="TgIcon"
           style={{ width: "20px" }}
+          preview={false}
         />
       </Button>
     </Header>
