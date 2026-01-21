@@ -13,8 +13,8 @@ const MainHeader = () => {
     navigate("/"); 
   };
   return (
-    <Header className="header-container" onClick={handleHomeClick}>
-      <div className="logo">
+    <Header className="header-container">
+      <div className="logo" onClick={handleHomeClick}>
         <svg
           width="69"
           height="64"
