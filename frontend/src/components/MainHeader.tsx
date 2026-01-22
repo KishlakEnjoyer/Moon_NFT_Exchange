@@ -1,13 +1,14 @@
 import { Header } from "antd/es/layout/layout";
-import { Badge, Button, Divider, Dropdown, Flex, Image, MenuProps } from "antd";
+import { Avatar, Badge, Button, Dropdown, Flex, Image, MenuProps } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
 import "../styles/HeaderStyle.css";
 
 import IconSwitch from "./SwitchTheme";
 import { useState } from "react";
-import { BellOutlined, LogoutOutlined, SettingOutlined, ShoppingCartOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
+import { BellOutlined, LogoutOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
+import { endianness } from "os";
 
 interface MainHeaderProps {
   darkMode: boolean;
@@ -17,7 +18,7 @@ interface MainHeaderProps {
 const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
   const navigate = useNavigate(); 
 
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const handleConnectClick = () => {
     navigate("/account"); 
@@ -26,31 +27,15 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
     navigate("/"); 
   };
 
+  const handleLogIn = () => {
+    setIsAuthenticated(true);
+  }
+
   const currentUser = {
     nickname: 'KishlakEnjoyer',
-    balance: 3.02
-
+    balance: 3.02,
+    image_url: 'ava.png'
   };
-
-  const menuItems: MenuProps['items'] = [
-    {
-      key: '1',
-      label: 'Профиль',
-      icon: <UserOutlined />,
-    },
-    {
-      key: '2',
-      label: 'Настройки',
-      icon: <SettingOutlined />,
-    },
-    {
-      key: '3',
-      label: 'Выход',
-      icon: <LogoutOutlined />,
-      danger: true,
-      onClick: () => setIsAuthenticated(false),
-    },
-  ];
   return (
     <Header className="header-container">
       <div className="logo" onClick={handleHomeClick}>
@@ -101,13 +86,14 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
         </Title>
       </div>
       <div className="right-part">
-        <IconSwitch darkMode={darkMode} onThemeChange={onThemeChange}/>
         {!isAuthenticated && (
-          <Button
+          <div className="authed-header">
+            <IconSwitch darkMode={darkMode} onThemeChange={onThemeChange}/>
+            <Button
             color="default"
             variant="outlined"
             size="large"
-            onClick={handleConnectClick}
+            onClick={handleLogIn}
           >
             Connect TG
             <Image
@@ -117,38 +103,34 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
               preview={false}
             />
           </Button>
+          </div>
         )}
 
         {isAuthenticated && (
           <div className="authed-header">
-            <Badge count={5} >
+            <IconSwitch darkMode={darkMode} onThemeChange={onThemeChange}/>
+
+            <Avatar size='large' src={currentUser.image_url} onClick={handleConnectClick} style={{border: '1px solid gray'}}/>
+            
+            <Badge count={4} >
               <Button type="text" 
-              icon={<BellOutlined style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }} />} 
+              icon={<BellOutlined style={{ fontSize: 'var(--size-lg)', }} />} 
               size="large"/>
             </Badge>
 
             <Button type="text" icon={<UsergroupAddOutlined />} 
-            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}
+            style={{ fontSize: 'var(--size-lg)',  }}
             size="large" />
 
             <Button type="text" icon={<ShoppingCartOutlined />}
-            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}
+            style={{ fontSize: 'var(--size-lg)',  }}
             size="large"/>
 
-            <Flex className="balance-badge" orientation="horizontal"
-            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}>
-              <TONIcon/>
+            <Button type="primary" icon={<PlusOutlined />} iconPlacement={"end"} size="large">
               {currentUser.balance}
-              <Button className="popup-balance" style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}>
-                +
-              </Button>
-            </Flex>
-
-            <Dropdown menu={{ items: menuItems }} trigger={['click']}>
-              <Button type="text" className="username-btn" style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)', fontWeight: 'var(--font-bold)' }}>
-                {currentUser.nickname}
-              </Button>
-            </Dropdown>
+              <TONIcon/>
+            </Button>
+                     
           </div>
         )}
       </div>

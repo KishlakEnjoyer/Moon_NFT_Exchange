@@ -5,8 +5,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: var(--black-100);
-    color: var(--white-100) !important;
+    background: none;
 }
 
 .header-title {
@@ -42,14 +41,6 @@
   font-size: 14px;
 }
 
-.balance-badge {
-  display: flex;
-  align-items: center;
-  background-color: gray;
-  border-radius: 10%;
-}
-
-.popup-balance {
-  background: none;
-  border: none;
+.balance-container {
+  background: var(--ant-color-bg-layout);
 }
