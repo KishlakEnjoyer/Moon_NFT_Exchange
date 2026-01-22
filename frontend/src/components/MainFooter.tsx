@@ -1,5 +1,6 @@
 import { Footer } from "antd/es/layout/layout"
 import Text from "antd/es/typography/Text";
+import "../styles/FooterStyle.css";
 
 
 const MainFooter = () => {

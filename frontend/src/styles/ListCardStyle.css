@@ -1,0 +1,15 @@
+.listing-card {
+    border-radius: var(--size-sm);
+    display: flex;
+    flex-direction: column;
+    padding: var(--size-2xs);
+    width: 100%;
+    overflow: hidden;
+}
+
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}

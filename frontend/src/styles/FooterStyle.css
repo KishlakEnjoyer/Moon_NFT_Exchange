@@ -1,0 +1,14 @@
+.footer-container {
+    background-color: var(--black-70);
+    width: 100%;
+    height: var(--size-3xl);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.footer-container span {
+    opacity: 0.5;
+    font-size: var(--size-sm);
+}

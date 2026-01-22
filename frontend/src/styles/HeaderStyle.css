@@ -1,0 +1,55 @@
+.header-container {
+    width: 100%;
+    height: auto;
+    padding: var(--size-base) var(--size-4xl);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--black-100);
+    color: var(--white-100) !important;
+}
+
+.header-title {
+  color: var(--blue-main) !important;
+  font-weight: var(--font-regular) !important;
+  margin: 0 !important;
+  
+  &:hover {
+    opacity: 0.65;
+  }
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: var(--size-base);
+    cursor: pointer;
+}
+
+.right-part {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+}
+
+
+
+.authed-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.balance-badge {
+  display: flex;
+  align-items: center;
+  background-color: gray;
+  border-radius: 10%;
+}
+
+.popup-balance {
+  background: none;
+  border: none;
+}

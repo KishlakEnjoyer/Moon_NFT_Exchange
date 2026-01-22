@@ -1,17 +1,16 @@
-import { Layout } from 'antd';
-import React, { PureComponent } from 'react';
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import { Layout, Typography } from 'antd';
 import { Content } from 'antd/es/layout/layout';
+import "../styles/AccountViewStyle.css";
+
+
+const { Text } = Typography;
 
 const AccountView = () => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <MainHeader />
-      <Content>
-        
+      <Content className='account-container'>
+        <Text>Account View</Text>
       </Content>
-      <MainFooter/>
     </Layout>
   );
 }

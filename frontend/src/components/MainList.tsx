@@ -8,7 +8,6 @@ const MainList = () => {
 
   const sentinelRef = useRef(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const loadMore = () => {
     setVisibleCount((prev) => Math.min(prev + 12, items.length));
   };
@@ -29,7 +28,6 @@ const MainList = () => {
 
     return () => {
       if (sentinelRef.current) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         observer.unobserve(sentinelRef.current);
       }
     };

@@ -1,10 +1,23 @@
 import { Header } from "antd/es/layout/layout";
-import { Button, Image } from "antd";
+import { Badge, Button, Divider, Dropdown, Flex, Image, MenuProps } from "antd";
 import Title from "antd/es/typography/Title";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import "../styles/HeaderStyle.css";
 
-const MainHeader = () => {
+import IconSwitch from "./SwitchTheme";
+import { useState } from "react";
+import { BellOutlined, LogoutOutlined, SettingOutlined, ShoppingCartOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
+import TONIcon from "./icons/TONIcon";
+
+interface MainHeaderProps {
+  darkMode: boolean;
+  onThemeChange: (checked: boolean) => void;
+}
+
+const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
   const navigate = useNavigate(); 
+
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const handleConnectClick = () => {
     navigate("/account"); 
@@ -12,6 +25,32 @@ const MainHeader = () => {
   const handleHomeClick = () => {
     navigate("/"); 
   };
+
+  const currentUser = {
+    nickname: 'KishlakEnjoyer',
+    balance: 3.02
+
+  };
+
+  const menuItems: MenuProps['items'] = [
+    {
+      key: '1',
+      label: 'Профиль',
+      icon: <UserOutlined />,
+    },
+    {
+      key: '2',
+      label: 'Настройки',
+      icon: <SettingOutlined />,
+    },
+    {
+      key: '3',
+      label: 'Выход',
+      icon: <LogoutOutlined />,
+      danger: true,
+      onClick: () => setIsAuthenticated(false),
+    },
+  ];
   return (
     <Header className="header-container">
       <div className="logo" onClick={handleHomeClick}>
@@ -61,16 +100,58 @@ const MainHeader = () => {
           Moon
         </Title>
       </div>
+      <div className="right-part">
+        <IconSwitch darkMode={darkMode} onThemeChange={onThemeChange}/>
+        {!isAuthenticated && (
+          <Button
+            color="default"
+            variant="outlined"
+            size="large"
+            onClick={handleConnectClick}
+          >
+            Connect TG
+            <Image
+              src="/icons/tg-icon-png.png"
+              alt="TgIcon"
+              style={{ width: "20px", marginLeft: "8px" }}
+              preview={false}
+            />
+          </Button>
+        )}
 
-      <Button color="default" variant="outlined" size="large" onClick={handleConnectClick}>
-        Connect TG
-        <Image
-          src="/icons/tg-icon-png.png"
-          alt="TgIcon"
-          style={{ width: "20px" }}
-          preview={false}
-        />
-      </Button>
+        {isAuthenticated && (
+          <div className="authed-header">
+            <Badge count={5} >
+              <Button type="text" 
+              icon={<BellOutlined style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }} />} 
+              size="large"/>
+            </Badge>
+
+            <Button type="text" icon={<UsergroupAddOutlined />} 
+            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}
+            size="large" />
+
+            <Button type="text" icon={<ShoppingCartOutlined />}
+            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}
+            size="large"/>
+
+            <Flex className="balance-badge" orientation="horizontal"
+            style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}>
+              <TONIcon/>
+              {currentUser.balance}
+              <Button className="popup-balance" style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)' }}>
+                +
+              </Button>
+            </Flex>
+
+            <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+              <Button type="text" className="username-btn" style={{ fontSize: 'var(--size-lg)', color: 'var(--white-100)', fontWeight: 'var(--font-bold)' }}>
+                {currentUser.nickname}
+              </Button>
+            </Dropdown>
+          </div>
+        )}
+      </div>
     </Header>
   );
 };

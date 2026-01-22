@@ -1,11 +1,27 @@
 import { Button, Card, Space, Typography, Image } from "antd";
-import cardImage from "./card.png";
+import cardPng from "./card.png";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
+import "../styles/ListCardStyle.css";
+
 
 const { Text } = Typography;
 
 const ListingCard = () => {
+  const presentInfo = {
+    name: "Mighty Arm",
+    cardImage: cardPng,
+    number: "#277",
+    price: 70.2
+  };
+
+  const handleCardClick = () => {
+    alert(`Collection name: ${presentInfo.name}\n
+Present image: ${presentInfo.cardImage}\n
+Present number: ${presentInfo.number}\n
+Present price: ${presentInfo.price} TON`); 
+  };
+
   return (
     <Card
       className="listing-card"
@@ -25,7 +41,9 @@ const ListingCard = () => {
           className="card-image"
           alt="Mighty Arm"
           draggable={false}
-          src={cardImage}
+          src={presentInfo.cardImage}
+          preview={false}
+          onClick={handleCardClick}
         />
       }
     >
@@ -36,8 +54,9 @@ const ListingCard = () => {
             fontSize: 'var(--size-base)', 
             fontWeight: 'var(--font-semibold)', 
           }}
+          onClick={handleCardClick}
         >
-          Mighty Arm
+          {presentInfo.name}
         </Text>
         <Text
           type="secondary"
@@ -46,7 +65,7 @@ const ListingCard = () => {
             fontWeight: 'var(--font-light)', 
           }}
         >
-          #277
+          {presentInfo.number}
         </Text>
       </Space>
 
@@ -62,7 +81,7 @@ const ListingCard = () => {
           icon={<TONIcon/>}
           size="large"
           block>
-          70.2
+          {presentInfo.price}
         </Button>
 
         <Button
