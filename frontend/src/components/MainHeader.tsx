@@ -6,7 +6,7 @@ import "../styles/HeaderStyle.css";
 
 import IconSwitch from "./SwitchTheme";
 import { useState } from "react";
-import { BellOutlined, LogoutOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
+import { BellOutlined, LogoutOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, TeamOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 import { endianness } from "os";
 
@@ -118,7 +118,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
               size="large"/>
             </Badge>
 
-            <Button type="text" icon={<UsergroupAddOutlined />} 
+            <Button type="text" icon={<TeamOutlined />} 
             style={{ fontSize: 'var(--size-lg)',  }}
             size="large" />
 
