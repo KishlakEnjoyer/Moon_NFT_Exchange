@@ -2,6 +2,7 @@ import { Flex, Layout, Row, Space, Typography, Image, Avatar } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import "../styles/AccountViewStyle.css";
 import Title from 'antd/es/typography/Title';
+import { Link } from 'react-router-dom';
 
 
 const { Text } = Typography;
@@ -20,11 +21,13 @@ const AccountView = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Content className='account-container'>
         <Flex className='top-info' vertical={false}>
-          <Avatar size={140} src={currentUser.image_url} style={{border: '1px solid gray'}}/>
-          <Flex className='user-info' vertical>
-            <Title level={2}>{currentUser.nickname}</Title>
-            <Title level={5}>{currentUser.tg_username}</Title>
-            <Text>{currentUser.about_me}</Text>
+          <Flex className='top-info' vertical={false}>
+            <Avatar size={140} src={currentUser.image_url} style={{border: '1px solid gray'}}/>
+            <Flex className='user-info' vertical>
+              <Title level={2}>{currentUser.nickname}</Title>
+              <Link to={'https://ant-design.antgroup.com/components/typography'} >{currentUser.tg_username}</Link>
+              <Text>{currentUser.about_me}</Text>
+            </Flex>
           </Flex>
         </Flex>
         <Flex className='albums-of-presents'>
