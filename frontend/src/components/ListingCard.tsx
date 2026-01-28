@@ -80,6 +80,7 @@ Present price: ${presentInfo.price} TON`);
           type="primary"
           icon={<TONIcon/>}
           size="large"
+          
           block>
           {presentInfo.price}
         </Button>
@@ -89,6 +90,7 @@ Present price: ${presentInfo.price} TON`);
           icon={<ShoppingCartOutlined />}
           style={{ aspectRatio: '1 / 1' }}
           size="large"
+          className='icon-antd'
         />
       </div>
     </Card>

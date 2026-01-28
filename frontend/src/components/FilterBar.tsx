@@ -65,7 +65,7 @@ const FilterBar = () => {
           getPopupContainer={popupContainer}
           menu={{ items: [{ key: '1', label: 'Test' }] }}
         >
-          <Button icon={<FilterOutlined />} size="large"/>
+          <Button icon={<FilterOutlined />} size="large" className='icon-antd'/>
         </Dropdown>
       </Col>
     </Row>

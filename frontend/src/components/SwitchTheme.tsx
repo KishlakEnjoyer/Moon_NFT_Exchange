@@ -15,9 +15,8 @@ const IconSwitch: React.FC<IconSwitchProps> = ({ darkMode, onThemeChange }) => {
       size='default'
       checked={darkMode}
       onChange={onThemeChange}
-      checkedChildren={<MoonOutlined />}
-      unCheckedChildren={<SunOutlined />}
-      className="icon-switch"
+      checkedChildren={<MoonOutlined/>}
+      unCheckedChildren={<SunOutlined/>}
     />
   );
 };

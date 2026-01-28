@@ -6,9 +6,8 @@ import "../styles/HeaderStyle.css";
 
 import IconSwitch from "./SwitchTheme";
 import { useState } from "react";
-import { BellOutlined, LogoutOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, TeamOutlined, UsergroupAddOutlined, UserOutlined } from "@ant-design/icons";
+import { BellOutlined, LogoutOutlined, PlusOutlined, ShoppingCartOutlined, TeamOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
-import { endianness } from "os";
 
 interface MainHeaderProps {
   darkMode: boolean;
@@ -20,9 +19,6 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleConnectClick = () => {
-    navigate("/account"); 
-  };
   const handleHomeClick = () => {
     navigate("/"); 
   };
@@ -30,6 +26,26 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
   const handleLogIn = () => {
     setIsAuthenticated(true);
   }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  }
+
+  const dropdownItems: MenuProps['items'] = [
+    {
+      key: 'profile',
+      label: 'Profile',
+      icon: <UserOutlined />,
+      onClick: () => navigate('/account')
+    },
+    {
+      key: 'logout',
+      label: 'Log out',
+      icon: <LogoutOutlined />,
+      danger: true,
+      onClick: handleLogout
+    }
+  ];
 
   const currentUser = {
     nickname: 'KishlakEnjoyer',
@@ -110,19 +126,26 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
           <div className="authed-header">
             <IconSwitch darkMode={darkMode} onThemeChange={onThemeChange}/>
 
-            <Avatar size='large' src={currentUser.image_url} onClick={handleConnectClick} style={{border: '1px solid gray'}}/>
-            
+            <Dropdown menu={{ items: dropdownItems }} trigger={['hover']}>
+              <Avatar 
+                size='large' 
+                src={currentUser.image_url} 
+                style={{ border: '1px solid gray', cursor: 'pointer' }}
+              />
+            </Dropdown>            
             <Badge count={4} >
               <Button type="text" 
-              icon={<BellOutlined style={{ fontSize: 'var(--size-lg)', }} />} 
+              icon={<BellOutlined  />} 
+              className='icon-antd'
               size="large"/>
             </Badge>
 
             <Button type="text" icon={<TeamOutlined />} 
-            style={{ fontSize: 'var(--size-lg)',  }}
+            className='icon-antd'
             size="large" />
 
             <Button type="text" icon={<ShoppingCartOutlined />}
+            className='icon-antd'
             style={{ fontSize: 'var(--size-lg)',  }}
             size="large"/>
 
