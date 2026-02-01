@@ -1,5 +1,8 @@
 .account-container {
   padding: var(--size-2xs) var(--size-4xl);
+  gap: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .top-info {
@@ -20,7 +23,6 @@
   flex-direction: column;
 }
 
-/* Стили для кнопки "Показать больше" */
 .user-info .ant-btn-link {
   padding: 0;
   height: auto;

@@ -1,5 +1,4 @@
 import { Button, Card, Space, Typography, Image } from "antd";
-import cardPng from "./card.png";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 import "../styles/ListCardStyle.css";
@@ -10,7 +9,7 @@ const { Text } = Typography;
 const ListingCard = () => {
   const presentInfo = {
     name: "Mighty Arm",
-    cardImage: cardPng,
+    cardImage: "card.png",
     number: "#277",
     price: 70.2
   };
