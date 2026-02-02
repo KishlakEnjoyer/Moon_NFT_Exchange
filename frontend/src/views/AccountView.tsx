@@ -144,6 +144,7 @@ Present price: ${presentInfo.price} TON`);
                 styles={{
                   cover: {
                     padding: 0,
+                    background: 'none'
                   },
                 }} 
                 bodyStyle={{ display: 'none' }}

@@ -1,3 +1,5 @@
+CREATE DATABASE  IF NOT EXISTS `moon_db` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `moon_db`;
 -- MySQL dump 10.13  Distrib 8.0.44, for Win64 (x86_64)
 --
 -- Host: 127.0.0.1    Database: moon_db
@@ -21,7 +23,9 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'fe3e01db-cca7-11f0-b92b-18c04db6078c:1-1207';
+SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '5e413194-bca1-11f0-8c8e-6a5c699f88d4:1-166,
+fe3e01db-cca7-11f0-b92b-18c04db6078c:1-1367,
+ff3cbf88-c26b-11f0-97f6-9247a0409e9e:1-339';
 
 --
 -- Table structure for table `album_presents`
@@ -543,4 +547,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-09 18:46:19
+-- Dump completed on 2026-02-03  0:44:31
