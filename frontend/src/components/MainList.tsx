@@ -1,16 +1,17 @@
 import { Row, Col, Space } from "antd";
 import ListingCard from "./ListingCard";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
-const MainList = () => {
+
+const MainList: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(36); 
   const items = Array.from({ length: 152 }); 
 
   const sentinelRef = useRef(null);
-
-  const loadMore = () => {
+  
+  const loadMore = useCallback(() => {
     setVisibleCount((prev) => Math.min(prev + 12, items.length));
-  };
+  }, [items.length]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(

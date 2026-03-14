@@ -1,5 +1,6 @@
 :root {
     --black-100: #000000;
+    --black-100-semiopac: #000000b2;
     --black-90: #131313;
     --black-80: #1f1f1f;
     --black-70: #303030;
@@ -34,6 +35,7 @@
     --font-black:      900;
     --font-ultrablack: 950;
 
+    --size-height: 100vh;
     --size-max-width: 2000px;
     --size-5xl: 128px;
     --size-4xl: 64px;

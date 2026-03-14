@@ -14,7 +14,6 @@ load_dotenv()
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
-# dp.include_router(start.router)
 
 async def main():
     commands = [
@@ -23,11 +22,15 @@ async def main():
     ]
     await bot.set_my_commands(commands)
     await dp.start_polling(bot)
+    
+@dp.message_handler(commands=['start'])
+async def start(message):
+    await message.answer('Hi, health 200.')
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    print('Бот запущен!')
+    print('Bot running!')
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print('Бот выключен!')
+        print('Bot stopped!')
