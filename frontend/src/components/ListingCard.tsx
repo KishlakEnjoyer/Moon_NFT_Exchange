@@ -3,22 +3,21 @@ import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 import "../styles/ListCardStyle.css";
 
+interface ListingCardProps {
+  giftName?: string;
+  giftImage?: string;
+  giftNumber?: string | number;
+  giftPrice?: number | string;
+}
 
 const { Text } = Typography;
 
-const ListingCard = () => {
-  const presentInfo = {
-    name: "Mighty Arm",
-    cardImage: "card.png",
-    number: "#277",
-    price: 70.2
-  };
-
+const ListingCard = ({ giftName, giftImage, giftNumber, giftPrice }: ListingCardProps) => {
   const handleCardClick = () => {
-    alert(`Collection name: ${presentInfo.name}\n
-Present image: ${presentInfo.cardImage}\n
-Present number: ${presentInfo.number}\n
-Present price: ${presentInfo.price} TON`); 
+    alert(`Collection name: ${giftName}\n
+Present image: ${giftImage}\n
+Present number: ${giftNumber}\n
+Present price: ${giftPrice} TON`); 
   };
 
   return (
@@ -40,7 +39,7 @@ Present price: ${presentInfo.price} TON`);
           className="card-image"
           alt="Mighty Arm"
           draggable={false}
-          src={presentInfo.cardImage}
+          src={giftImage}
           preview={false}
           onClick={handleCardClick}
         />
@@ -55,7 +54,7 @@ Present price: ${presentInfo.price} TON`);
           }}
           onClick={handleCardClick}
         >
-          {presentInfo.name}
+          {giftName}
         </Text>
         <Text
           type="secondary"
@@ -64,7 +63,7 @@ Present price: ${presentInfo.price} TON`);
             fontWeight: 'var(--font-light)', 
           }}
         >
-          {presentInfo.number}
+          {giftNumber ? `#${giftNumber}` : 'No. not specified'}
         </Text>
       </Space>
 
@@ -81,7 +80,7 @@ Present price: ${presentInfo.price} TON`);
           size="large"
           
           block>
-          {presentInfo.price}
+          {giftPrice}
         </Button>
 
         <Button

@@ -2,6 +2,7 @@ import {
   Flex, Layout, Typography, Avatar, Button,
   Tooltip, Image, Row, Col, Space,
   FloatButton,
+  Segmented,
 } from "antd";
 import { Content } from "antd/es/layout/layout";
 import "../styles/AccountViewStyle.css";
@@ -73,9 +74,24 @@ const AccountView = () => {
           </Flex>
         </Flex>
 
-        <Flex className="albums-of-presents">
-          <Button>ALL</Button>
-        </Flex>
+        <div style={{
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          whiteSpace: 'nowrap',
+          width: '100%',
+        }}>
+          <Segmented<string>
+            options={[
+              'All',
+              'Bears', 
+              'BlackBG', 
+              'Golden', 
+              'Other'
+            ]}
+            onChange={(value) => console.log(value)}
+            size="large"
+          />
+        </div>
 
         <Space className="main-list" orientation="vertical" size={12}>
           <Row gutter={[12, 12]} justify="start">

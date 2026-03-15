@@ -20,3 +20,24 @@ body {
 .icon-antd {
   font-size: var(--size-lg);
 }
+
+.scroll-wrapper::-webkit-scrollbar {
+  height: 4px; 
+}
+
+.scroll-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.4); 
+  border-radius: 4px;
+}
+
+.scroll-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.scroll-wrapper::-webkit-scrollbar {
+  display: none;
+}

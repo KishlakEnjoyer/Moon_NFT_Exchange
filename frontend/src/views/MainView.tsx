@@ -10,13 +10,13 @@ const MainView = () => {
   useDocumentTitle("Moon Exchange - Home");
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ minHeight: "var(--size-screen)" }}>
       <Content className="main-container">
         <div className="filter-sticky">
           <FilterBar />
         </div>
         <MainList />
-        <FloatButton.BackTop icon={<UpOutlined/>} style={{ right: '10px', bottom: '10px' }} shape="square"/>
+        <FloatButton.BackTop icon={<UpOutlined/>} style={{ right: 'var(--size-s)', bottom: 'var(--size-s)' }} shape="square"/>
       </Content>
     </Layout>
   );

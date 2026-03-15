@@ -55,11 +55,11 @@ const MainList: React.FC = () => {
         <div
           ref={sentinelRef}
           style={{
-            height: "20px",
+            height: "var(--size-lg)",
             width: "100%",
             textAlign: "center",
-            fontSize: "14px",
-            color: "#999",
+            fontSize: "var(--size-smm)",
+            color: "var(--white-60)",
           }}
         >
           Загрузка...

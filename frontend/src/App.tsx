@@ -21,6 +21,7 @@ function App() {
       algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
       token: {
         fontFamily: 'Geist, sans-serif',
+        colorPrimary: '#2b4acb',
       },
       components: {
         Pagination: {
