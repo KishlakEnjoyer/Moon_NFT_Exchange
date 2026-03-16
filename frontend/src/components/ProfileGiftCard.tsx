@@ -41,8 +41,8 @@ const ProfileGiftCard = ({
       <Card
         hoverable
         styles={{
-          cover: { padding: 0, background: "none" },
-          body: { display: "none" },
+          cover: { padding: 0, background: "none", width: "100%" },
+          body: { display: "none", width: "100%" },
         }}
         style={{ borderRadius: 18, overflow: "hidden" }}
         cover={

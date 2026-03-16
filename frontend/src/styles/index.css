@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
 @import './Variables.css';
 
+
 * {
   margin: 0;
   padding: 0;
@@ -22,7 +23,7 @@ body {
 }
 
 .scroll-wrapper::-webkit-scrollbar {
-  height: 4px; 
+  height: var(); 
 }
 
 .scroll-wrapper::-webkit-scrollbar-track {
@@ -40,4 +41,46 @@ body {
 
 .scroll-wrapper::-webkit-scrollbar {
   display: none;
+}
+
+
+.glow-blum {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    z-index: 0;        
+    pointer-events: none; 
+}
+
+.glow-blum.big {
+    bottom: var(--glow-big-bottom);
+    width: var(--glow-big-width);
+    height: var(--glow-big-height);
+    background-color: var(--accent-100);
+    filter: blur(var(--glow-big-blur));
+    opacity: 0.8;
+    animation: glow-move-big 10s ease infinite;
+}
+
+.glow-blum.small {
+    bottom: var(--glow-small-bottom);
+    width: var(--glow-small-width);
+    height: var(--glow-small-height);
+    background-color: var(--accent-150);
+    filter: blur(var(--glow-small-blur));
+    opacity: 0.6;
+    animation: glow-move-small 10s ease infinite;
+}
+
+@keyframes glow-move-big {
+    0%   { opacity: 0.5; filter: blur(var(--glow-big-blur-min)); }
+    50%  { opacity: 1;   filter: blur(var(--glow-big-blur-max)); }
+    100% { opacity: 0.5; filter: blur(var(--glow-big-blur-min)); }
+}
+
+@keyframes glow-move-small {
+    0%   { opacity: 0.5; filter: blur(var(--glow-small-blur-min)); }
+    50%  { opacity: 1;   filter: blur(var(--glow-small-blur-max)); }
+    100% { opacity: 0.5; filter: blur(var(--glow-small-blur-min)); }
 }

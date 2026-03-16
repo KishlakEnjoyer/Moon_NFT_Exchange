@@ -134,7 +134,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
             <Dropdown menu={{ items: dropdownItems }} trigger={['hover']}>
               <Avatar 
                 size='large' 
-                src={currentUser.image_url} 
+                src={`/images/${currentUser.image_url}`} 
                 style={{ border: '1px solid gray', cursor: 'pointer' }}
               />
             </Dropdown>            

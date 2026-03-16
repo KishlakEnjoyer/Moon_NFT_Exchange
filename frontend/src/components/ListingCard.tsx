@@ -4,20 +4,20 @@ import TONIcon from "./icons/TONIcon";
 import "../styles/ListCardStyle.css";
 
 interface ListingCardProps {
-  giftName?: string;
-  giftImage?: string;
-  giftNumber?: string | number;
-  giftPrice?: number | string;
+  collectionName?: string;
+  presentImage?: string;
+  presentNumber?: string | number;
+  presentPrice?: number | string;
 }
 
 const { Text } = Typography;
 
-const ListingCard = ({ giftName, giftImage, giftNumber, giftPrice }: ListingCardProps) => {
+const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice }: ListingCardProps) => {
   const handleCardClick = () => {
-    alert(`Collection name: ${giftName}\n
-Present image: ${giftImage}\n
-Present number: ${giftNumber}\n
-Present price: ${giftPrice} TON`); 
+    alert(`Collection name: ${collectionName}\n
+           Present image: ${presentImage}\n
+           Present number: ${presentNumber}\n
+           Present price: ${presentPrice} TON`); 
   };
 
   return (
@@ -37,9 +37,9 @@ Present price: ${giftPrice} TON`);
       cover={
         <Image
           className="card-image"
-          alt="Mighty Arm"
+          alt={collectionName || 'Unknown Collection'}
           draggable={false}
-          src={giftImage}
+          src={`/images/${presentImage || "placeholder.png"}`}
           preview={false}
           onClick={handleCardClick}
         />
@@ -54,7 +54,7 @@ Present price: ${giftPrice} TON`);
           }}
           onClick={handleCardClick}
         >
-          {giftName}
+          {collectionName || 'Unknown Collection'}
         </Text>
         <Text
           type="secondary"
@@ -63,7 +63,7 @@ Present price: ${giftPrice} TON`);
             fontWeight: 'var(--font-light)', 
           }}
         >
-          {giftNumber ? `#${giftNumber}` : 'No. not specified'}
+          {presentNumber ? `#${presentNumber}` : 'No. not specified'}
         </Text>
       </Space>
 
@@ -80,7 +80,7 @@ Present price: ${giftPrice} TON`);
           size="large"
           
           block>
-          {giftPrice}
+          {presentPrice ? `${presentPrice}` : 'Price not specified'}
         </Button>
 
         <Button

@@ -5,6 +5,11 @@
     padding: var(--size-2xs);
     width: 100%;
     overflow: hidden;
+    z-index: 4;
+    background-color: var(--liquid-glass-bg);
+    backdrop-filter: blur(var(--liquid-glass-blur));
+    box-shadow: 0px 5px 5px -5px rgba(34, 60, 80, 0.6);
+    border: 1.5px solid var(--black-transparent);
 }
 
 .card-image {
@@ -12,4 +17,5 @@
     height: 100%;
     object-fit: cover;
     object-position: center;
+    border-radius: 12px;
 }

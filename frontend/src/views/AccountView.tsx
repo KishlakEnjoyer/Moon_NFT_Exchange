@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { EditOutlined, HistoryOutlined, UpOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState, useCallback } from "react";
 import ProfileGiftCard from "../components/ProfileGiftCard";
+import CardList from "../components/CardList";
 
 const { Text } = Typography;
 
@@ -22,38 +23,44 @@ const AccountView = () => {
     about_me: "TG invester from Russia.",
   };
 
-  const presentInfo = { name: "Mighty Arm", cardImage: "card.png", number: 277 };
+  const presents = [
+    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1},
+    { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2 },
+    { collectionName: "Plush Pepe", presentNumber: 4},
+  ];
 
-  const items = Array.from({ length: 152 });
   const [visibleCount, setVisibleCount] = useState(36);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + 12, items.length));
-  }, [items.length]);
+    setVisibleCount((prev) => Math.min(prev + 12, presents.length));
+  }, [presents.length]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && visibleCount < items.length) loadMore();
+        if (entries[0].isIntersecting && visibleCount < presents.length) loadMore();
       },
       { threshold: 1.0 }
     );
     if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => { if (sentinelRef.current) observer.unobserve(sentinelRef.current); };
-  }, [visibleCount, items.length, loadMore]);
+  }, [visibleCount, presents.length, loadMore]);
 
   return (
     <Layout style={{ minHeight: "var(--size-height)" }}>
       <Content className="account-container">
         <Flex className="top-info" vertical={false}>
           <Flex style={{ gap: "var(--size-lg)" }} vertical={false}>
-            <Avatar size={140} src={currentUser.image_url}
+
+            <Avatar size={140} src={`/images/${currentUser.image_url}`}
               style={{ border: "1px solid gray", flexShrink: 0 }} />
+
             <Flex className="user-info" vertical>
               <Title level={2} style={{ marginBottom: "0px" }}>
                 {currentUser.nickname}
               </Title>
+              
               <Link to="https://t.me/jdm_enjoyerr"
                 style={{ display: "flex", gap: "var(--size-2xs)" }}>
                 <Image src="/icons/tg-icon-png.png" alt="TgIcon"
@@ -93,23 +100,16 @@ const AccountView = () => {
           />
         </div>
 
-        <Space className="main-list" orientation="vertical" size={12}>
-          <Row gutter={[12, 12]} justify="start">
-            {items.slice(0, visibleCount).map((_, index) => (
-              <Col key={index} xs={12} sm={8} md={6} lg={4} xl={3}>
-                <ProfileGiftCard
-                  cardImage={presentInfo.cardImage}
-                  name={presentInfo.name}
-                  number={presentInfo.number}
-                />
-              </Col>
-            ))}
-          </Row>
-
-          {visibleCount < items.length && (
-            <div ref={sentinelRef} style={{ height: "var(--size-lg)", width: "100%" }} />
+        <CardList
+          items={presents}
+          renderCard={(item) => (
+            <ProfileGiftCard
+              cardImage={`/images/${item.presentImage || "placeholder.png"}`}
+              name={item.collectionName}
+              number={item.presentNumber}
+            />
           )}
-        </Space>
+        />
         <FloatButton.BackTop icon={<UpOutlined/>} style={{ right: 'var(--size-s)', bottom: 'var(--size-s)' }} shape="square"/>
       </Content>
     </Layout>

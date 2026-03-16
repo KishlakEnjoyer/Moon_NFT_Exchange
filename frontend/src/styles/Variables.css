@@ -15,6 +15,7 @@
     --white-60: #9e9e9e;
     --white-50: #ffffff80;
 
+    --accent-150: #a8b9ff;
     --accent-100: #2b4acb;
     --accent-50: #2b4acb50;
     --accent-20: #2b4acb20;
@@ -47,4 +48,21 @@
     --size-xs: 8px;
     --size-2xs: 4px;
     --size-3xs: 2px;
+
+    --glow-big-bottom: -500px;
+    --glow-big-width: 1200px;
+    --glow-big-height: 800px;
+    --glow-big-blur: 250px;
+    --glow-big-blur-min: 180px;
+    --glow-big-blur-max: 330px;
+
+    --glow-small-bottom: -250px;
+    --glow-small-width: 700px;
+    --glow-small-height: 500px;
+    --glow-small-blur: 120px;
+    --glow-small-blur-min: 60px;
+    --glow-small-blur-max: 130px;
+
+    --liquid-glass-blur: 10px;
+    --liquid-glass-bg: #aaaaaa18;
 }

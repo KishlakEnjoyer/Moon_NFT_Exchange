@@ -17,6 +17,10 @@ function App() {
   }, [darkMode]);
 
   return (
+    <>
+    <div className="glow-blum big"></div>
+    <div className="glow-blum small"></div>
+
     <ConfigProvider theme={{
       algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
       token: {
@@ -41,6 +45,7 @@ function App() {
           <MainFooter/>
       </Layout>
     </ConfigProvider>
+    </>
   );
 }
 
