@@ -1,26 +1,40 @@
+# Ignore environment variable files
 .env
 .env.local
 .env.*.local
 
-
+# Virtual environment directories
 venv/
 env/
 ENV/
 .venv/
 .env
 
-
+# Python cache and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 
+# Logs and databases
 logs/
 *.log
 
-
+# Docker files
 /docker-compose.override.yml
 
 
+# Database files
 *.db
 *.sqlite
 
+# Block chain data and artifacts
+cache/
+artifacts/
+
+# Secret key and data of Ganache
+ganache-data/
+
+# Node
+node_modules/
+
+backend/contract_info.json
