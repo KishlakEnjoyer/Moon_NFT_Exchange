@@ -1,13 +1,8 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 from blockchain_router import router as blockchain_router
+from auth_router import router as auth_router
 
-app = FastAPI()
+app = FastAPI(title="Moon NFT Exchange API")
+
 app.include_router(blockchain_router)
-
-
-gifts = []
-
-@app.get("/gifts")
-def get_gifts():
-    return gifts
+app.include_router(auth_router)
