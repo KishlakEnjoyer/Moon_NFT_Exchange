@@ -1,6 +1,6 @@
 import {
   Flex, Layout, Typography, Avatar, Button,
-  Tooltip, Image, Row, Col, Space,
+  Tooltip, Image,
   FloatButton,
   Segmented,
 } from "antd";
@@ -24,9 +24,9 @@ const AccountView = () => {
   };
 
   const presents = [
-    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1},
+    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1 },
     { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2 },
-    { collectionName: "Plush Pepe", presentNumber: 4},
+    { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 3 },
   ];
 
   const [visibleCount, setVisibleCount] = useState(36);
@@ -48,26 +48,34 @@ const AccountView = () => {
   }, [visibleCount, presents.length, loadMore]);
 
   return (
-    <Layout style={{ minHeight: "var(--size-height)" }}>
+    <Layout className="min-h-screen">
       <Content className="account-container">
-        <Flex className="top-info" vertical={false}>
-          <Flex style={{ gap: "var(--size-lg)" }} vertical={false}>
 
-            <Avatar size={140} src={`/images/${currentUser.image_url}`}
-              style={{ border: "1px solid gray", flexShrink: 0 }} />
+        <Flex className="top-info" vertical={false}>
+          <Flex className="gap-5" vertical={false}>
+
+            <Avatar
+              size={140}
+              src={`/images/${currentUser.image_url}`}
+              className="border border-gray-500 shrink-0"
+            />
 
             <Flex className="user-info" vertical>
-              <Title level={2} style={{ marginBottom: "0px" }}>
+              <Title level={2} className="!mb-0">
                 {currentUser.nickname}
               </Title>
-              
-              <Link to="https://t.me/jdm_enjoyerr"
-                style={{ display: "flex", gap: "var(--size-2xs)" }}>
-                <Image src="/icons/tg-icon-png.png" alt="TgIcon"
-                  style={{ width: "var(--size-lg)" }} preview={false} />
+
+              <Link to="https://t.me/jdm_enjoyerr" className="flex items-center gap-1">
+                <Image
+                  src="/icons/tg-icon-png.png"
+                  alt="TgIcon"
+                  style={{ width: "var(--size-lg)" }}
+                  preview={false}
+                />
                 {currentUser.tg_username}
               </Link>
-              <Text style={{ marginTop: "var(--size-sm)", lineHeight: "1.5" }}>
+
+              <Text className="mt-3 leading-relaxed">
                 {currentUser.about_me}
               </Text>
             </Flex>
@@ -81,20 +89,9 @@ const AccountView = () => {
           </Flex>
         </Flex>
 
-        <div style={{
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          whiteSpace: 'nowrap',
-          width: '100%',
-        }}>
+        <div className="overflow-x-auto overflow-y-hidden whitespace-nowrap w-full">
           <Segmented<string>
-            options={[
-              'All',
-              'Bears', 
-              'BlackBG', 
-              'Golden', 
-              'Other'
-            ]}
+            options={['All', 'Bears', 'BlackBG', 'Golden', 'Other']}
             onChange={(value) => console.log(value)}
             size="large"
           />
@@ -110,7 +107,12 @@ const AccountView = () => {
             />
           )}
         />
-        <FloatButton.BackTop icon={<UpOutlined/>} style={{ right: 'var(--size-s)', bottom: 'var(--size-s)' }} shape="square"/>
+
+        <FloatButton.BackTop
+          icon={<UpOutlined />}
+          style={{ right: 'var(--size-s)', bottom: 'var(--size-s)' }}
+          shape="square"
+        />
       </Content>
     </Layout>
   );
