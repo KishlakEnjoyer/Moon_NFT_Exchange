@@ -5,7 +5,6 @@ import {
   Segmented,
 } from "antd";
 import { Content } from "antd/es/layout/layout";
-import "../styles/AccountViewStyle.css";
 import Title from "antd/es/typography/Title";
 import { Link } from "react-router-dom";
 import { EditOutlined, HistoryOutlined, UpOutlined } from "@ant-design/icons";
@@ -24,9 +23,9 @@ const AccountView = () => {
   };
 
   const presents = [
-    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1 },
-    { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2 },
-    { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 3 },
+    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, onSale: false, visible: false },
+    { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2, onSale: true, visible: true },
+    { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 120000, onSale: true, visible: true },
   ];
 
   const [visibleCount, setVisibleCount] = useState(36);
@@ -49,9 +48,9 @@ const AccountView = () => {
 
   return (
     <Layout className="min-h-screen">
-      <Content className="account-container">
+      <Content className="gap-5 flex flex-col py-[var(--size-2xs] px-[var(--size-4xl)]">
 
-        <Flex className="top-info" vertical={false}>
+        <Flex className="gap-5 flex justify-between items-start" vertical={false}>
           <Flex className="gap-5" vertical={false}>
 
             <Avatar
@@ -60,7 +59,7 @@ const AccountView = () => {
               className="border border-gray-500 shrink-0"
             />
 
-            <Flex className="user-info" vertical>
+            <Flex className="flex flex-column" vertical>
               <Title level={2} className="!mb-0">
                 {currentUser.nickname}
               </Title>
@@ -81,7 +80,7 @@ const AccountView = () => {
             </Flex>
           </Flex>
 
-          <Flex className="icons-container" vertical={false}>
+          <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
             <Tooltip title="History">
               <Button size="large" icon={<HistoryOutlined />} />
             </Tooltip>
@@ -100,11 +99,15 @@ const AccountView = () => {
         <CardList
           items={presents}
           renderCard={(item) => (
-            <ProfileGiftCard
-              cardImage={`/images/${item.presentImage || "placeholder.png"}`}
-              name={item.collectionName}
-              number={item.presentNumber}
-            />
+            <div className="w-full"> 
+              <ProfileGiftCard
+                cardImage={`/images/${item.presentImage || "placeholder.png"}`}
+                name={item.collectionName}
+                number={item.presentNumber}
+                onSale={item.onSale}
+                visible={item.visible}
+              />
+            </div>
           )}
         />
 

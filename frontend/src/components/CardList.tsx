@@ -29,7 +29,7 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
     <Space className="main-list" orientation="vertical" size={12}>
       <Row gutter={[12, 12]} justify="start">
         {items.slice(0, visibleCount).map((item, index) => (
-          <Col key={index} xs={12} sm={8} md={6} lg={4} xl={3}>
+          <Col key={index} xs={24} sm={12} md={8} lg={6} xl={4}>
             <div style={{ width: "100%" }}>
               {renderCard(item, index)}
             </div>
@@ -40,13 +40,7 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
       {visibleCount < items.length && (
         <div
           ref={sentinelRef}
-          style={{
-            height: "var(--size-lg)",
-            width: "100%",
-            textAlign: "center",
-            fontSize: "var(--size-smm)",
-            color: "var(--white-60)",
-          }}
+          className="w-full text-center h-[var(--size-lg)] text-[var(--size-smm)] text-[var(--white-60)]"
         >
           Загрузка...
         </div>

@@ -1,7 +1,6 @@
 import { Button, Card, Space, Typography, Image } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
-import "../styles/ListCardStyle.css";
 
 interface ListingCardProps {
   collectionName?: string;
@@ -22,8 +21,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
 
   return (
     <Card
-      className="listing-card"
-      hoverable
+      className="rounded-[var(--size-sm)] flex flex-col p-[var(--size-2xs)] w-full overflow-hidden z-[4] bg-[var(--liquid-glass-bg)] backdrop-blur-[var(--liquid-glass-blur)] shadow-[0px_5px_5px_-5px_rgba(34,60,80,0.6)] border-[1.5px] border-solid border-[var(--black-transparent)]"      hoverable
       styles={{
         body: {
           padding: '0', 
@@ -36,7 +34,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
       }}
       cover={
         <Image
-          className="card-image"
+          className="w-full h-full rounded-2xl object-cover object-center"
           alt={collectionName || 'Unknown Collection'}
           draggable={false}
           src={`/images/${presentImage || "placeholder.png"}`}

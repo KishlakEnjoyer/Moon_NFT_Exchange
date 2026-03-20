@@ -2,7 +2,6 @@ import { Header } from "antd/es/layout/layout";
 import { Avatar, Badge, Button, Dropdown, Flex, Image, MenuProps, theme } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
-import "../styles/HeaderStyle.css";
 
 import { useState } from "react";
 import { BellOutlined, LogoutOutlined, MoonOutlined, PlusOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, UserOutlined } from "@ant-design/icons";
@@ -54,8 +53,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
     image_url: 'ava.png'
   };
   return (
-    <Header className="header-container">
-      <div className="logo" onClick={handleHomeClick}>
+    <Header className="w-full h-auto py-[var(--size-base)] px-[var(--size-4xl)] flex justify-between items-center bg-transparent">
+      <div className="flex items-center gap-[var(--size-base)] cursor-pointer" onClick={handleHomeClick}>
         <svg
           width="69"
           height="64"
@@ -98,11 +97,11 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
           />
         </svg>
 
-        <Title level={1} className="header-title" style={{ color: token.colorPrimary }}>
+        <Title level={1} className="!margin-0 !font-[var(--font-regular)] hover:opacity-[0.65]" style={{ color: token.colorPrimary }}>
           Moon
         </Title>
       </div>
-      <div className="right-part">
+      <div className="flex flex-row items-center gap-5">
         <Button 
           type='text'
           onClick={() => onThemeChange(!darkMode)}
@@ -110,7 +109,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
           {darkMode ? <MoonOutlined /> : <SunOutlined />}
         </Button>
         {!isAuthenticated && (
-          <div className="authed-header">
+          <div className="flex items-center gap-[var(--size-base)] text-[var(--size-smm)]">
             <Button
             color="default"
             variant="outlined"
@@ -129,13 +128,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
         )}
 
         {isAuthenticated && (
-          <div className="authed-header">
+          <div className="flex items-center gap-[var(--size-base)] text-[var(--size-smm)]">
 
             <Dropdown menu={{ items: dropdownItems }} trigger={['hover']}>
               <Avatar 
                 size='large' 
                 src={`/images/${currentUser.image_url}`} 
-                style={{ border: '1px solid gray', cursor: 'pointer' }}
+                className="border-solid border-gray-500"
               />
             </Dropdown>            
             <Badge count={4} >

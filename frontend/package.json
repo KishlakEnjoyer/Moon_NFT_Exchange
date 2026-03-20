@@ -10,8 +10,6 @@
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.126",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
     "antd": "^6.1.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -45,6 +43,8 @@
     ]
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19"
