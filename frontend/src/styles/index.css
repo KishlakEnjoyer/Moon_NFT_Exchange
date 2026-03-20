@@ -45,6 +45,14 @@ body {
   display: none;
 }
 
+.ant-input-outlined, .ant-input-search-btn {
+    background: var(--liquid-glass-bg) !important;
+    backdrop-filter: blur(var(--liquid-glass-blur)) !important;
+    -webkit-backdrop-filter: blur(var(--liquid-glass-blur)) !important;
+}
+
+
+
 
 .glow-blum {
     position: fixed;
@@ -62,7 +70,7 @@ body {
     background-color: var(--accent-100);
     filter: blur(var(--glow-big-blur));
     opacity: 0.8;
-    animation: glow-move-big 10s ease infinite;
+    animation: glow-move-big 8s ease infinite;
 }
 
 .glow-blum.small {
@@ -72,7 +80,7 @@ body {
     background-color: var(--accent-150);
     filter: blur(var(--glow-small-blur));
     opacity: 0.6;
-    animation: glow-move-small 10s ease infinite;
+    animation: glow-move-small 8s ease infinite;
 }
 
 @keyframes glow-move-big {

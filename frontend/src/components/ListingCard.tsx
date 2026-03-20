@@ -11,6 +11,8 @@ interface ListingCardProps {
 
 const { Text } = Typography;
 
+const glassEffect = "!bg-[var(--liquid-glass-bg)]"
+
 const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice }: ListingCardProps) => {
   const handleCardClick = () => {
     alert(`Collection name: ${collectionName}\n
@@ -21,7 +23,8 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
 
   return (
     <Card
-      className="rounded-[var(--size-sm)] flex flex-col p-[var(--size-2xs)] w-full overflow-hidden z-[4] bg-[var(--liquid-glass-bg)] backdrop-blur-[var(--liquid-glass-blur)] shadow-[0px_5px_5px_-5px_rgba(34,60,80,0.6)] border-[1.5px] border-solid border-[var(--black-transparent)]"      hoverable
+      className="rounded-[var(--size-smm)] flex flex-col p-[var(--size-2xs)] w-full overflow-hidden z-[4] bg-[var(--liquid-glass-bg)] backdrop-blur-[var(--liquid-glass-blur)] shadow-[0px_5px_5px_-5px_rgba(34,60,80,0.6)] border-[1.5px] border-solid border-[var(--black-transparent)]"      
+      hoverable
       styles={{
         body: {
           padding: '0', 
@@ -34,7 +37,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
       }}
       cover={
         <Image
-          className="w-full h-full rounded-2xl object-cover object-center"
+          className="w-full h-full rounded-[var(--size-smm)] object-cover object-center"
           alt={collectionName || 'Unknown Collection'}
           draggable={false}
           src={`/images/${presentImage || "placeholder.png"}`}
@@ -76,7 +79,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
           type="primary"
           icon={<TONIcon/>}
           size="large"
-          
+          className="rounded-[var(--size-smm)]"
           block>
           {presentPrice ? `${presentPrice}` : 'Price not specified'}
         </Button>
@@ -84,9 +87,8 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
         <Button
           type="default"
           icon={<ShoppingCartOutlined />}
-          style={{ aspectRatio: '1 / 1' }}
           size="large"
-          className='icon-antd'
+          className={`icon-antd aspect-square rounded-[var(--size-smm)] ${glassEffect} border-current`}
         />
       </div>
     </Card>

@@ -33,7 +33,8 @@ function App() {
         },
         Card: {
           borderRadius: 12,
-        }
+        },
+        
       }
     }}>
       <Layout className='App'>

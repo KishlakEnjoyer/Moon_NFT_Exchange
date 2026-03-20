@@ -57,12 +57,13 @@
     --glow-big-blur-max: 330px;
 
     --glow-small-bottom: -250px;
-    --glow-small-width: 700px;
-    --glow-small-height: 500px;
+    --glow-small-width: 500px;
+    --glow-small-height: 400px;
     --glow-small-blur: 120px;
     --glow-small-blur-min: 60px;
     --glow-small-blur-max: 130px;
 
-    --liquid-glass-blur: 10px;
+    --liquid-glass-blur: 50px;
     --liquid-glass-bg: #aaaaaa18;
+    --liquid-glass-bg-secondary: #aaaaaa54;
 }

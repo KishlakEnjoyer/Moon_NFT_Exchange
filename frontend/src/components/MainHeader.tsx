@@ -97,7 +97,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
           />
         </svg>
 
-        <Title level={1} className="!margin-0 !font-[var(--font-regular)] hover:opacity-[0.65]" style={{ color: token.colorPrimary }}>
+        <Title level={1} className="!m-0 !font-[var(--font-regular)] hover:opacity-[0.65]" style={{ color: token.colorPrimary }}>
           Moon
         </Title>
       </div>
@@ -115,12 +115,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
             variant="outlined"
             size="large"
             onClick={handleLogIn}
+            className="bg-[var(--liquid-glass-bg)]"
           >
             Connect TG
             <Image
               src="/icons/tg-icon-png.png"
               alt="TgIcon"
-              style={{ width: "20px", marginLeft: "8px" }}
+              className="w-2 ml-2"
               preview={false}
             />
           </Button>
@@ -150,7 +151,6 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
 
             <Button type="text" icon={<ShoppingCartOutlined />}
             className='icon-antd'
-            style={{ fontSize: 'var(--size-lg)',  }}
             size="large"/>
 
             <Button type="primary" icon={<PlusOutlined />} iconPlacement={"end"} size="large">
