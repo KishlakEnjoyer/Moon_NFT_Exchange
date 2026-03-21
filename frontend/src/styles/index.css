@@ -71,6 +71,15 @@ body {
     filter: blur(var(--glow-big-blur));
     opacity: 0.8;
     animation: glow-move-big 8s ease infinite;
+    transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glow-blum.big.success {
+  background-color: var(--green-accept);
+}
+
+.glow-blum.big.fail {
+  background-color: var(--red-fail);
 }
 
 .glow-blum.small {

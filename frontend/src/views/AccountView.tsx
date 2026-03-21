@@ -26,6 +26,7 @@ const AccountView = () => {
     { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, onSale: false, visible: false },
     { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2, onSale: true, visible: true },
     { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 120000, onSale: true, visible: true },
+ 
   ];
 
   const [visibleCount, setVisibleCount] = useState(36);
@@ -49,10 +50,8 @@ const AccountView = () => {
   return (
     <Layout className="min-h-screen">
       <Content className="gap-5 flex flex-col py-[var(--size-2xs] px-[var(--size-4xl)]">
-
         <Flex className="gap-5 flex justify-between items-start" vertical={false}>
           <Flex className="gap-5" vertical={false}>
-
             <Avatar
               size={140}
               src={`/images/${currentUser.image_url}`}
@@ -82,9 +81,9 @@ const AccountView = () => {
 
           <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
             <Tooltip title="History">
-              <Button size="large" icon={<HistoryOutlined />} />
+              <Button size="large" icon={<HistoryOutlined />} className="!bg-[var(--liquid-glass-bg)]"/>
             </Tooltip>
-            <Button size="large" icon={<EditOutlined />}>Edit</Button>
+            <Button size="large" icon={<EditOutlined />} className="!bg-[var(--liquid-glass-bg)]">Edit</Button>
           </Flex>
         </Flex>
 
@@ -96,26 +95,24 @@ const AccountView = () => {
           />
         </div>
 
-        <CardList
-          items={presents}
-          renderCard={(item) => (
-            <div className="w-full"> 
-              <ProfileGiftCard
-                cardImage={`/images/${item.presentImage || "placeholder.png"}`}
-                name={item.collectionName}
-                number={item.presentNumber}
-                onSale={item.onSale}
-                visible={item.visible}
-              />
-            </div>
-          )}
-        />
+        <div className="mb-2">
+          <CardList
+            items={presents}
+            renderCard={(item) => (
+              <div className="w-full"> 
+                <ProfileGiftCard
+                  cardImage={`/images/${item.presentImage || "placeholder.png"}`}
+                  name={item.collectionName}
+                  number={item.presentNumber}
+                  onSale={item.onSale}
+                  visible={item.visible}
+                />
+              </div>
+            )}
+          />
+        </div>
 
-        <FloatButton.BackTop
-          icon={<UpOutlined />}
-          style={{ right: 'var(--size-s)', bottom: 'var(--size-s)' }}
-          shape="square"
-        />
+        <FloatButton.BackTop icon={<UpOutlined/>} className="!bg-[var(--liquid-glass-bg)] !right-[var(--size-s)] !bottom-[var(--size-s)]" shape="square"/>
       </Content>
     </Layout>
   );

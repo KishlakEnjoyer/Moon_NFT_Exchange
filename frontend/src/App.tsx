@@ -12,13 +12,32 @@ function App() {
     return savedTheme ? JSON.parse(savedTheme) : false;
   });
 
+  const [showSuccessGlow, setShowSuccessGlow] = useState(false);
+  const [showFailGlow, setShowFailGlow] = useState(false);
+
+  const triggerSuccessGlow = () => {
+    setShowSuccessGlow(true);
+    setShowFailGlow(false);
+    setTimeout(() => setShowSuccessGlow(false), 2000);
+  };
+
+  const triggerFailGlow = () => {
+    setShowFailGlow(true);
+    setShowSuccessGlow(false);
+    setTimeout(() => setShowFailGlow(false), 2000);
+  };
+
+
+
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
+  
+
   return (
     <>
-    <div className="glow-blum big"></div>
+    <div className={`glow-blum big ${showSuccessGlow ? 'success' : ''} ${showFailGlow ? 'fail' : ''}`}></div>
     <div className="glow-blum small"></div>
 
     <ConfigProvider theme={{
@@ -38,7 +57,7 @@ function App() {
       }
     }}>
       <Layout className='App'>
-        <MainHeader darkMode={darkMode} onThemeChange={setDarkMode}/>
+        <MainHeader darkMode={darkMode} onThemeChange={setDarkMode} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow}/>
           <Routes> 
             <Route path="/" element={<MainView />} />
             <Route path="/account" element={<AccountView/>} />

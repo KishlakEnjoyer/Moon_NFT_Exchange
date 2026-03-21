@@ -10,9 +10,11 @@ import TONIcon from "./icons/TONIcon";
 interface MainHeaderProps {
   darkMode: boolean;
   onThemeChange: (checked: boolean) => void;
+  onAuthSuccess?: () => void;
+  onAuthFail?: () => void;
 }
 
-const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
+const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAuthSuccess, onAuthFail }) => {
   const navigate = useNavigate(); 
   
   const { token } = theme.useToken();
@@ -24,7 +26,17 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
   };
 
   const handleLogIn = () => {
-    setIsAuthenticated(true);
+    /* API response */
+    /* Replace this later ↓*/
+    const success = true;
+
+    if(success){
+      setIsAuthenticated(true);
+      onAuthSuccess?.();
+    }
+    else{
+      onAuthFail?.();
+    }
   }
 
   const handleLogout = () => {
@@ -118,11 +130,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange }) => {
             className="bg-[var(--liquid-glass-bg)]"
           >
             Connect TG
-            <Image
+            <Avatar
               src="/icons/tg-icon-png.png"
               alt="TgIcon"
-              className="w-2 ml-2"
-              preview={false}
             />
           </Button>
           </div>

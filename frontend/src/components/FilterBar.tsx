@@ -8,8 +8,6 @@ import TONIcon from "./icons/TONIcon";
 
 const { Text } = Typography;
 
-const glassEffect = "!bg-[var(--liquid-glass-bg)]"
-
 const FilterBar = () => {
   const popupContainer = () => document.body;
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
@@ -31,7 +29,7 @@ const FilterBar = () => {
     border border-solid border-gray-800 bg-[var(--ant-color-bg-elevated)]" >
       <div>
         <Text strong>Price, <TONIcon/> TON</Text>
-        <Row align="middle" gutter={8} style={{ marginTop: 8 }}>
+        <Row align="middle" gutter={8} className="mt-[8px]">
           <Col>
             <Text>{priceRange[0]}</Text>
           </Col>
@@ -51,9 +49,9 @@ const FilterBar = () => {
       </div>
 
       <div>
-        <Text strong>Sort </Text>
+        <Text strong>Sort</Text>
         <Select
-          style={{ width: "100%", marginTop: 8 }}
+          className="w-full mt-[8px]"
           placeholder="Select sorting"
           value={sortOrder}
           onChange={setSortOrder}
@@ -77,7 +75,7 @@ const FilterBar = () => {
         block
         type="primary"
         onClick={handleApply}
-        style={{ background: "#3a7d44" }}
+        className="bg-[var(--green-accept)]"
       >
         Apply
       </Button>
@@ -96,23 +94,23 @@ const FilterBar = () => {
         />
       </Col>
       <Col flex="auto">
-        <Select className={`${glassEffect} w-full`}
+        <Select className={`!bg-[var(--liquid-glass-bg)] w-full`} style={{ backdropFilter: "blur(var(--liquid-glass-blur))"}}
           placeholder="Collection"  getPopupContainer={popupContainer} size="large" />
       </Col>
       <Col flex="auto">
-        <Select className={`${glassEffect} w-full`}
+        <Select className={`!bg-[var(--liquid-glass-bg)] w-full`} style={{ backdropFilter: "blur(var(--liquid-glass-blur))"}}
           placeholder="Model"  getPopupContainer={popupContainer} size="large" />
       </Col>
       <Col flex="auto">
-        <Select className={`${glassEffect} w-full`}
+        <Select className={`!bg-[var(--liquid-glass-bg)] w-full`} style={{ backdropFilter: "blur(var(--liquid-glass-blur))"}}
           placeholder="Background"  getPopupContainer={popupContainer} size="large" />
       </Col>
       <Col flex="auto">
-        <Select className={`${glassEffect} w-full`}
+        <Select className={`!bg-[var(--liquid-glass-bg)] w-full`} style={{ backdropFilter: "blur(var(--liquid-glass-blur))"}}
           placeholder="Symbol"  getPopupContainer={popupContainer} size="large" />
       </Col>
 
-      <Col style={{ maxWidth: "40px" }}>
+      <Col className="max-w-[40px]">
         <Dropdown
           open={open}
           onOpenChange={setOpen}
@@ -121,7 +119,10 @@ const FilterBar = () => {
           popupRender={() => filterPopup} 
           placement="bottomRight"
         >
-          <Button icon={<FilterOutlined />} size="large" className={`${glassEffect} w-full antd-icon`} />
+          <Button icon={<FilterOutlined />} size="large" 
+            className={`!bg-[var(--liquid-glass-bg)] w-full antd-icon`} 
+            style={{ backdropFilter: "blur(var(--liquid-glass-blur))"}}
+          />
         </Dropdown>
       </Col>
     </Row>

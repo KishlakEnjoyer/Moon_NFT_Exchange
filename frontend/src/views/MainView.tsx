@@ -35,7 +35,7 @@ const MainView = () => {
             />
           )}
         />
-        <FloatButton.BackTop icon={<UpOutlined/>} className="!right-[var(--size-s)] !bottom-[var(--size-s)]" shape="square"/>
+        <FloatButton.BackTop icon={<UpOutlined/>} className="!bg-[var(--liquid-glass-bg)] !right-[var(--size-s)] !bottom-[var(--size-s)]" shape="square"/>
       </Content>
     </Layout>
   );
