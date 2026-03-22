@@ -82,6 +82,10 @@ body {
   background-color: var(--red-fail);
 }
 
+.glow-blum.big.logout {
+  background-color: var(--purple-logout);
+}
+
 .glow-blum.small {
     bottom: var(--glow-small-bottom);
     width: var(--glow-small-width);
@@ -93,9 +97,9 @@ body {
 }
 
 @keyframes glow-move-big {
-    0%   { opacity: 0.5; filter: blur(var(--glow-big-blur-min)); }
+    0%   { opacity: 0.8; filter: blur(var(--glow-big-blur-min)); }
     50%  { opacity: 1;   filter: blur(var(--glow-big-blur-max)); }
-    100% { opacity: 0.5; filter: blur(var(--glow-big-blur-min)); }
+    100% { opacity: 0.8; filter: blur(var(--glow-big-blur-min)); }
 }
 
 @keyframes glow-move-small {

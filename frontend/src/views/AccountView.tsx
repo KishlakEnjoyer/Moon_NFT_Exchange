@@ -15,12 +15,40 @@ import CardList from "../components/CardList";
 const { Text } = Typography;
 
 const AccountView = () => {
-  const currentUser = {
+  const userFromAPI = {
+    id: 1,
+    tgId: 12345678,
     nickname: "KishlakEnjoyer",
     tg_username: "@jdm_enjoyerr",
     image_url: "ava.png",
     about_me: "TG invester from Russia.",
   };
+
+  const [isOwn, setIsOwn] = useState(false);
+
+  useEffect(() => {
+    let currentUserJSON = {
+      id: null,
+      tgId: null,
+      nickname: null,
+      tg_username: null,
+      image_url: null,
+      about_me: null,
+    };
+
+    const currentUser = localStorage?.getItem('currentUser');
+
+    if(currentUser != null){
+      currentUserJSON = JSON.parse(currentUser);
+    }
+    if(currentUserJSON.id == userFromAPI.id){
+      setIsOwn(true);
+    }
+    else {
+      setIsOwn(false);
+    }
+  }, [localStorage?.getItem('currentUser')]);
+
 
   const presents = [
     { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, onSale: false, visible: false },
@@ -54,13 +82,13 @@ const AccountView = () => {
           <Flex className="gap-5" vertical={false}>
             <Avatar
               size={140}
-              src={`/images/${currentUser.image_url}`}
+              src={`/images/${userFromAPI.image_url}`}
               className="border border-gray-500 shrink-0"
             />
 
             <Flex className="flex flex-column" vertical>
               <Title level={2} className="!mb-0">
-                {currentUser.nickname}
+                {userFromAPI.nickname}
               </Title>
 
               <Link to="https://t.me/jdm_enjoyerr" className="flex items-center gap-1">
@@ -70,21 +98,21 @@ const AccountView = () => {
                   style={{ width: "var(--size-lg)" }}
                   preview={false}
                 />
-                {currentUser.tg_username}
+                {userFromAPI.tg_username}
               </Link>
 
               <Text className="mt-3 leading-relaxed">
-                {currentUser.about_me}
+                {userFromAPI.about_me}
               </Text>
             </Flex>
           </Flex>
 
-          <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
+          {isOwn ? <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
             <Tooltip title="History">
               <Button size="large" icon={<HistoryOutlined />} className="!bg-[var(--liquid-glass-bg)]"/>
             </Tooltip>
             <Button size="large" icon={<EditOutlined />} className="!bg-[var(--liquid-glass-bg)]">Edit</Button>
-          </Flex>
+          </Flex> : <Flex/>}
         </Flex>
 
         <div className="overflow-x-auto overflow-y-hidden whitespace-nowrap w-full">

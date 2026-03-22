@@ -38,3 +38,9 @@ ganache-data/
 node_modules/
 
 backend/contract_info.json
+
+# Images
+*.webp
+*.png
+*.jpeg
+*.jpg

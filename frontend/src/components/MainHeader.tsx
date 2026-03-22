@@ -3,7 +3,7 @@ import { Avatar, Badge, Button, Dropdown, Flex, Image, MenuProps, theme } from "
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
 
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { BellOutlined, LogoutOutlined, MoonOutlined, PlusOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 
@@ -12,14 +12,22 @@ interface MainHeaderProps {
   onThemeChange: (checked: boolean) => void;
   onAuthSuccess?: () => void;
   onAuthFail?: () => void;
+  onLogout?: () => void;
 }
 
-const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAuthSuccess, onAuthFail }) => {
+const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAuthSuccess, onAuthFail, onLogout }) => {
   const navigate = useNavigate(); 
   
   const { token } = theme.useToken();
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let isAuth = localStorage.getItem('isAuth');
+    if(isAuth === 'true'){
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   const handleHomeClick = () => {
     navigate("/"); 
@@ -28,10 +36,22 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
   const handleLogIn = () => {
     /* API response */
     /* Replace this later ↓*/
+    const currentUser = {
+      id: 1,
+      tgId: 12345678,
+      nickname: "KishlakEnjoyer",
+      tg_username: "@jdm_enjoyerr",
+      image_url: "ava.png",
+      about_me: "TG invester from Russia.",
+    };
+
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
     const success = true;
 
     if(success){
       setIsAuthenticated(true);
+      localStorage.setItem('isAuth', 'true');
       onAuthSuccess?.();
     }
     else{
@@ -41,6 +61,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    localStorage.setItem('isAuth', '');
+    onLogout?.();
   }
 
   const dropdownItems: MenuProps['items'] = [

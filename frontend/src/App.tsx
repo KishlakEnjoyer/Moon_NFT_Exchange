@@ -14,6 +14,7 @@ function App() {
 
   const [showSuccessGlow, setShowSuccessGlow] = useState(false);
   const [showFailGlow, setShowFailGlow] = useState(false);
+  const [showLogoutGlow, setShowLogoutGlow] = useState(false);
 
   const triggerSuccessGlow = () => {
     setShowSuccessGlow(true);
@@ -27,6 +28,10 @@ function App() {
     setTimeout(() => setShowFailGlow(false), 2000);
   };
 
+  const triggerLogoutGlow = () => {
+    setShowLogoutGlow(true);
+    setTimeout(() => setShowLogoutGlow(false), 2000);
+  };
 
 
   useEffect(() => {
@@ -37,7 +42,7 @@ function App() {
 
   return (
     <>
-    <div className={`glow-blum big ${showSuccessGlow ? 'success' : ''} ${showFailGlow ? 'fail' : ''}`}></div>
+    <div className={`glow-blum big ${showSuccessGlow ? 'success' : ''} ${showFailGlow ? 'fail' : ''} ${showLogoutGlow ? 'logout' : ''}`}></div>
     <div className="glow-blum small"></div>
 
     <ConfigProvider theme={{
@@ -57,7 +62,7 @@ function App() {
       }
     }}>
       <Layout className='App'>
-        <MainHeader darkMode={darkMode} onThemeChange={setDarkMode} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow}/>
+        <MainHeader darkMode={darkMode} onThemeChange={setDarkMode} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow} onLogout={triggerLogoutGlow}/>
           <Routes> 
             <Route path="/" element={<MainView />} />
             <Route path="/account" element={<AccountView/>} />
