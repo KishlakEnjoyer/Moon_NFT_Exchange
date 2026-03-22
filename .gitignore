@@ -26,6 +26,8 @@ logs/
 # Database files
 *.db
 *.sqlite
+*.sql
+*.csv
 
 # Block chain data and artifacts
 cache/
@@ -44,3 +46,5 @@ backend/contract_info.json
 *.png
 *.jpeg
 *.jpg
+
+
