@@ -6,75 +6,53 @@ import {
 } from "antd";
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { EditOutlined, HistoryOutlined, UpOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState, useCallback } from "react";
 import ProfileGiftCard from "../components/ProfileGiftCard";
 import CardList from "../components/CardList";
 
+import { getUserByUsername } from "../fictive_data/users";
+
 const { Text } = Typography;
 
 const AccountView = () => {
-  const userFromAPI = {
-    id: 1,
-    tgId: 12345678,
-    nickname: "KishlakEnjoyer",
-    tg_username: "@jdm_enjoyerr",
-    image_url: "ava.png",
-    about_me: "TG invester from Russia.",
-  };
-
   const [isOwn, setIsOwn] = useState(false);
 
+  const { username } = useParams();
+  const user = getUserByUsername(username ?? "");
+
   useEffect(() => {
-    let currentUserJSON = {
-      id: null,
-      tgId: null,
-      nickname: null,
-      tg_username: null,
-      image_url: null,
-      about_me: null,
+    const checkOwnership = () => {
+      const currentUser = localStorage.getItem('currentUser');
+      const currentUserJSON = currentUser ? JSON.parse(currentUser) : { id: null };
+      setIsOwn(currentUserJSON.id === user?.user_id);
     };
 
-    const currentUser = localStorage?.getItem('currentUser');
+    checkOwnership();
 
-    if(currentUser != null){
-      currentUserJSON = JSON.parse(currentUser);
-    }
-    if(currentUserJSON.id == userFromAPI.id){
-      setIsOwn(true);
-    }
-    else {
-      setIsOwn(false);
-    }
-  }, [localStorage?.getItem('currentUser')]);
-
-
-  const presents = [
-    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, onSale: false, visible: false },
-    { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2, onSale: true, visible: true },
-    { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 120000, onSale: true, visible: true },
- 
-  ];
+    window.addEventListener('storage', checkOwnership); 
+    return () => window.removeEventListener('storage', checkOwnership);
+  }, []);
 
   const [visibleCount, setVisibleCount] = useState(36);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + 12, presents.length));
-  }, [presents.length]);
+    setVisibleCount((prev) => Math.min(prev + 12, user?.gifts.length ?? 0));
+  }, [user?.gifts.length]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && visibleCount < presents.length) loadMore();
+        if (entries[0].isIntersecting && visibleCount < (user?.gifts.length ?? 0)) loadMore();
       },
       { threshold: 1.0 }
     );
     if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => { if (sentinelRef.current) observer.unobserve(sentinelRef.current); };
-  }, [visibleCount, presents.length, loadMore]);
-
+  }, [visibleCount, user?.gifts.length, loadMore]);
+  if (!user) return <div className="text-white flex justify-center min-h-screen w-full items-center text-2xl">Пользователь не найден.</div>;
   return (
     <Layout className="min-h-screen">
       <Content className="gap-5 flex flex-col py-[var(--size-2xs] px-[var(--size-4xl)]">
@@ -82,27 +60,35 @@ const AccountView = () => {
           <Flex className="gap-5" vertical={false}>
             <Avatar
               size={140}
-              src={`/images/${userFromAPI.image_url}`}
+              src={`/images/${user.profile_pic_url}`}
               className="border border-gray-500 shrink-0"
             />
 
             <Flex className="flex flex-column" vertical>
               <Title level={2} className="!mb-0">
-                {userFromAPI.nickname}
+                {user.username}
               </Title>
 
-              <Link to="https://t.me/jdm_enjoyerr" className="flex items-center gap-1">
-                <Image
-                  src="/icons/tg-icon-png.png"
-                  alt="TgIcon"
-                  style={{ width: "var(--size-lg)" }}
-                  preview={false}
-                />
-                {userFromAPI.tg_username}
-              </Link>
+              {(user.tg_visibility || isOwn) && (
+                <Link
+                  to={`https://t.me/${user.tg_username}`}
+                  className="flex items-center gap-1"
+                >
+                  <Image
+                    src="/icons/tg-icon-png.png"
+                    alt="TgIcon"
+                    style={{ width: "var(--size-lg)" }}
+                    preview={false}
+                  />
+                  {user.tg_username}
+                  {isOwn && !user.tg_visibility && (
+                    <span className="text-xs text-gray-400 ml-1">(скрыто)</span>
+                  )}
+                </Link>
+              )}
 
               <Text className="mt-3 leading-relaxed">
-                {userFromAPI.about_me}
+                {user.about_me}
               </Text>
             </Flex>
           </Flex>
@@ -125,7 +111,7 @@ const AccountView = () => {
 
         <div className="mb-2">
           <CardList
-            items={presents}
+            items={user.gifts}
             renderCard={(item) => (
               <div className="w-full"> 
                 <ProfileGiftCard

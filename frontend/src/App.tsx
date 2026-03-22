@@ -65,7 +65,7 @@ function App() {
         <MainHeader darkMode={darkMode} onThemeChange={setDarkMode} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow} onLogout={triggerLogoutGlow}/>
           <Routes> 
             <Route path="/" element={<MainView />} />
-            <Route path="/account" element={<AccountView/>} />
+            <Route path="/account/:username" element={<AccountView/>} />
           </Routes>
           <MainFooter/>
       </Layout>

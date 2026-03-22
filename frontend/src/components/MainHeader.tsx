@@ -52,6 +52,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
     if(success){
       setIsAuthenticated(true);
       localStorage.setItem('isAuth', 'true');
+      window.dispatchEvent(new Event('storage'));
       onAuthSuccess?.();
     }
     else{
@@ -62,6 +63,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.setItem('isAuth', '');
+    localStorage.removeItem('currentUser');
+    window.dispatchEvent(new Event('storage')); 
     onLogout?.();
   }
 

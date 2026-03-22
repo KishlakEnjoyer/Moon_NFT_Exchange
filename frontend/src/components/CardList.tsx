@@ -1,4 +1,3 @@
-import { Row, Col, Space } from "antd";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 interface CardListProps<T> {
@@ -26,16 +25,14 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
   }, [visibleCount, items.length, loadMore]);
 
   return (
-    <Space className="main-list" orientation="vertical" size={12}>
-      <Row gutter={[12, 12]} justify="start">
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-3">
         {items.slice(0, visibleCount).map((item, index) => (
-          <Col key={index} xs={24} sm={12} md={8} lg={6} xl={4}>
-            <div style={{ width: "100%" }}>
-              {renderCard(item, index)}
-            </div>
-          </Col>
+          <div key={index} className="w-full">
+            {renderCard(item, index)}
+          </div>
         ))}
-      </Row>
+      </div>
 
       {visibleCount < items.length && (
         <div
@@ -45,7 +42,7 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
           Загрузка...
         </div>
       )}
-    </Space>
+    </div>
   );
 };
 
