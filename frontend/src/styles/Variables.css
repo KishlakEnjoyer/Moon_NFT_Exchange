@@ -5,6 +5,7 @@
     --black-80: #1f1f1f;
     --black-70: #303030;
     --black-60: #3f3f3f;
+    --black-40: #5a5a5a;
 
     --black-transparent: #00000080;
 
@@ -14,6 +15,7 @@
     --white-70: #dbdbdb;
     --white-60: #9e9e9e;
     --white-50: #ffffff80;
+    --white-40: #ffffff62;
 
     --accent-150: #a8b9ff;
     --accent-100: #2b4acb;
@@ -67,5 +69,8 @@
 
     --liquid-glass-blur: 50px;
     --liquid-glass-bg: #aaaaaa18;
-    --liquid-glass-bg-secondary: #aaaaaa54;
+    --liquid-glass-bg-accent: #1a1a1ab6;
+    --liquid-glass-bg-second-accent: #111111f5;
+    --liquid-glass-bg-light-theme: rgba(255, 255, 255, 0.88);
+    --liquid-glass-bg-secondary: #aaaaaa35;
 }

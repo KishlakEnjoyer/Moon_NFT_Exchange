@@ -5,18 +5,16 @@ import FilterBar from "../components/FilterBar";
 import { UpOutlined } from "@ant-design/icons";
 import ListingCard from "../components/ListingCard";
 import CardList from "../components/CardList";
+import { getActiveListings, ListingFull } from "../fictive_data/listings";
+import ModalPresentDetail from "../components/ModalPresentDetail";
+import { useState } from "react";
 
 const MainView = () => {
   useDocumentTitle("Moon Exchange - Home");
-  const lots = [
-    { collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, presentPrice: 50 },
-    { collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 1, presentPrice: 120 },
-    { collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2, presentPrice: 150 },
-    { collectionName: "Plush Pepe", presentImage: "pepe3.png", presentNumber: 3, presentPrice: 180 },
-    { collectionName: "Plush Pepe", presentImage: "pepe4.png", presentNumber: 4, presentPrice: 200 },
-    { collectionName: "Plush Pepe", presentImage: "pepe4.png", presentNumber: 4, presentPrice: 200 },
 
-  ];
+  const lots = getActiveListings();
+  const [selectedPresent, setSelectedPresent] = useState<ListingFull | null>(null);
+  
 
   return (
     <Layout className="min-h-screen">
@@ -28,14 +26,21 @@ const MainView = () => {
           items={lots}
           renderCard={(item) => (
             <ListingCard
-              collectionName={item.collectionName}
-              presentImage={item.presentImage}
-              presentNumber={item.presentNumber}
-              presentPrice={item.presentPrice}
+              item={item}
+              collectionName={item.present.collectionName}
+              presentImage={item.present.image_url}
+              presentNumber={item.present.present_num}
+              presentPrice={item.price}
+              onPresentClick={() => setSelectedPresent(item)}
             />
           )}
         />
         <FloatButton.BackTop icon={<UpOutlined/>} className="!bg-[var(--liquid-glass-bg)] !right-[var(--size-s)] !bottom-[var(--size-s)]" shape="square"/>
+        <ModalPresentDetail
+          open={!!selectedPresent}
+          item={selectedPresent}
+          onClose={() => setSelectedPresent(null)}
+        />
       </Content>
     </Layout>
   );

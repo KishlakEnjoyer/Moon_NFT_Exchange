@@ -11,8 +11,9 @@ import { EditOutlined, HistoryOutlined, UpOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState, useCallback } from "react";
 import ProfileGiftCard from "../components/ProfileGiftCard";
 import CardList from "../components/CardList";
-
 import { getUserByUsername } from "../fictive_data/users";
+import NotFound from "./NotFound";
+import { getPresentById } from "../fictive_data/presents";
 
 const { Text } = Typography;
 
@@ -30,8 +31,7 @@ const AccountView = () => {
     };
 
     checkOwnership();
-
-    window.addEventListener('storage', checkOwnership); 
+    window.addEventListener('storage', checkOwnership);
     return () => window.removeEventListener('storage', checkOwnership);
   }, []);
 
@@ -52,19 +52,21 @@ const AccountView = () => {
     if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => { if (sentinelRef.current) observer.unobserve(sentinelRef.current); };
   }, [visibleCount, user?.gifts.length, loadMore]);
-  if (!user) return <div className="text-white flex justify-center min-h-screen w-full items-center text-2xl">Пользователь не найден.</div>;
+
+  if (!user) return <NotFound />;
+
   return (
     <Layout className="min-h-screen">
-      <Content className="gap-5 flex flex-col py-[var(--size-2xs] px-[var(--size-4xl)]">
+      <Content className="gap-5 flex flex-col py-[var(--size-2xs)] px-[var(--size-4xl)]">
         <Flex className="gap-5 flex justify-between items-start" vertical={false}>
           <Flex className="gap-5" vertical={false}>
             <Avatar
               size={140}
-              src={`/images/${user.profile_pic_url}`}
+              src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`}
               className="border border-gray-500 shrink-0"
             />
 
-            <Flex className="flex flex-column" vertical>
+            <Flex vertical>
               <Title level={2} className="!mb-0">
                 {user.username}
               </Title>
@@ -82,7 +84,7 @@ const AccountView = () => {
                   />
                   {user.tg_username}
                   {isOwn && !user.tg_visibility && (
-                    <span className="text-xs text-gray-400 ml-1">(скрыто)</span>
+                    <span className="text-xs text-gray-400 ml-1">Hidden</span>
                   )}
                 </Link>
               )}
@@ -93,12 +95,16 @@ const AccountView = () => {
             </Flex>
           </Flex>
 
-          {isOwn ? <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
-            <Tooltip title="History">
-              <Button size="large" icon={<HistoryOutlined />} className="!bg-[var(--liquid-glass-bg)]"/>
-            </Tooltip>
-            <Button size="large" icon={<EditOutlined />} className="!bg-[var(--liquid-glass-bg)]">Edit</Button>
-          </Flex> : <Flex/>}
+          {isOwn ? (
+            <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
+              <Tooltip title="History">
+                <Button size="large" icon={<HistoryOutlined />} className="!bg-[var(--liquid-glass-bg)]" />
+              </Tooltip>
+              <Button size="large" icon={<EditOutlined />} className="!bg-[var(--liquid-glass-bg)]">
+                Edit
+              </Button>
+            </Flex>
+          ) : <Flex />}
         </Flex>
 
         <div className="overflow-x-auto overflow-y-hidden whitespace-nowrap w-full">
@@ -111,22 +117,31 @@ const AccountView = () => {
 
         <div className="mb-2">
           <CardList
-            items={user.gifts}
-            renderCard={(item) => (
-              <div className="w-full"> 
-                <ProfileGiftCard
-                  cardImage={`/images/${item.presentImage || "placeholder.png"}`}
-                  name={item.collectionName}
-                  number={item.presentNumber}
-                  onSale={item.onSale}
-                  visible={item.visible}
-                />
-              </div>
-            )}
+            items={user.gifts.slice(0, visibleCount)}
+            renderCard={(item) => {
+            const present = getPresentById(item.present_id);
+
+            return (
+                <div className="w-full">
+                  <ProfileGiftCard
+                    cardImage={`${process.env.REACT_APP_IMAGES_URL}/presents/${present?.image_url || "placeholder.png"}`}
+                    name={present?.collectionName}
+                    number={present?.present_num}
+                    onSale={item.onSale}
+                    visible={item.visible}
+                  />
+                </div>
+              );
+            }}
           />
+          <div ref={sentinelRef} className="h-1" />
         </div>
 
-        <FloatButton.BackTop icon={<UpOutlined/>} className="!bg-[var(--liquid-glass-bg)] !right-[var(--size-s)] !bottom-[var(--size-s)]" shape="square"/>
+        <FloatButton.BackTop
+          icon={<UpOutlined />}
+          className="!bg-[var(--liquid-glass-bg)] !right-[var(--size-s)] !bottom-[var(--size-s)]"
+          shape="square"
+        />
       </Content>
     </Layout>
   );

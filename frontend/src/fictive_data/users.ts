@@ -1,8 +1,5 @@
 export interface Gift {
-  id: number;
-  collectionName: string;
-  presentImage: string;
-  presentNumber: number;
+  present_id: number;
   onSale: boolean;
   visible: boolean;
 }
@@ -34,9 +31,9 @@ export const users: User[] = [
     is_active: true,
     about_me: "TG investor from Russia.",
     gifts: [
-      { id: 1, collectionName: "Cap", presentImage: "cap.png", presentNumber: 1, onSale: false, visible: false },
-      { id: 2, collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 2, onSale: true, visible: true },
-      { id: 3, collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 120000, onSale: true, visible: true },
+      { present_id: 1, onSale: false, visible: false },
+      { present_id: 2, onSale: true, visible: true },
+      { present_id: 3, onSale: true, visible: true },
     ],
   },
   {
@@ -51,8 +48,8 @@ export const users: User[] = [
     is_active: true,
     about_me: "Collector of rare digital gifts.",
     gifts: [
-      { id: 4, collectionName: "Golden Bear", presentImage: "cap.png", presentNumber: 777, onSale: true, visible: true },
-      { id: 5, collectionName: "Cap", presentImage: "cap.png", presentNumber: 42, onSale: false, visible: true },
+      { present_id: 4, onSale: true, visible: true },
+      { present_id: 5, onSale: false, visible: true },
     ],
   },
   {
@@ -67,9 +64,9 @@ export const users: User[] = [
     is_active: true,
     about_me: "To the moon 🚀",
     gifts: [
-      { id: 6, collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 999, onSale: false, visible: true },
-      { id: 7, collectionName: "Golden Bear", presentImage: "pepe2.png", presentNumber: 1, onSale: true, visible: true },
-      { id: 8, collectionName: "Cap", presentImage: "cap.png", presentNumber: 50, onSale: true, visible: false },
+      { present_id: 6, onSale: false, visible: true },
+      { present_id: 7, onSale: true, visible: true },
+      { present_id: 8, onSale: true, visible: false },
     ],
   },
   {
@@ -84,8 +81,8 @@ export const users: User[] = [
     is_active: true,
     about_me: "All things Pepe.",
     gifts: [
-      { id: 9, collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 3, onSale: false, visible: true },
-      { id: 10, collectionName: "Plush Pepe", presentImage: "pepe2.png", presentNumber: 7, onSale: true, visible: true },
+      { present_id: 9, onSale: false, visible: true },
+      { present_id: 10, onSale: true, visible: true },
     ],
   },
   {
@@ -95,15 +92,15 @@ export const users: User[] = [
     tg_username: "ton_whale",
     tg_visibility: true,
     username: "TonWhale",
-    profile_pic_url: "ava.png",
+    profile_pic_url: "023933c7810baed41527c26a1ab051a1.jpg",
     wallet_address: "0xf00df00df00df00df00df00df00df00df00df00d",
     is_active: true,
     about_me: "Big fish in the TON ocean.",
     gifts: [
-      { id: 11, collectionName: "Golden Bear", presentImage: "cap.png", presentNumber: 1, onSale: true, visible: true },
-      { id: 12, collectionName: "Cap", presentImage: "cap.png", presentNumber: 88, onSale: false, visible: false },
-      { id: 13, collectionName: "Plush Pepe", presentImage: "pepe.png", presentNumber: 404, onSale: true, visible: true },
-      { id: 14, collectionName: "Golden Bear", presentImage: "pepe2.png", presentNumber: 12, onSale: false, visible: true },
+      { present_id: 11, onSale: true, visible: true },
+      { present_id: 12, onSale: false, visible: false },
+      { present_id: 13, onSale: true, visible: true },
+      { present_id: 14, onSale: false, visible: true },
     ],
   },
 ];

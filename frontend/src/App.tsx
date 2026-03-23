@@ -5,6 +5,7 @@ import MainView from './views/MainView';
 import AccountView from './views/AccountView';
 import MainHeader from './components/MainHeader';
 import MainFooter from './components/MainFooter';
+import NotFound from './views/NotFound';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -55,10 +56,17 @@ function App() {
         Pagination: {
           borderRadius: 999,
         },
+        Modal: {
+          contentBg: darkMode ? 'var(--liquid-glass-bg-accent)' : 'var(--liquid-glass-bg-light-theme)',
+          headerBg: 'transparent',
+        },
         Card: {
+          colorBgContainer: darkMode ? 'var(--liquid-glass-bg)' : 'var(--liquid-glass-bg-light-theme)',
           borderRadius: 12,
         },
-        
+        Button: {
+          colorBgContainer: darkMode ? 'var(--liquid-glass-bg-secondary)' : 'var(--liquid-glass-bg-light-theme)',
+        },
       }
     }}>
       <Layout className='App'>
@@ -66,6 +74,7 @@ function App() {
           <Routes> 
             <Route path="/" element={<MainView />} />
             <Route path="/account/:username" element={<AccountView/>} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           <MainFooter/>
       </Layout>

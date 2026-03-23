@@ -1,8 +1,12 @@
 import { Button, Card, Space, Typography, Image } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
+import { ListingFull } from "../fictive_data/listings";
 
 interface ListingCardProps {
+  item: ListingFull;
+  onPresentClick?: (item: ListingFull) => void;
+  onClose?: () => void;
   collectionName?: string;
   presentImage?: string;
   presentNumber?: string | number;
@@ -11,15 +15,7 @@ interface ListingCardProps {
 
 const { Text } = Typography;
 
-const glassEffect = "!bg-[var(--liquid-glass-bg)]"
-
-const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice }: ListingCardProps) => {
-  const handleCardClick = () => {
-    alert(`Collection name: ${collectionName}\n
-           Present image: ${presentImage}\n
-           Present number: ${presentNumber}\n
-           Present price: ${presentPrice} TON`); 
-  };
+const ListingCard = ({ item, collectionName, presentImage, presentNumber, presentPrice, onPresentClick, onClose }: ListingCardProps) => {
 
   return (
     <Card
@@ -40,9 +36,9 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
           className="w-full h-full rounded-[var(--size-smm)] object-cover object-center"
           alt={collectionName || 'Unknown Collection'}
           draggable={false}
-          src={`/images/${presentImage || "placeholder.png"}`}
+          src={`${process.env.REACT_APP_IMAGES_URL}/presents/${presentImage || "placeholder.png"}`}
           preview={false}
-          onClick={handleCardClick}
+          onClick={() => onPresentClick?.(item)}
         />
       }
     >
@@ -53,7 +49,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
             fontSize: 'var(--size-base)', 
             fontWeight: 'var(--font-semibold)', 
           }}
-          onClick={handleCardClick}
+          onClick={() => onPresentClick?.(item)}
         >
           {collectionName || 'Unknown Collection'}
         </Text>
@@ -88,7 +84,7 @@ const ListingCard = ({ collectionName, presentImage, presentNumber, presentPrice
           type="default"
           icon={<ShoppingCartOutlined />}
           size="large"
-          className={`icon-antd aspect-square rounded-[var(--size-smm)] ${glassEffect} border-current`}
+          className={`icon-antd aspect-square rounded-[var(--size-smm)] !bg-[var(--liquid-glass-bg)]`}
         />
       </div>
     </Card>

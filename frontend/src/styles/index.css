@@ -52,6 +52,22 @@ body {
 }
 
 
+/* .ant-modal-container {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+} */
+.ant-modal-body ::-webkit-scrollbar {
+  width: 4px;
+}
+.ant-modal-body ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ant-modal-body ::-webkit-scrollbar-thumb {
+  background: var(--black-transparent);
+  border-radius: 4px;
+}
+
+
 
 
 .glow-blum {

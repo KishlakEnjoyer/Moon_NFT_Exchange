@@ -20,7 +20,7 @@ const ProfileGiftCard = ({
   return (
     <div className="relative w-full h-full z-4">
       {!visible && <div className="w-full h-full absolute z-50 flex items-center justify-center">
-        <EyeInvisibleOutlined className="text-white text-xl bg-[var(--black-100-semiopac)] p-[var(--size-sm)] rounded-full" />
+        <EyeInvisibleOutlined className="text-white text-3xl bg-[var(--black-100-semiopac)] p-[var(--size-sm)] rounded-full" />
       </div>}
 
       <div className="flex flex-row gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">

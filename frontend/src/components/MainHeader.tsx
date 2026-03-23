@@ -7,6 +7,9 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { BellOutlined, LogoutOutlined, MoonOutlined, PlusOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 
+import { getActiveListings } from "../fictive_data/listings";
+import ModalCart from "./ModalCart";
+
 interface MainHeaderProps {
   darkMode: boolean;
   onThemeChange: (checked: boolean) => void;
@@ -16,6 +19,11 @@ interface MainHeaderProps {
 }
 
 const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAuthSuccess, onAuthFail, onLogout }) => {
+
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cartItems, setCartItems] = useState(getActiveListings());
+
+
   const navigate = useNavigate(); 
   
   const { token } = theme.useToken();
@@ -73,7 +81,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
       key: 'profile',
       label: 'Profile',
       icon: <UserOutlined />,
-      onClick: () => navigate('/account')
+      onClick: () => navigate(`/account/${currentUser.nickname}`)
     },
     {
       key: 'logout',
@@ -84,11 +92,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
     }
   ];
 
-  const currentUser = {
-    nickname: 'KishlakEnjoyer',
-    balance: 3.02,
-    image_url: 'ava.png'
-  };
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  
   return (
     <Header className="w-full h-auto py-[var(--size-base)] px-[var(--size-4xl)] flex justify-between items-center bg-transparent">
       <div className="flex items-center gap-[var(--size-base)] cursor-pointer" onClick={handleHomeClick}>
@@ -169,7 +174,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
             <Dropdown menu={{ items: dropdownItems }} trigger={['hover']}>
               <Avatar 
                 size='large' 
-                src={`/images/${currentUser.image_url}`} 
+                src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${currentUser.image_url}`} 
                 className="border-solid border-gray-500"
               />
             </Dropdown>            
@@ -186,7 +191,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
 
             <Button type="text" icon={<ShoppingCartOutlined />}
             className='icon-antd'
-            size="large"/>
+            size="large"
+            onClick={() => setCartOpen(true)}/>
 
             <Button type="primary" icon={<PlusOutlined />} iconPlacement={"end"} size="large">
               {currentUser.balance}
@@ -196,7 +202,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
           </div>
         )}
       </div>
+      <ModalCart open={cartOpen} onClose={() => setCartOpen(false)} onOpen={() => setCartOpen(true)} items={cartItems} />
     </Header>
+    
   );
 };
 
