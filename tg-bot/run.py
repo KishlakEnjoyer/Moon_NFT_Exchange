@@ -6,7 +6,7 @@ from aiogram.types import Message, BotCommand
 from aiogram.filters import CommandStart, CommandObject
 from dotenv import load_dotenv
 
-from handlers import start
+from handlers import start, confirm_auth
 
 load_dotenv()
 
@@ -17,6 +17,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 dp.include_router(start.router)
+dp.include_router(confirm_auth.router)
 
 
 async def main():

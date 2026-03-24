@@ -1,12 +1,20 @@
 import { Header } from "antd/es/layout/layout";
-import { Avatar, Badge, Button, Dropdown, Flex, Image, MenuProps, theme } from "antd";
+import { Avatar, Badge, Button, Dropdown, MenuProps, theme } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  BellOutlined,
+  LogoutOutlined,
+  MoonOutlined,
+  PlusOutlined,
+  ShoppingCartOutlined,
+  SunOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 
-import { useEffect, useEffectEvent, useState } from "react";
-import { BellOutlined, LogoutOutlined, MoonOutlined, PlusOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, UserOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
-
 import { getActiveListings } from "../fictive_data/listings";
 import ModalCart from "./ModalCart";
 
@@ -18,85 +26,220 @@ interface MainHeaderProps {
   onLogout?: () => void;
 }
 
-const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAuthSuccess, onAuthFail, onLogout }) => {
+const MainHeader: React.FC<MainHeaderProps> = ({
+  darkMode,
+  onThemeChange,
+  onAuthSuccess,
+  onAuthFail,
+  onLogout,
+}) => {
+  const pollingRef = useRef<number | null>(null);
+  const initAbortRef = useRef<AbortController | null>(null);
+  const authAttemptRef = useRef(0);
 
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState(getActiveListings());
+  const [cartItems] = useState(getActiveListings());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [hasPendingAuth, setHasPendingAuth] = useState(false);
 
-
-  const navigate = useNavigate(); 
-  
+  const navigate = useNavigate();
   const { token } = theme.useToken();
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const clearPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const clearPendingAuth = () => {
+    localStorage.removeItem("auth_state");
+    localStorage.removeItem("auth_deep_link");
+    setHasPendingAuth(false);
+  };
+
+  const startAuthPolling = (state: string) => {
+    clearPolling();
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const activeState = localStorage.getItem("auth_state");
+
+        if (activeState !== state) {
+          clearPolling();
+          return;
+        }
+
+        const res = await fetch(
+          `${process.env.REACT_APP_API_URL}/auth/status/${state}`
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        console.log("Auth status:", data);
+
+        if (data.status === "confirmed") {
+          clearPolling();
+
+          localStorage.setItem("isAuth", "true");
+          localStorage.setItem("currentUser", JSON.stringify(data.user));
+          clearPendingAuth();
+
+          setIsAuthenticated(true);
+          window.dispatchEvent(new Event("storage"));
+          onAuthSuccess?.();
+          return;
+        }
+
+        if (
+          data.status === "expired" ||
+          data.status === "failed" ||
+          data.status === "declined"
+        ) {
+          clearPolling();
+          clearPendingAuth();
+          onAuthFail?.();
+        }
+      } catch (err) {
+        clearPolling();
+        console.error("Polling failed:", err);
+      }
+    }, 2000);
+  };
 
   useEffect(() => {
-    let isAuth = localStorage.getItem('isAuth');
-    if(isAuth === 'true'){
+    const isAuth = localStorage.getItem("isAuth");
+    if (isAuth === "true") {
       setIsAuthenticated(true);
     }
+
+    const savedState = localStorage.getItem("auth_state");
+    if (savedState) {
+      setHasPendingAuth(true);
+      startAuthPolling(savedState);
+    }
+
+    return () => {
+      clearPolling();
+
+      if (initAbortRef.current) {
+        initAbortRef.current.abort();
+        initAbortRef.current = null;
+      }
+    };
   }, []);
 
   const handleHomeClick = () => {
-    navigate("/"); 
+    navigate("/");
   };
 
-  const handleLogIn = () => {
-    /* API response */
-    /* Replace this later ↓*/
-    const currentUser = {
-      id: 1,
-      tgId: 12345678,
-      nickname: "KishlakEnjoyer",
-      tg_username: "@jdm_enjoyerr",
-      image_url: "ava.png",
-      about_me: "TG invester from Russia.",
-    };
+  const handleLogIn = async () => {
+    try {
+      setIsConnecting(true);
 
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      const existingState = localStorage.getItem("auth_state");
+      const existingLink = localStorage.getItem("auth_deep_link");
 
-    const success = true;
+      if (existingState && existingLink) {
+        setHasPendingAuth(true);
 
-    if(success){
-      setIsAuthenticated(true);
-      localStorage.setItem('isAuth', 'true');
-      window.dispatchEvent(new Event('storage'));
-      onAuthSuccess?.();
+        if (!pollingRef.current) {
+          startAuthPolling(existingState);
+        }
+
+        window.open(existingLink, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      authAttemptRef.current += 1;
+      const currentAttempt = authAttemptRef.current;
+
+      clearPolling();
+
+      if (initAbortRef.current) {
+        initAbortRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      initAbortRef.current = controller;
+
+      clearPendingAuth();
+
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/auth/init`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+
+      const data = await res.json();
+
+      if (currentAttempt !== authAttemptRef.current) {
+        return;
+      }
+
+      localStorage.setItem("auth_state", data.state);
+      localStorage.setItem("auth_deep_link", data.deep_link);
+      setHasPendingAuth(true);
+
+      window.open(data.deep_link, "_blank", "noopener,noreferrer");
+      startAuthPolling(data.state);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+
+      console.error("Request failed:", err);
+    } finally {
+      setIsConnecting(false);
     }
-    else{
-      onAuthFail?.();
-    }
-  }
+  };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem('isAuth', '');
-    localStorage.removeItem('currentUser');
-    window.dispatchEvent(new Event('storage')); 
-    onLogout?.();
-  }
+    clearPolling();
+    clearPendingAuth();
 
-  const dropdownItems: MenuProps['items'] = [
+    localStorage.setItem("isAuth", "");
+    localStorage.removeItem("currentUser");
+
+    window.dispatchEvent(new Event("storage"));
+    onLogout?.();
+  };
+
+  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+
+  const dropdownItems: MenuProps["items"] = [
     {
-      key: 'profile',
-      label: 'Profile',
+      key: "profile",
+      label: "Profile",
       icon: <UserOutlined />,
-      onClick: () => navigate(`/account/${currentUser.nickname}`)
+      onClick: () => navigate(`/account/${currentUser.username}`),
     },
     {
-      key: 'logout',
-      label: 'Log out',
+      key: "logout",
+      label: "Log out",
       icon: <LogoutOutlined />,
       danger: true,
-      onClick: handleLogout
-    }
+      onClick: handleLogout,
+    },
   ];
 
-  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-  
   return (
     <Header className="w-full h-auto py-[var(--size-base)] px-[var(--size-4xl)] flex justify-between items-center bg-transparent">
-      <div className="flex items-center gap-[var(--size-base)] cursor-pointer" onClick={handleHomeClick}>
+      <div
+        className="flex items-center gap-[var(--size-base)] cursor-pointer"
+        onClick={handleHomeClick}
+      >
         <svg
           width="69"
           height="64"
@@ -112,99 +255,106 @@ const MainHeader: React.FC<MainHeaderProps> = ({ darkMode, onThemeChange,  onAut
             d="M9.56367 0.736035C11.199 -1.11188 13.9581 0.815568 13.5378 3.25104L13.4328 3.89536C12.9325 7.12666 12.8422 10.4764 13.2132 13.8823C15.4865 34.7543 34.1904 49.8251 54.9894 47.5439C58.6104 47.1468 62.0555 46.2487 65.2649 44.9271C67.5437 43.9887 70.0148 46.2764 68.5695 48.2781L67.9918 49.0565C61.9198 57.0319 52.7312 62.5952 42.0036 63.7717C21.2047 66.0526 2.50063 50.9821 0.227433 30.1101C-0.94482 19.3463 2.48294 9.14309 8.92996 1.47138L9.56367 0.736035ZM11.0376 1.22946C10.8861 1.2424 10.6912 1.30943 10.4778 1.55042C3.84267 9.05095 0.271323 19.2246 1.44235 29.9772C3.64237 50.1757 21.7432 64.7599 41.8711 62.5526C52.5871 61.3772 61.7154 55.6806 67.5801 47.5583C67.7687 47.2972 67.7923 47.0915 67.7723 46.9403C67.7497 46.7707 67.6565 46.5685 67.462 46.3787C67.0608 45.9873 66.3832 45.7932 65.7291 46.0625C62.415 47.4271 58.8579 48.3533 55.1218 48.7631C33.652 51.1177 14.345 35.5604 11.9983 14.0153C11.5901 10.2671 11.7225 6.58279 12.3336 3.04146C12.4542 2.34237 12.1176 1.72004 11.6498 1.41149C11.4232 1.26222 11.2074 1.215 11.0376 1.22946Z"
             fill="currentColor"
           />
-          <path
-            d="M7.5 14.5C8.71445 14.5 9.5 15.2699 9.5 16C9.5 16.7301 8.71445 17.5 7.5 17.5C6.28555 17.5 5.5 16.7301 5.5 16C5.5 15.2699 6.28555 14.5 7.5 14.5Z"
-            stroke="currentColor"
-          />
-          <path
-            d="M17.5 46.5C18.7145 46.5 19.5 47.2699 19.5 48C19.5 48.7301 18.7145 49.5 17.5 49.5C16.2855 49.5 15.5 48.7301 15.5 48C15.5 47.2699 16.2855 46.5 17.5 46.5Z"
-            stroke="currentColor"
-          />
-          <path
-            d="M13.5 33.5C16.3073 33.5 18.5 35.5585 18.5 38C18.5 40.4415 16.3073 42.5 13.5 42.5C10.6927 42.5 8.5 40.4415 8.5 38C8.5 35.5585 10.6927 33.5 13.5 33.5Z"
-            stroke="currentColor"
-          />
-          <path
-            d="M27 47.5C28.9978 47.5 30.5 48.9038 30.5 50.5C30.5 52.0962 28.9978 53.5 27 53.5C25.0022 53.5 23.5 52.0962 23.5 50.5C23.5 48.9038 25.0022 47.5 27 47.5Z"
-            stroke="currentColor"
-          />
+          <path d="M7.5 14.5C8.71445 14.5 9.5 15.2699 9.5 16C9.5 16.7301 8.71445 17.5 7.5 17.5C6.28555 17.5 5.5 16.7301 5.5 16C5.5 15.2699 6.28555 14.5 7.5 14.5Z" stroke="currentColor" />
+          <path d="M17.5 46.5C18.7145 46.5 19.5 47.2699 19.5 48C19.5 48.7301 18.7145 49.5 17.5 49.5C16.2855 49.5 15.5 48.7301 15.5 48C15.5 47.2699 16.2855 46.5 17.5 46.5Z" stroke="currentColor" />
+          <path d="M13.5 33.5C16.3073 33.5 18.5 35.5585 18.5 38C18.5 40.4415 16.3073 42.5 13.5 42.5C10.6927 42.5 8.5 40.4415 8.5 38C8.5 35.5585 10.6927 33.5 13.5 33.5Z" stroke="currentColor" />
+          <path d="M27 47.5C28.9978 47.5 30.5 48.9038 30.5 50.5C30.5 52.0962 28.9978 53.5 27 53.5C25.0022 53.5 23.5 52.0962 23.5 50.5C23.5 48.9038 25.0022 47.5 27 47.5Z" stroke="currentColor" />
           <circle cx="7" cy="28" r="3.5" stroke="currentColor" />
-          <path
-            d="M48 52.5C48.7301 52.5 49.5 53.2855 49.5 54.5C49.5 55.7145 48.7301 56.5 48 56.5C47.2699 56.5 46.5 55.7145 46.5 54.5C46.5 53.2855 47.2699 52.5 48 52.5Z"
-            stroke="currentColor"
-          />
-          <path
-            d="M36.5 55.5C37.5231 55.5 38.5 56.5301 38.5 58C38.5 59.4699 37.5231 60.5 36.5 60.5C35.4769 60.5 34.5 59.4699 34.5 58C34.5 56.5301 35.4769 55.5 36.5 55.5Z"
-            stroke="currentColor"
-          />
+          <path d="M48 52.5C48.7301 52.5 49.5 53.2855 49.5 54.5C49.5 55.7145 48.7301 56.5 48 56.5C47.2699 56.5 46.5 55.7145 46.5 54.5C46.5 53.2855 47.2699 52.5 48 52.5Z" stroke="currentColor" />
+          <path d="M36.5 55.5C37.5231 55.5 38.5 56.5301 38.5 58C38.5 59.4699 37.5231 60.5 36.5 60.5C35.4769 60.5 34.5 59.4699 34.5 58C34.5 56.5301 35.4769 55.5 36.5 55.5Z" stroke="currentColor" />
         </svg>
 
-        <Title level={1} className="!m-0 !font-[var(--font-regular)] hover:opacity-[0.65]" style={{ color: token.colorPrimary }}>
+        <Title
+          level={1}
+          className="!m-0 !font-[var(--font-regular)] hover:opacity-[0.65]"
+          style={{ color: token.colorPrimary }}
+        >
           Moon
         </Title>
       </div>
+
       <div className="flex flex-row items-center gap-5">
-        <Button 
-          type='text'
-          onClick={() => onThemeChange(!darkMode)}
-        >
+        <Button type="text" onClick={() => onThemeChange(!darkMode)}>
           {darkMode ? <MoonOutlined /> : <SunOutlined />}
         </Button>
+
         {!isAuthenticated && (
           <div className="flex items-center gap-[var(--size-base)] text-[var(--size-smm)]">
             <Button
-            color="default"
-            variant="outlined"
-            size="large"
-            onClick={handleLogIn}
-            className="bg-[var(--liquid-glass-bg)]"
-          >
-            Connect TG
-            <Avatar
-              src="/icons/tg-icon-png.png"
-              alt="TgIcon"
-            />
-          </Button>
+              color="default"
+              variant="outlined"
+              size="large"
+              onClick={handleLogIn}
+              className="bg-[var(--liquid-glass-bg)]"
+              loading={isConnecting}
+              disabled={isConnecting}
+            >
+              {isConnecting
+                ? "Connecting..."
+                : hasPendingAuth
+                ? "Open TG again"
+                : "Connect TG"}
+              <Avatar src="/icons/tg-icon-png.png" alt="TgIcon" />
+            </Button>
           </div>
         )}
 
         {isAuthenticated && (
           <div className="flex items-center gap-[var(--size-base)] text-[var(--size-smm)]">
-
-            <Dropdown menu={{ items: dropdownItems }} trigger={['hover']}>
-              <Avatar 
-                size='large' 
-                src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${currentUser.image_url}`} 
+            <Dropdown menu={{ items: dropdownItems }} trigger={["hover"]}>
+              <Avatar
+                size="large"
+                src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${
+                  currentUser.image_url ? currentUser.image_url : "example_user.png"
+                }`}
                 className="border-solid border-gray-500"
               />
-            </Dropdown>            
-            <Badge count={4} >
-              <Button type="text" 
-              icon={<BellOutlined  />} 
-              className='icon-antd'
-              size="large"/>
+            </Dropdown>
+
+            <Badge count={4}>
+              <Button
+                type="text"
+                icon={<BellOutlined />}
+                className="icon-antd"
+                size="large"
+              />
             </Badge>
 
-            <Button type="text" icon={<TeamOutlined />} 
-            className='icon-antd'
-            size="large" />
+            <Button
+              type="text"
+              icon={<TeamOutlined />}
+              className="icon-antd"
+              size="large"
+            />
 
-            <Button type="text" icon={<ShoppingCartOutlined />}
-            className='icon-antd'
-            size="large"
-            onClick={() => setCartOpen(true)}/>
+            <Button
+              type="text"
+              icon={<ShoppingCartOutlined />}
+              className="icon-antd"
+              size="large"
+              onClick={() => setCartOpen(true)}
+            />
 
-            <Button type="primary" icon={<PlusOutlined />} iconPlacement={"end"} size="large">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              iconPlacement={"end"}
+              size="large"
+            >
               {currentUser.balance}
-              <TONIcon/>
+              <TONIcon />
             </Button>
-                     
           </div>
         )}
       </div>
-      <ModalCart open={cartOpen} onClose={() => setCartOpen(false)} onOpen={() => setCartOpen(true)} items={cartItems} />
+
+      <ModalCart
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        onOpen={() => setCartOpen(true)}
+        items={cartItems}
+      />
     </Header>
-    
   );
 };
 
