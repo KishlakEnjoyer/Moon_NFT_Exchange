@@ -9,6 +9,7 @@ from core.database import get_db
 from core.models import User
 from utils.redis_client import redis_client
 
+
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 

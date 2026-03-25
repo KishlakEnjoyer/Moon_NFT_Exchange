@@ -9,7 +9,7 @@ from states.AuthState import AuthState
 
 router = Router()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+REACT_APP_API_URL = os.getenv("API_DOCKER_URL")
 
 
 @router.callback_query(AuthState.waiting_confirm, lambda c: c.data == "confirm")
@@ -30,7 +30,7 @@ async def confirm_auth(callback: CallbackQuery, state: FSMContext):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{BACKEND_URL}/auth/confirm", json=payload) as resp:
+            async with session.post(f"{REACT_APP_API_URL}/auth/confirm", json=payload) as resp:
                 text = await resp.text()
 
                 if resp.status != 200:
@@ -62,7 +62,7 @@ async def decline_auth(callback: CallbackQuery, state: FSMContext):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{BACKEND_URL}/auth/decline", json=payload) as resp:
+            async with session.post(f"{REACT_APP_API_URL}/auth/decline", json=payload) as resp:
                 text = await resp.text()
 
                 if resp.status != 200:
