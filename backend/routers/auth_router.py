@@ -2,26 +2,16 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.models import User
+from core.request_models import ConfirmAuthRequest, DeclineAuthRequest
 from utils.redis_client import redis_client
+from services.blockchain.user_wallet_service import ensure_user_wallet
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-class ConfirmAuthRequest(BaseModel):
-    state: str
-    tg_id: int
-    tg_username: str | None = None
-    profile_pic_url: str | None = None
-
-
-class DeclineAuthRequest(BaseModel):
-    state: str
 
 
 @auth_router.post("/init")
@@ -78,8 +68,6 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
             user_tg_id=payload.tg_id,
             tg_username=payload.tg_username,
             tg_visibility=1,
-            username=username_candidate,
-            profile_pic_url=payload.profile_pic_url,
             wallet_address=None,
             is_active=1,
             about_me=None,
@@ -94,13 +82,11 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
             user.tg_username = payload.tg_username
             updated = True
 
-        if payload.profile_pic_url and user.profile_pic_url != payload.profile_pic_url:
-            user.profile_pic_url = payload.profile_pic_url
-            updated = True
-
         if updated:
             db.commit()
             db.refresh(user)
+
+    user = ensure_user_wallet(db, user)
 
     redis_payload = {
         "status": "confirmed",
@@ -113,7 +99,6 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
             "tg_username": user.tg_username,
             "tg_visibility": user.tg_visibility,
             "username": user.username,
-            "profile_pic_url": user.profile_pic_url,
             "wallet_address": user.wallet_address,
             "is_active": user.is_active,
             "about_me": user.about_me,

@@ -11,7 +11,6 @@ export interface Present {
   generated_at: string | null;
   is_burned: boolean;
 
-  // Денормализованные поля для удобства (потом придут с JOIN из API)
   collectionName: string;
   modelName: string;
   modelRarity: number;    // % редкости

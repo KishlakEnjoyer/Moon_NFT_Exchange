@@ -25,7 +25,6 @@ async def confirm_auth(callback: CallbackQuery, state: FSMContext):
         "state": auth_state,
         "tg_id": callback.from_user.id,
         "tg_username": callback.from_user.username,
-        "profile_pic_url": None,
     }
 
     try:

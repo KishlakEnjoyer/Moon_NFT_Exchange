@@ -33,6 +33,7 @@ logs/
 # Block chain data and artifacts
 cache/
 artifacts/
+blockchain/ganache-db/
 
 # Secret key and data of Ganache
 ganache-data/

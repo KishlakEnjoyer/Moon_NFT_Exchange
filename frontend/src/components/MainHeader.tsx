@@ -305,7 +305,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               <Avatar
                 size="large"
                 src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${
-                  currentUser.image_url ? currentUser.image_url : "example_user.png"
+                  currentUser.profile_pic_url ? currentUser.profile_pic_url : "example_user.png"
                 }`}
                 className="border-solid border-gray-500"
               />
