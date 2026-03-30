@@ -1,12 +1,11 @@
 import asyncio
 import logging
 import os
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, BotCommand
-from aiogram.filters import CommandStart, CommandObject
+from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
-from handlers import start, confirm_auth
+from handlers import start, confirm_auth, info, topup
 
 load_dotenv()
 
@@ -18,11 +17,14 @@ dp = Dispatcher()
 
 dp.include_router(start.router)
 dp.include_router(confirm_auth.router)
+dp.include_router(info.router)
+dp.include_router(topup.router)
 
 
 async def main():
     commands = [
-        BotCommand(command="start", description="Главное меню"),
+        BotCommand(command="start", description="Start authentication process"),
+        BotCommand(command="profile", description="Info about your profile"),
     ]
     await bot.set_my_commands(commands)
     await dp.start_polling(bot)

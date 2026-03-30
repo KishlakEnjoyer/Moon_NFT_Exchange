@@ -4,6 +4,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: moon_backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     env_file:
@@ -17,7 +19,7 @@ services:
 
   tg-bot:
     build:
-      context: ./tg-bot
+      context: ./tg_bot
       dockerfile: Dockerfile
     container_name: moon_tgbot
     env_file:
@@ -25,8 +27,6 @@ services:
     restart: always
     depends_on:
       - backend
-      - db
-      - redis
     networks:
       - moon_net
 

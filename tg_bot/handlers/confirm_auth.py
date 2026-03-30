@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from states.AuthState import AuthState
+from keyboards.topupKeyboard import get_topup_keyboard
 
 router = Router()
 
@@ -38,7 +39,7 @@ async def confirm_auth(callback: CallbackQuery, state: FSMContext):
                     return
 
         await callback.answer("Confirmed")
-        await callback.message.edit_text("✅ Login confirmed. You can return to the site.")
+        await callback.message.edit_text("✅ Login confirmed. You can return to the site.", reply_markup=get_topup_keyboard())
         await state.clear()
 
     except Exception as e:

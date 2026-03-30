@@ -1,0 +1,52 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from core.database import get_db
+from core.request_models import TopUpRequest, TopUpResponse
+from services.blockchain.topup_service import transfer_tokens_to_user_by_tg_id
+
+topup_router = APIRouter(prefix="/topup", tags=["topup"])
+
+
+@topup_router.post("/topup", response_model=TopUpResponse)
+def topup(
+    payload: TopUpRequest,
+    db: Session = Depends(get_db),
+) -> TopUpResponse:
+    try:
+        result = transfer_tokens_to_user_by_tg_id(
+            db=db,
+            tg_id=payload.tg_id,
+            amount=payload.amount,
+        )
+        return TopUpResponse(**result)
+
+    except ValueError as e:
+        msg = str(e)
+
+        print(msg)
+
+        if msg == "User not found":
+            raise HTTPException(status_code=404, detail=msg)
+
+        if msg == "User wallet not found":
+            raise HTTPException(status_code=400, detail=msg)
+
+        raise HTTPException(status_code=400, detail=msg)
+
+    except RuntimeError as e:
+        msg = str(e)
+
+        print(msg)
+
+        if msg.startswith("Cooldown active:"):
+            seconds = int(msg.split(":")[1])
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": "Cooldown active",
+                    "remaining_seconds": seconds,
+                },
+            )
+
+        raise HTTPException(status_code=400, detail=msg)

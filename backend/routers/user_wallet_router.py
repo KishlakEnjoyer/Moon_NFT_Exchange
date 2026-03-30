@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from services.blockchain.user_wallet_service import get_user_wallet_balances
+from services.user_wallet_service import get_user_wallet_balances
 
 user_wallet_router = APIRouter(
     prefix="/user-wallet",

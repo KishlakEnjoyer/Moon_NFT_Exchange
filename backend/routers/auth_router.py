@@ -8,7 +8,7 @@ from core.database import get_db
 from core.models import User
 from core.request_models import ConfirmAuthRequest, DeclineAuthRequest
 from utils.redis_client import redis_client
-from services.blockchain.user_wallet_service import ensure_user_wallet
+from services.user_wallet_service import ensure_user_wallet
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -52,10 +52,12 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
     if auth_data.get("status") in ["failed", "declined", "expired"]:
         raise HTTPException(status_code=400, detail="This auth request is no longer active")
 
+    effective_username = payload.tg_username or f"user_{payload.tg_id}"
+
     user = db.query(User).filter(User.user_tg_id == payload.tg_id).first()
 
     if not user:
-        base_username = payload.tg_username or f"user_{payload.tg_id}"
+        base_username = effective_username  
         username_candidate = base_username
         suffix = 1
 
@@ -66,8 +68,9 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
         user = User(
             role_id=1,
             user_tg_id=payload.tg_id,
-            tg_username=payload.tg_username,
+            tg_username=effective_username,  
             tg_visibility=1,
+            username=effective_username,
             wallet_address=None,
             is_active=1,
             about_me=None,
@@ -78,8 +81,8 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
     else:
         updated = False
 
-        if payload.tg_username and user.tg_username != payload.tg_username:
-            user.tg_username = payload.tg_username
+        if user.tg_username != effective_username:
+            user.tg_username = effective_username
             updated = True
 
         if updated:
