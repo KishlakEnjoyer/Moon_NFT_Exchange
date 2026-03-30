@@ -42,3 +42,39 @@ class TopUpResponse(BaseModel):
     block_number: int
     new_balance: str
     cooldown_minutes: int
+
+
+class CollectionOption(BaseModel):
+    id: int
+    name: str
+    image_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ModelOption(BaseModel):
+    id: int
+    name: str
+    image_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class BackgroundOption(BaseModel):
+    id: int
+    name: str
+    image_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class SymbolOption(BaseModel):
+    id: int
+    name: str
+    image_url: str | None = None
+
+    class Config:
+        from_attributes = True
