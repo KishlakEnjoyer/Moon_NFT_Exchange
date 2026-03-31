@@ -1,24 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from services.user_wallet_service import get_user_wallet_balances
 from core.database import get_db
 from core.request_models import TopUpRequest, TopUpResponse
 from services.blockchain.topup_service import transfer_tokens_to_user_by_tg_id
+
+from utils.websocket_manager import ws_manager
+import asyncio
 
 topup_router = APIRouter(prefix="/topup", tags=["topup"])
 
 
 @topup_router.post("/topup", response_model=TopUpResponse)
-def topup(
+async def topup( 
     payload: TopUpRequest,
     db: Session = Depends(get_db),
 ) -> TopUpResponse:
     try:
-        result = transfer_tokens_to_user_by_tg_id(
+        result = await asyncio.to_thread( 
+            transfer_tokens_to_user_by_tg_id,
             db=db,
             tg_id=payload.tg_id,
             amount=payload.amount,
         )
+
+        await ws_manager.send_balance(result["user_id"], result["new_balance"])
+
         return TopUpResponse(**result)
 
     except ValueError as e:

@@ -17,6 +17,7 @@ import {
 import TONIcon from "./icons/TONIcon";
 import { getActiveListings } from "../fictive_data/listings";
 import ModalCart from "./ModalCart";
+import { useBalanceSocket } from "../hooks/useBalanceSocket";
 
 interface MainHeaderProps {
   darkMode: boolean;
@@ -33,6 +34,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   onAuthFail,
   onLogout,
 }) => {
+  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+
   const pollingRef = useRef<number | null>(null);
   const initAbortRef = useRef<AbortController | null>(null);
   const authAttemptRef = useRef(0);
@@ -42,6 +45,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasPendingAuth, setHasPendingAuth] = useState(false);
+  const [balance, setBalance] = useState<number>(currentUser.balance ?? 0);
+
 
   const navigate = useNavigate();
   const { token } = theme.useToken();
@@ -131,6 +136,24 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     };
   }, []);
 
+  useBalanceSocket(
+    isAuthenticated ? currentUser.user_id : null,
+    (newBalance) => {
+      setBalance(newBalance);
+      const updated = { ...currentUser, balance: newBalance };
+      localStorage.setItem("currentUser", JSON.stringify(updated));
+    }
+  );
+
+  useEffect(() => {
+  if (isAuthenticated) {
+    const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
+    setBalance(user.balance ?? 0);
+  } else {
+    setBalance(0);
+  }
+}, [isAuthenticated]);
+
   const handleHomeClick = () => {
     navigate("/");
   };
@@ -216,7 +239,6 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     onLogout?.();
   };
 
-  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
 
   const dropdownItems: MenuProps["items"] = [
     {
@@ -340,8 +362,10 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               icon={<PlusOutlined />}
               iconPlacement={"end"}
               size="large"
-            >
-              {currentUser.balance}
+              onClick={() => {
+                window.open(`https://t.me/moon_exchange_bot`, "_blank", "noopener,noreferrer");
+              }}>
+              {balance}
               <TONIcon />
             </Button>
           </div>

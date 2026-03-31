@@ -125,6 +125,7 @@ def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -
     db.add(topup)
     db.commit()
     db.refresh(topup)
+    
 
     try:
         nonce = w3.eth.get_transaction_count(faucet_address)
@@ -167,12 +168,12 @@ def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -
 
         return {
             "topup_id": topup.topup_id,
-            "user_id": user.user_id,
+            "user_id": user.user_id,  
             "wallet_address": user.wallet_address,
             "amount": str(amount),
             "tx_hash": tx_hash_hex,
             "block_number": int(receipt.blockNumber),
-            "new_balance": new_balance,
+            "new_balance": new_balance,  
             "cooldown_minutes": TOPUP_COOLDOWN_MINUTES,
         }
 

@@ -9,9 +9,23 @@ from core.models import User
 from core.request_models import ConfirmAuthRequest, DeclineAuthRequest
 from utils.redis_client import redis_client
 from services.user_wallet_service import ensure_user_wallet
+from services.user_wallet_service import get_user_wallet_balances
+
+from fastapi import WebSocket, WebSocketDisconnect
+from utils.websocket_manager import ws_manager
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@auth_router.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: int, db: Session = Depends(get_db)):
+    await ws_manager.connect(user_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()  
+    except WebSocketDisconnect:
+        ws_manager.disconnect(user_id)
 
 
 @auth_router.post("/init")
@@ -166,6 +180,8 @@ def auth_status(state: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         return {"status": "failed"}
+    
+    balance = get_user_wallet_balances(db, user.user_tg_id)['token_balance']
 
     return {
         "status": "confirmed",
@@ -180,5 +196,6 @@ def auth_status(state: str, db: Session = Depends(get_db)):
             "wallet_address": user.wallet_address,
             "is_active": user.is_active,
             "about_me": user.about_me,
+            "balance": balance
         }
     }
