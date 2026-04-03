@@ -35,12 +35,13 @@ To design, develop, and test a fully functional multi-chain NFT exchange that en
 
 ## 📋 Project Structure
 
-- `contracts/` — Smart contracts  
-- `frontend/` — Web interface  
-- `backend/` — API and business logic  
+- `blockchain/` — Blockshain logic  
+- `images/` — Images folder  
+- `ipynbs/` — ipynb's folder (Parsing, ML)  
+- `frontend/` — Web interface (React TS)
+- `backend/` — API and business logic (FastAPI)
 - `docs/` — Project documentation and technical specification  
-- `tests/` — Unit and integration tests
-- `tg-bot/` — Telegram bot logic  
+- `tg_bot/` — Telegram bot logic  
 
 ---
 
