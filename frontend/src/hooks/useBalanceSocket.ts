@@ -5,6 +5,7 @@ export const useBalanceSocket = (
   onBalanceUpdate: (balance: number) => void
 ) => {
   const wsRef = useRef<WebSocket | null>(null);
+  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onBalanceUpdateRef = useRef(onBalanceUpdate);
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export const useBalanceSocket = (
     if (!userId) {
       wsRef.current?.close();
       wsRef.current = null;
+      if (pingRef.current) clearInterval(pingRef.current);
       return;
     }
 
@@ -35,7 +37,13 @@ export const useBalanceSocket = (
         }
       };
 
+      if (pingRef.current) clearInterval(pingRef.current);
+      pingRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+      }, 30000);
+
       ws.onclose = () => {
+        if (pingRef.current) clearInterval(pingRef.current);
         if (!cancelled) setTimeout(connect, 3000);
       };
 
@@ -46,6 +54,7 @@ export const useBalanceSocket = (
 
     return () => {
       cancelled = true;
+      if (pingRef.current) clearInterval(pingRef.current);
       wsRef.current?.close();
       wsRef.current = null;
     };

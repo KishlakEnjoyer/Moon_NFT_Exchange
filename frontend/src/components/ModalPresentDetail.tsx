@@ -1,6 +1,5 @@
 import { Modal, Flex, Typography, Image, Button, Avatar } from "antd";
-import { ListingFull } from "../fictive_data/listings";
-import { getCollectionById } from "../fictive_data/collections";
+import { ApiListing, getPresentImageUrl } from "../services/listingService";
 import TONIcon from "./icons/TONIcon";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCartOutlined } from "@ant-design/icons";
@@ -9,20 +8,23 @@ const { Title, Text } = Typography;
 
 interface ModalPresentDetailProps {
   open: boolean;
-  item: ListingFull | null;
+  item: ApiListing | null;
   onClose: () => void;
+  onAddToCart?: (listingId: number) => void;
+  isInCart?: boolean;
 }
 
-const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onClose }) => {
+const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onClose, onAddToCart, isInCart }) => {
   const navigate = useNavigate();
   if (!item) return null;
 
-  const { present, seller, price } = item;
-  const collection = getCollectionById(present.collection_id);
+  const price = parseFloat(item.price).toFixed(2);
 
   const handleSellerClick = () => {
     onClose();
-    navigate(`/account/${seller.username}`);
+    if (item.seller_username) {
+      navigate(`/account/${item.seller_username}`);
+    }
   };
 
   const attributes = [
@@ -37,29 +39,27 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onC
         >
           <Avatar
             size={24}
-            src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${seller.profile_pic_url}`}
+            src={`${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`}
           />
-          <Text className="!text-[var(--accent-150)]">{seller.username}</Text>
+          <Text className="!text-[var(--accent-150)]">{item.seller_username || 'Unknown'}</Text>
         </Flex>
       ),
     },
     {
       key: 'Model',
-      value: present.modelName,
+      value: item.model_name || '—',
     },
     {
       key: 'Symbol',
-      value: present.symbolName,
+      value: item.symbol_name || '—',
     },
     {
-      key: 'Backdrop',
-      value: present.backgroundName,
+      key: 'Network',
+      value: item.blockchain_network,
     },
     {
-      key: 'Quantity',
-      value: collection
-        ? `${present.present_num.toLocaleString('en-US')} of ${collection.collection_limit.toLocaleString('en-US')} issued`
-        : present.present_num.toLocaleString('en-US'),
+      key: 'Token ID',
+      value: item.token_id,
     },
   ];
 
@@ -70,12 +70,11 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onC
       footer={null}
       width={400}
       title={null}
-
     >
       <Flex vertical align="center" gap={16} className="pt-4">
         <Image
-          src={`${process.env.REACT_APP_IMAGES_URL}/presents/${present.image_url}`}
-          alt={present.collectionName}
+          src={getPresentImageUrl(item.present_image_url)}
+          alt={item.collection_name}
           width={180}
           preview={false}
           className="rounded-[var(--size-smm)]"
@@ -83,9 +82,9 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onC
 
         <Flex vertical align="center" gap={4}>
           <Title level={4} className="!mb-0">
-            {present.collectionName} #{present.present_num.toLocaleString('en-US')}
+            {item.collection_name} #{item.present_id}
           </Title>
-          <Text type="secondary">{present.modelName}</Text>
+          {item.model_name && <Text type="secondary">{item.model_name}</Text>}
         </Flex>
 
         <div className="w-full rounded-[var(--size-smm)] border-solid border border-[var(--black-60)] overflow-hidden">
@@ -109,12 +108,18 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onC
         </div>
 
         <Flex className="w-full" gap={8}>
-        <Button type="primary" size="large" style={{ flex: 3 }} icon={<TONIcon />}>
-            {price} — Buy
-        </Button>
-        <Button type="default" size="large" style={{ flex: 1 }} icon={<ShoppingCartOutlined />}
+          <Button type="primary" size="large" style={{ flex: 3 }} icon={<TONIcon />}>
+            {price} TON — Buy
+          </Button>
+          <Button 
+            type="default" 
+            size="large" 
+            style={{ flex: 1 }} 
+            icon={<ShoppingCartOutlined />}
             className="!bg-[var(--liquid-glass-bg)]"
-        />
+            onClick={() => onAddToCart?.(item.listing_id)}
+            disabled={isInCart}
+          />
         </Flex>
       </Flex>
     </Modal>

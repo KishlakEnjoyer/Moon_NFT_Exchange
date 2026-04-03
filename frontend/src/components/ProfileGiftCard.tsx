@@ -5,26 +5,32 @@ interface ProfileGiftCardProps {
   cardImage?: string;
   name?: string;
   number?: string | number;
-  onSale?: boolean;
-  visible?: boolean;
+  isOnSale?: boolean;
+  isVisible?: boolean;
+  isUpgraded?: boolean;
+  onClick?: () => void;
 }
 
 const ProfileGiftCard = ({
   cardImage,
   name,
   number,
-  onSale = true,
-  visible = true
+  isOnSale = false,
+  isVisible = true,
+  isUpgraded = false,
+  onClick
 }: ProfileGiftCardProps) => {
 
   return (
-    <div className="relative w-full h-full z-4">
-      {!visible && <div className="w-full h-full absolute z-50 flex items-center justify-center">
-        <EyeInvisibleOutlined className="text-white text-3xl bg-[var(--black-100-semiopac)] p-[var(--size-sm)] rounded-full" />
-      </div>}
+    <div className={`relative w-full h-full z-4 cursor-pointer`} onClick={onClick}>
+      {!isVisible && (
+        <div className="w-full h-full absolute z-50 flex items-center justify-center">
+          <EyeInvisibleOutlined className="text-white text-3xl bg-[var(--black-100-semiopac)] p-[var(--size-sm)] rounded-full" />
+        </div>
+      )}
 
       <div className="flex flex-row gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">
-        {onSale && 
+        {isOnSale && 
           <div className="text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
             On Sale
           </div>
@@ -49,7 +55,7 @@ const ProfileGiftCard = ({
             alt={name}
             draggable={false}
             preview={false}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${!isUpgraded ? 'p-4' : ''}`}
           />
         }
       />

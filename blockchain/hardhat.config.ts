@@ -38,7 +38,7 @@ export default defineConfig({
       url: "http://127.0.0.1:8545",
       chainId: 1337,
       accounts: [
-        "0xf21dd0916be1317ba81636198ad14c7acd01dbfddeef8d4313f27c8cd411c6dc",
+        "0xf507c38d7c9c98daf37842d015bd8862d28b812dc57548e00e23d62bf412f1e1",
       ],
     },
     sepolia: {

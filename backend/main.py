@@ -6,6 +6,14 @@ from routers.user_wallet_router import user_wallet_router
 from routers.info_router import user_info_router
 from routers.topup_router import topup_router
 from routers.filter_router import filters_router
+from routers.notification_router import notification_router
+from routers.album_router import album_router  
+from routers.report_router import report_router  
+from routers.gift_router import gift_router  
+from routers.listings_router import listings_router  
+from routers.cart_router import cart_router  
+from routers.transactions_router import transactions_router  
+from routers.presents_router import presents_router  
 from dotenv import load_dotenv
 import os
 
@@ -13,9 +21,11 @@ load_dotenv()
 
 app = FastAPI(title="Moon NFT Exchange API")
 
+origins = [o for o in [os.getenv("REACT_APP_FRONT_URL"), os.getenv("REACT_APP_FRONT_URL2")] if o]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("REACT_APP_FRONT_URL"), os.getenv("REACT_APP_FRONT_URL2")],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,3 +37,11 @@ app.include_router(user_wallet_router)
 app.include_router(user_info_router)
 app.include_router(topup_router)
 app.include_router(filters_router)
+app.include_router(notification_router)
+app.include_router(album_router)
+app.include_router(report_router)
+app.include_router(gift_router)
+app.include_router(listings_router)
+app.include_router(cart_router)
+app.include_router(transactions_router)
+app.include_router(presents_router)

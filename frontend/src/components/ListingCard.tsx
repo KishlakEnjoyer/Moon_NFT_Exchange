@@ -1,21 +1,19 @@
 import { Button, Card, Space, Typography, Image } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
-import { ListingFull } from "../fictive_data/listings";
+import { ApiListing, getPresentImageUrl } from "../services/listingService";
 
 interface ListingCardProps {
-  item: ListingFull;
-  onPresentClick?: (item: ListingFull) => void;
-  onClose?: () => void;
-  collectionName?: string;
-  presentImage?: string;
-  presentNumber?: string | number;
-  presentPrice?: number | string;
+  item: ApiListing;
+  onPresentClick?: (item: ApiListing) => void;
+  onAddToCart?: (listingId: number) => void;
+  isInCart?: boolean;
 }
 
 const { Text } = Typography;
 
-const ListingCard = ({ item, collectionName, presentImage, presentNumber, presentPrice, onPresentClick, onClose }: ListingCardProps) => {
+const ListingCard = ({ item, onPresentClick, onAddToCart, isInCart }: ListingCardProps) => {
+  const price = parseFloat(item.price).toFixed(2);
 
   return (
     <Card
@@ -34,9 +32,9 @@ const ListingCard = ({ item, collectionName, presentImage, presentNumber, presen
       cover={
         <Image
           className="w-full h-full rounded-[var(--size-smm)] object-cover object-center"
-          alt={collectionName || 'Unknown Collection'}
+          alt={item.collection_name || 'Unknown Collection'}
           draggable={false}
-          src={`${process.env.REACT_APP_IMAGES_URL}/presents/${presentImage || "placeholder.png"}`}
+          src={getPresentImageUrl(item.present_image_url)}
           preview={false}
           onClick={() => onPresentClick?.(item)}
         />
@@ -51,7 +49,7 @@ const ListingCard = ({ item, collectionName, presentImage, presentNumber, presen
           }}
           onClick={() => onPresentClick?.(item)}
         >
-          {collectionName || 'Unknown Collection'}
+          {item.collection_name || 'Unknown Collection'}
         </Text>
         <Text
           type="secondary"
@@ -60,7 +58,7 @@ const ListingCard = ({ item, collectionName, presentImage, presentNumber, presen
             fontWeight: 'var(--font-light)', 
           }}
         >
-          {presentNumber ? `#${presentNumber}` : 'No. not specified'}
+          #{item.present_id}
         </Text>
       </Space>
 
@@ -77,14 +75,16 @@ const ListingCard = ({ item, collectionName, presentImage, presentNumber, presen
           size="large"
           className="rounded-[var(--size-smm)]"
           block>
-          {presentPrice ? `${presentPrice}` : 'Price not specified'}
+          {price}
         </Button>
 
         <Button
           type="default"
           icon={<ShoppingCartOutlined />}
           size="large"
-          className={`icon-antd aspect-square rounded-[var(--size-smm)] !bg-[var(--liquid-glass-bg)]`}
+          className={`icon-antd aspect-square rounded-[var(--size-smm)] !bg-[var(--liquid-glass-bg)] ${isInCart ? '!border-[var(--color-primary)]' : ''}`}
+          onClick={() => onAddToCart?.(item.listing_id)}
+          disabled={isInCart}
         />
       </div>
     </Card>

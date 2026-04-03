@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigProvider, Layout, theme } from 'antd';
+
 import { Routes, Route } from 'react-router-dom';
 import MainView from './views/MainView';
 import AccountView from './views/AccountView';

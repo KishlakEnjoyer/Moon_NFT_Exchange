@@ -1,42 +1,75 @@
-import { Modal, Button, Flex, Divider, Typography, Empty } from "antd";
-import { useState } from "react";
+import { Modal, Button, Flex, Divider, Typography, Empty, message } from "antd";
+import { useState, useEffect, useCallback } from "react";
 import TONIcon from "./icons/TONIcon";
-import { ListingFull } from "../fictive_data/listings";
-import CartItem from "./CartItem";
-import ModalPresentDetail from "./ModalPresentDetail";
-
+import { CartItem, getCart, removeFromCart, clearCart } from "../services/listingService";
+import CartItemRow from "./CartItem";
 
 const { Text, Title } = Typography;
+
+const getStoredCurrentUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("currentUser") || "{}");
+  } catch {
+    return {};
+  }
+};
 
 interface ModalCartProps {
   open: boolean;
   onClose: () => void;
   onOpen: () => void;
-  items: ListingFull[];
 }
 
-const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen, items: initialItems }) => {
-  const [items, setItems] = useState<ListingFull[]>(initialItems);
-  const [selectedPresent, setSelectedPresent] = useState<ListingFull | null>(null);
+const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
+  const [messageApi, contextHolder] = message.useMessage();
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  const handleRemove = (listing_id: number) => {
-    setItems((prev) => prev.filter((item) => item.listing_id !== listing_id));
+  const currentUserId = getStoredCurrentUser().user_id;
+
+  const loadCart = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      const cart = await getCart(currentUserId);
+      setCartItems(cart.items);
+    } catch {
+      setCartItems([]);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (open) {
+      loadCart();
+    }
+  }, [open, loadCart]);
+
+  const handleRemove = async (cartItemId: number) => {
+    try {
+      await removeFromCart(cartItemId);
+      setCartItems((prev) => prev.filter((item) => item.cart_item_id !== cartItemId));
+    } catch (e: any) {
+      messageApi.error(e.message || "Failed to remove item");
+    }
   };
 
-  const handlePresentClick = (item: ListingFull) => {
-    onClose();                 
-    setSelectedPresent(item);  
+  const handleClearCart = async () => {
+    if (!currentUserId) return;
+    try {
+      await clearCart(currentUserId);
+      setCartItems([]);
+    } catch (e: any) {
+      messageApi.error(e.message || "Failed to clear cart");
+    }
   };
 
-  const handlePresentClose = () => {
-    setSelectedPresent(null);   
-    onOpen();
+  const handlePresentClick = (_item: CartItem) => {
+    onClose();
   };
 
-  const total = items.reduce((sum, item) => sum + item.price, 0);
+  const total = cartItems.reduce((sum, item) => sum + parseFloat(item.price), 0);
 
   return (
     <>
+      {contextHolder}
       <Modal
         open={open}
         onCancel={onClose}
@@ -46,22 +79,29 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen, items: ini
       >
         <Flex vertical gap={12} className="mt-4 max-h-[65vh]">
           <Flex vertical gap={12} className="mt-4 max-h-[50vh] overflow-y-auto">
-            {items.length === 0 ? (
+            {cartItems.length === 0 ? (
               <Empty description="Cart is empty" className="py-8" />
             ) : (
-              items.map((item) => (
-                <CartItem
-                  key={item.listing_id}
-                  item={item}
-                  onRemove={handleRemove}
-                  onPresentClick={handlePresentClick}
-                  onClose={onClose}
-                />
-              ))
+              <>
+                <Flex justify="flex-end">
+                  <Button type="link" size="small" onClick={handleClearCart}>
+                    Clear cart
+                  </Button>
+                </Flex>
+                {cartItems.map((item) => (
+                  <CartItemRow
+                    key={item.cart_item_id}
+                    item={item}
+                    onRemove={handleRemove}
+                    onPresentClick={handlePresentClick}
+                    onClose={onClose}
+                  />
+                ))}
+              </>
             )}
           </Flex>
 
-          {items.length > 0 && (
+          {cartItems.length > 0 && (
             <>
               <Divider className="!my-2" />
               <Flex justify="space-between" align="center">
@@ -78,12 +118,6 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen, items: ini
           )}
         </Flex>
       </Modal>
-
-      <ModalPresentDetail
-        open={!!selectedPresent}
-        item={selectedPresent}
-        onClose={handlePresentClose}
-      />
     </>
   );
 };

@@ -95,6 +95,12 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    cart: Mapped[Cart | None] = relationship(
+        "Cart",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class Role(Base):
@@ -216,8 +222,10 @@ class Present(Base):
     token_id: Mapped[str] = mapped_column(String(78), nullable=False)
     metadata_uri: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
     is_burned: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    is_visible: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
 
     collection: Mapped[Collections] = relationship("Collections", back_populates="presents")
     model: Mapped[Models | None] = relationship("Models", back_populates="presents")
@@ -674,6 +682,117 @@ class PresentsWithState(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     is_burned: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     is_upgraded: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+
+class ReportType(Base):
+    __tablename__ = "report_types"
+
+    report_type_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_type_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    reports: Mapped[list[Report]] = relationship("Report", back_populates="report_type")
+
+
+class ReportStatus(Base):
+    __tablename__ = "report_statuses"
+
+    report_status_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_status_name: Mapped[str | None] = mapped_column(String(65), nullable=True)
+
+    reports: Mapped[list[Report]] = relationship("Report", back_populates="report_status")
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    report_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    sender_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+    receiver_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+    report_type_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("report_types.report_type_id"),
+        nullable=False,
+        index=True,
+    )
+    report_status_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("report_statuses.report_status_id"),
+        nullable=False,
+        default=1,
+        index=True,
+    )
+    moderator_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+
+    sender: Mapped[User] = relationship("User", foreign_keys=[sender_id])
+    receiver: Mapped[User] = relationship("User", foreign_keys=[receiver_id])
+    report_type: Mapped[ReportType] = relationship("ReportType", back_populates="reports")
+    report_status: Mapped[ReportStatus] = relationship("ReportStatus", back_populates="reports")
+    moderator: Mapped[User | None] = relationship("User", foreign_keys=[moderator_id])
+
+
+class Cart(Base):
+    __tablename__ = "carts"
+
+    cart_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="cart")
+    items: Mapped[list[CartItem]] = relationship(
+        "CartItem",
+        back_populates="cart",
+        cascade="all, delete-orphan",
+    )
+
+
+class CartItem(Base):
+    __tablename__ = "cart_items"
+
+    cart_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    cart_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("carts.cart_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    listing_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("listings.listing_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+
+    cart: Mapped[Cart] = relationship("Cart", back_populates="items")
+    listing: Mapped[Listing] = relationship("Listing")
 
 
 class TransactionHistory(Base):

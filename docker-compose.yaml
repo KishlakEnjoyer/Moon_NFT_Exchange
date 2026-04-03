@@ -11,6 +11,8 @@ services:
     env_file:
       - ./.env
     restart: unless-stopped
+    volumes:
+      - ./images:/app/images
     depends_on:
       - db
       - redis
@@ -58,6 +60,18 @@ services:
     networks:
       - moon_net
 
+  ganache:
+    image: trufflesuite/ganache:latest
+    container_name: moon_ganache
+    command: --host 0.0.0.0 --port 8545 --database.dbPath /data --wallet.mnemonic "since topple flame hold grab video camera melody device task wisdom useful"
+    ports:
+      - "8545:8545"
+    volumes:
+      - ganache_data:/data
+    restart: unless-stopped
+    networks:
+      - moon_net
+
   images:
     image: nginx:alpine
     container_name: moon_images
@@ -71,6 +85,7 @@ services:
 
 volumes:
   moon_db_data:
+  ganache_data:
 
 networks:
   moon_net:

@@ -2,7 +2,7 @@ import os
 
 import httpx
 
-BACKEND_URL = os.getenv("REACT_APP_API_URL")
+BACKEND_URL = os.getenv("API_DOCKER_URL")
 
 
 class TopupCooldownError(Exception):
