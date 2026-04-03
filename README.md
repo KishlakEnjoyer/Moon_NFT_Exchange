@@ -14,7 +14,7 @@ To design, develop, and test a fully functional multi-chain NFT exchange that en
 
 - **Minting and listing NFTs** (creating and selling digital gifts)
 - **Auctions and fixed-price listings**
-- **User wallets** (integrated with MetaMask and other Web3 providers)
+- **User wallets** (integrated with Web3 providers)
 - **Search and filtering of NFTs**
 - **Smart contracts** written in Solidity
 - **Multi-chain support**: Ethereum, Polygon, BNB Chain
@@ -25,11 +25,13 @@ To design, develop, and test a fully functional multi-chain NFT exchange that en
 
 ## 🛠 Technologies Used
 
-- **Frontend**: React, AntDesign
-- **Backend**: Node.js, Express / FastAPI  
-- **Blockchain**: Solidity, Hardhat / Truffle  
+- **Frontend**: React, AntDesign, Spoilerjs, TailWindCSS
+- **Backend**: FastAPI
+- **Telegram Bot**: Aiogram
+- **Blockchain**: Solidity, Hardhat / Truffle, Ganache  
 - **Database**: MySQL  
-- **Deployment**: Docker  
+- **Deployment**: Docker, VPS
+- **Neural Network**: ChatGPT 5.4, Claude, Qwen 3.6
 
 ---
 
