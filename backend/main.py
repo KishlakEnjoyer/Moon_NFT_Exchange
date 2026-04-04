@@ -13,7 +13,8 @@ from routers.gift_router import gift_router
 from routers.listings_router import listings_router  
 from routers.cart_router import cart_router  
 from routers.transactions_router import transactions_router  
-from routers.presents_router import presents_router  
+from routers.presents_router import presents_router
+from routers.generation_image_router import image_generator_router  
 from dotenv import load_dotenv
 import os
 
@@ -45,3 +46,4 @@ app.include_router(listings_router)
 app.include_router(cart_router)
 app.include_router(transactions_router)
 app.include_router(presents_router)
+app.include_router(image_generator_router)

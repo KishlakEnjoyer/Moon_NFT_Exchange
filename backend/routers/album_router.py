@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from core.database import get_db
+from core.models import AlbumPresent, Album
 from core.request_models import AlbumResponse, CreateAlbumRequest, RenameAlbumRequest
 from services.album_service import create_album, delete_album, rename_album
 
@@ -59,3 +61,62 @@ def delete_album_endpoint(
     except ValueError as e:
         status_code = 404 if str(e) == "Album not found" else 400
         raise HTTPException(status_code=status_code, detail=str(e))
+
+
+@album_router.post("/{album_id}/presents/{present_id}")
+def add_present_to_album(
+    album_id: int,
+    present_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    existing = db.scalar(
+        select(AlbumPresent).where(
+            AlbumPresent.album_id == album_id,
+            AlbumPresent.present_id == present_id,
+        )
+    )
+    if existing:
+        return {"ok": True}
+
+    db.add(AlbumPresent(album_id=album_id, present_id=present_id))
+    db.commit()
+    return {"ok": True}
+
+
+@album_router.delete("/{album_id}/presents/{present_id}")
+def remove_present_from_album(
+    album_id: int,
+    present_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    item = db.scalar(
+        select(AlbumPresent).where(
+            AlbumPresent.album_id == album_id,
+            AlbumPresent.present_id == present_id,
+        )
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Present not found in album")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+
+@album_router.get("/{user_id}/presents")
+def get_user_presents_albums(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    user_albums = db.scalars(
+        select(Album.album_id).where(Album.album_owner_id == user_id)
+    ).all()
+    user_album_ids = list(user_albums)
+    if not user_album_ids:
+        return []
+    items = db.query(AlbumPresent).filter(
+        AlbumPresent.album_id.in_(user_album_ids)
+    ).all()
+    return [
+        {"album_id": item.album_id, "present_id": item.present_id}
+        for item in items
+    ]

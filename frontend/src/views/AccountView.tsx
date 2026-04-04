@@ -31,6 +31,7 @@ import AlbumContextMenu from "../components/AlbumContextMenu";
 import CardList from "../components/CardList";
 import EditProfileModal from "../components/EditProfileModal";
 import GiftDetailModal from "../components/GiftDetailModal";
+import PresentCardContextMenu from "../components/PresentCardContextMenu";
 import ProfileGiftCard from "../components/ProfileGiftCard";
 import ReportModal from "../components/ReportModal";
 import SendGiftModal from "../components/SendGiftModal";
@@ -55,6 +56,7 @@ interface Present {
 
 interface Album {
   album_id: number;
+  album_owner_id: number;
   album_title: string;
   present_ids: number[];
 }
@@ -103,7 +105,7 @@ const AccountView = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isGiftOpen, setIsGiftOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [selectedGift, setSelectedGift] = useState<Present | null>(null);
+  const [selectedGiftId, setSelectedGiftId] = useState<number | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -253,6 +255,7 @@ const AccountView = () => {
         ...albums,
         {
           album_id: newAlbum.album_id,
+          album_owner_id: newAlbum.album_owner_id,
           album_title: newAlbum.album_title,
           present_ids: [],
         },
@@ -522,25 +525,29 @@ const AccountView = () => {
             </Flex>
           ) : (
             <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
-              <Tooltip title="Send Gift">
-                <Button
-                  size="large"
-                  icon={<GiftOutlined />}
-                  className="!bg-[var(--liquid-glass-bg)]"
-                  onClick={() => setIsGiftOpen(true)}
-                >
-                  Send Gift
-                </Button>
-              </Tooltip>
-              <Tooltip title="Report">
-                <Button
-                  size="large"
-                  icon={<FlagOutlined />}
-                  className="!bg-[var(--liquid-glass-bg)]"
-                  onClick={() => setIsReportOpen(true)}
-                  danger
-                />
-              </Tooltip>
+              {getStoredCurrentUser().user_id && (
+                <Tooltip title="Send Gift">
+                  <Button
+                    size="large"
+                    icon={<GiftOutlined />}
+                    className="!bg-[var(--liquid-glass-bg)]"
+                    onClick={() => setIsGiftOpen(true)}
+                  >
+                    Send Gift
+                  </Button>
+                </Tooltip>
+              )}
+              {getStoredCurrentUser().user_id && (
+                <Tooltip title="Report">
+                  <Button
+                    size="large"
+                    icon={<FlagOutlined />}
+                    className="!bg-[var(--liquid-glass-bg)]"
+                    onClick={() => setIsReportOpen(true)}
+                    danger
+                  />
+                </Tooltip>
+              )}
             </Flex>
           )}
         </Flex>
@@ -614,15 +621,25 @@ const AccountView = () => {
             items={filteredPresents.slice(0, visibleCount)}
             renderCard={(item) => (
               <div className="w-full">
-                <ProfileGiftCard
-                  cardImage={item.model_id !== null ? `${process.env.REACT_APP_IMAGES_URL}/presents/${`${item.image_url}.webp` || "placeholder.png"}` : `${process.env.REACT_APP_IMAGES_URL}/collections/${item.image_url}.webp`}
-                  name={item.collection?.collection_name}
-                  number={item.present_num}
-                  isOnSale={item.is_on_sale}
+                <PresentCardContextMenu
+                  presentId={item.present_id}
+                  userId={user.user_id}
+                  isOwner={isOwn}
                   isVisible={item.is_visible !== 0}
-                  isUpgraded={item.model_id !== null}
-                  onClick={() => setSelectedGift(item)}
-                />
+                  albums={user.albums}
+                  activeAlbumId={activeAlbumId}
+                  onRefresh={loadUser}
+                >
+                  <ProfileGiftCard
+                    cardImage={item.model_id !== null ? `${process.env.REACT_APP_IMAGES_URL}/presents/${`${item.image_url}.webp` || "placeholder.png"}` : `${process.env.REACT_APP_IMAGES_URL}/collections/${item.image_url}.webp`}
+                    name={item.collection?.collection_name}
+                    number={item.present_num}
+                    isOnSale={item.is_on_sale}
+                    isVisible={item.is_visible !== 0}
+                    isUpgraded={item.model_id !== null}
+                    onClick={() => setSelectedGiftId(item.present_id)}
+                  />
+                </PresentCardContextMenu>
               </div>
             )}
           />
@@ -655,7 +672,7 @@ const AccountView = () => {
           open={isGiftOpen}
           senderId={getStoredCurrentUser().user_id}
           onClose={() => setIsGiftOpen(false)}
-          onSent={() => {}}
+          onSent={loadUser}
           initialReceiverId={isOwn ? null : user.user_id}
         />
 
@@ -667,10 +684,10 @@ const AccountView = () => {
         />
 
         <GiftDetailModal
-          open={!!selectedGift}
-          present={selectedGift}
+          open={!!selectedGiftId}
+          presentId={selectedGiftId}
           userId={user.user_id}
-          onClose={() => setSelectedGift(null)}
+          onClose={() => setSelectedGiftId(null)}
           onRefresh={loadUser}
         />
 

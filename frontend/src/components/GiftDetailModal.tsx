@@ -1,69 +1,136 @@
-import { Modal, Flex, Typography, Image, Button, Input, Tag, message } from "antd";
-import { useState } from "react";
-import { EyeOutlined, EyeInvisibleOutlined, TagOutlined } from "@ant-design/icons";
+import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfirm } from "antd";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { RightOutlined, CheckOutlined, FireOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
-import { createListing, togglePresentVisibility } from "../services/presentService";
+import { PresentDetail, getPresentDetail, togglePresentVisibility } from "../services/presentService";
 
 const { Text, Title } = Typography;
 
-interface Present {
-  present_id: number;
-  present_num: number;
-  image_url: string | null;
-  collection: { collection_name: string } | null;
-  model_id: number | null;
-  is_on_sale?: boolean;
-}
+const API_URL = process.env.REACT_APP_API_URL;
 
 interface GiftDetailModalProps {
   open: boolean;
-  present: Present | null;
+  presentId: number | null;
   userId: number;
   onClose: () => void;
   onRefresh: () => void;
 }
 
-const GiftDetailModal = ({ open, present, userId, onClose, onRefresh }: GiftDetailModalProps) => {
+const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDetailModalProps) => {
   const [messageApi, contextHolder] = message.useMessage();
-  const [selling, setSelling] = useState(false);
-  const [price, setPrice] = useState("");
+  const [detail, setDetail] = useState<PresentDetail | null>(null);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
-  if (!present) return null;
+  useEffect(() => {
+    if (!open || !presentId) return;
+    setLoading(true);
+    setDetail(null);
+    getPresentDetail(presentId)
+      .then((data) => setDetail(data))
+      .catch(() => setDetail(null))
+      .finally(() => setLoading(false));
+  }, [open, presentId]);
 
-  const isUpgraded = present.model_id !== null;
-  const imageUrl = present.image_url
-    ? `${process.env.REACT_APP_IMAGES_URL}/collections/${present.image_url}.webp`
-    : `${process.env.REACT_APP_IMAGES_URL}/presents/placeholder.png`;
+  if (!detail && !loading) return null;
 
   const handleToggleVisibility = async () => {
+    if (!detail) return;
     try {
-      await togglePresentVisibility(present.present_id, userId);
+      await togglePresentVisibility(detail.present_id, userId);
+      setDetail({ ...detail, is_visible: detail.is_visible === 1 ? 0 : 1 });
       onRefresh();
-      messageApi.success(present.is_on_sale ? "Hidden" : "Shown");
     } catch (e: any) {
       messageApi.error(e.message || "Failed to toggle visibility");
     }
   };
 
-  const handleSell = async () => {
-    if (!price || parseFloat(price) <= 0) {
-      messageApi.warning("Enter a valid price");
-      return;
-    }
+  const handleBurn = async () => {
+    if (!detail) return;
     setSubmitting(true);
     try {
-      await createListing(present.present_id, userId, price);
-      messageApi.success("Listed for sale!");
-      setSelling(false);
-      setPrice("");
+      const res = await fetch(`${API_URL}/presents/${detail.present_id}/burn?user_id=${userId}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Burn failed");
+      }
+      const data = await res.json();
+      messageApi.success(`Burned! Received ${parseFloat(data.refund_amount).toFixed(2)} TON`);
+      setDetail({ ...detail, is_burned: true });
       onRefresh();
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to list for sale");
+      messageApi.error(e.message || "Failed to burn");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleOwnerClick = () => {
+    if (detail?.owner_username) {
+      onClose();
+      navigate(`/account/${detail.owner_username}`);
+    }
+  };
+
+  const burnRefundPercent = parseFloat(process.env.REACT_APP_BURN_REFUND_PERCENT || "75");
+  const burnRefundAmount = (parseFloat(detail?.base_price || "0") * burnRefundPercent / 100).toFixed(2);
+
+  const attributes = [
+    {
+      key: "Owner",
+      value: (
+        <Flex
+          align="center"
+          gap={8}
+          className="cursor-pointer hover:opacity-75 transition-opacity"
+          onClick={handleOwnerClick}
+        >
+          <Avatar size={24} src={`${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`} />
+          <Text className="!text-[var(--accent-150)]">{detail?.owner_username || "Unknown"}</Text>
+        </Flex>
+      ),
+    },
+    ...(detail?.original_sender_username ? [{
+      key: "From",
+      value: (
+        <Text className="!text-[var(--accent-150)]">{detail.original_sender_username}</Text>
+      ),
+    }] : []),
+    {
+      key: "Collection",
+      value: detail?.collection_name || "—",
+    },
+    {
+      key: "Total Supply",
+      value: detail?.total_supply || 0,
+    },
+    {
+      key: "Base Price",
+      value: `${parseFloat(detail?.base_price || "0").toFixed(2)} TON`,
+    },
+  ];
+
+  if (detail?.is_upgraded) {
+    if (detail.model_name) {
+      attributes.push({ key: "Model", value: detail.model_name });
+    }
+    if (detail.background_name) {
+      attributes.push({ key: "Background", value: detail.background_name });
+    }
+    if (detail.symbol_name) {
+      attributes.push({ key: "Symbol", value: detail.symbol_name });
+    }
+  }
+
+  const imageUrl = detail?.image_url
+    ? `${process.env.REACT_APP_IMAGES_URL}/collections/${detail.image_url}.webp`
+    : `${process.env.REACT_APP_IMAGES_URL}/presents/placeholder.png`;
+
+  const hasModels = detail?.has_models;
 
   return (
     <>
@@ -78,7 +145,7 @@ const GiftDetailModal = ({ open, present, userId, onClose, onRefresh }: GiftDeta
         <Flex vertical align="center" gap={16} className="pt-4">
           <Image
             src={imageUrl}
-            alt={present.collection?.collection_name || "Gift"}
+            alt={detail?.collection_name}
             width={180}
             preview={false}
             className="rounded-[var(--size-smm)]"
@@ -86,71 +153,114 @@ const GiftDetailModal = ({ open, present, userId, onClose, onRefresh }: GiftDeta
 
           <Flex vertical align="center" gap={4}>
             <Title level={4} className="!mb-0">
-              {present.collection?.collection_name || "Unknown"} #{present.present_num}
+              {detail?.collection_name} #{detail?.present_num}
             </Title>
-            {isUpgraded ? (
-              <Tag color="purple">Upgraded</Tag>
-            ) : (
-              <Tag>Basic</Tag>
-            )}
-            {present.is_on_sale && (
-              <Tag color="orange">On Sale</Tag>
-            )}
+            <Flex gap={4}>
+              {detail?.is_upgraded ? (
+                <Tag color="purple">Upgraded</Tag>
+              ) : (
+                <Tag>Basic</Tag>
+              )}
+              {detail?.is_on_sale && (
+                <Tag color="orange">On Sale</Tag>
+              )}
+            </Flex>
           </Flex>
 
+          <div className="w-full rounded-[var(--size-smm)] border-solid border border-[var(--black-60)] overflow-hidden">
+            {attributes.map((attr, i) => (
+              <Flex
+                key={attr.key}
+                justify="space-between"
+                align="center"
+                className={`px-4 py-3 ${i % 2 === 0 ? "bg-[var(--liquid-glass-bg)]" : ""} ${i !== attributes.length - 1 ? "border-b border-[var(--black-transparent)]" : ""}`}
+              >
+                <Text type="secondary" className="shrink-0 mr-4">{attr.key}</Text>
+                <Flex align="center" gap={8}>
+                  {typeof attr.value === "string" ? (
+                    <Text>{attr.value}</Text>
+                  ) : (
+                    attr.value
+                  )}
+                </Flex>
+              </Flex>
+            ))}
+          </div>
+
           <Flex vertical gap={8} className="w-full">
-            <Button
-              type="default"
-              size="large"
-              block
-              icon={present.is_on_sale ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-              className="!bg-[var(--liquid-glass-bg)]"
+            <Flex
+              align="center"
+              justify="space-between"
+              className="cursor-pointer px-2 py-1 rounded hover:bg-[var(--black-transparent-05)] transition-colors"
               onClick={handleToggleVisibility}
             >
-              {present.is_on_sale ? "Hide" : "Show"}
-            </Button>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {detail?.is_visible === 1
+                  ? "This gift is visible"
+                  : "This gift is hidden"}
+              </Text>
+              <Text
+                className="!text-[var(--accent-150)]"
+                style={{ fontSize: 13 }}
+              >
+                {detail?.is_visible === 1 ? "Hide from Profile" : "Show"} <RightOutlined style={{ fontSize: 10 }} />
+              </Text>
+            </Flex>
 
-            {isUpgraded && !selling && !present.is_on_sale && (
+            {!detail?.is_on_sale && (
+              <Popconfirm
+                title="Burn to Redeem"
+                description={
+                  <Flex vertical gap={4}>
+                    <Text>
+                      You will receive <Text strong style={{ color: "var(--color-primary)" }}>{burnRefundAmount} TON</Text>
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      ({burnRefundPercent}% of base price). This action cannot be undone.
+                    </Text>
+                  </Flex>
+                }
+                onConfirm={handleBurn}
+                okText="Burn"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: submitting }}
+              >
+                <Button
+                  danger
+                  size="large"
+                  block
+                  icon={<FireOutlined />}
+                  loading={submitting}
+                >
+                  Burn to Redeem — {burnRefundAmount} TON
+                </Button>
+              </Popconfirm>
+            )}
+
+            {hasModels && !detail?.is_upgraded && (
               <Button
                 type="primary"
                 size="large"
                 block
-                icon={<TagOutlined />}
-                onClick={() => setSelling(true)}
+                icon={<FireOutlined />}
+                onClick={() => {
+                  messageApi.info("Upgrade feature coming soon!");
+                }}
               >
-                Put on Sale
+                Upgrade
               </Button>
             )}
 
-            {selling && (
-              <Flex vertical gap={8}>
-                <Input
-                  type="number"
-                  placeholder="Price in TON"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  addonAfter={<TONIcon />}
-                  size="large"
-                />
-                <Flex gap={8}>
-                  <Button
-                    type="primary"
-                    size="large"
-                    block
-                    onClick={handleSell}
-                    loading={submitting}
-                  >
-                    Confirm
-                  </Button>
-                  <Button
-                    size="large"
-                    block
-                    onClick={() => { setSelling(false); setPrice(""); }}
-                  >
-                    Cancel
-                  </Button>
-                </Flex>
-              </Flex>
+            {!hasModels && (
+              <Button
+                type="default"
+                size="large"
+                block
+                icon={<CheckOutlined />}
+                onClick={onClose}
+              >
+                OK
+              </Button>
             )}
           </Flex>
         </Flex>

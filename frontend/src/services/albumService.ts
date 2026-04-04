@@ -63,3 +63,29 @@ export async function deleteAlbum(albumId: number): Promise<void> {
 
   await parseResponse(response);
 }
+
+export interface Album {
+  album_id: number;
+  album_owner_id: number;
+  album_title: string;
+}
+
+export async function getAlbums(userId: number): Promise<Album[]> {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/user-info/web/${userId}`);
+  const data = await response.json();
+  return data.albums || [];
+}
+
+export async function addPresentToAlbum(albumId: number, presentId: number): Promise<void> {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
+    method: "POST",
+  });
+  await parseResponse(response);
+}
+
+export async function removePresentFromAlbum(albumId: number, presentId: number): Promise<void> {
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
+    method: "DELETE",
+  });
+  await parseResponse(response);
+}

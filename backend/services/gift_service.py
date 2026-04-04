@@ -32,6 +32,7 @@ from services.notification_service import (
     create_notification,
     notification_to_dict,
 )
+from utils.tg_bot import send_tg_message, send_tg_message_sync
 
 notification_manager = NotificationManager()
 
@@ -117,6 +118,7 @@ def purchase_and_send_gift(
         raise HTTPException(status_code=400, detail="Collection is sold out")
 
     price = collection.base_price
+    print(f"[DEBUG] Collection: {collection.collection_name}, Price: {price}")
     price_units = to_token_units(str(price))
 
     sender_balance_raw = get_token_balance_raw(sender.wallet_address)
@@ -135,8 +137,14 @@ def purchase_and_send_gift(
     sender_private_key = decrypt_private_key(sender.wallet_private_key_encrypted)
     sender_account = Account.from_key(sender_private_key)
     sender_address = Web3.to_checksum_address(sender.wallet_address)
-    platform_address = Web3.to_checksum_address(os.getenv("PLATFORM_OWNER_ADDRESS", sender_address))
+    platform_owner_key = os.getenv("PLATFORM_OWNER_PRIVATE_KEY")
+    if not platform_owner_key:
+        raise HTTPException(status_code=500, detail="Platform private key not configured")
+    platform_account = Account.from_key(platform_owner_key)
+    platform_address = Web3.to_checksum_address(platform_account.address)
 
+    
+    
     try:
         nonce = w3.eth.get_transaction_count(sender_address)
         gas_price = w3.eth.gas_price
@@ -166,63 +174,82 @@ def purchase_and_send_gift(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Blockchain error: {str(e)}")
 
-    present_num = get_next_present_num(db, collection_id)
-    token_id = f"{collection_id}-{present_num}"
-    metadata_uri = f"{os.getenv('REACT_APP_API_URL', '')}/metadata/{collection_id}/{present_num}"
-
-    present = Present(
-        collection_id=collection_id,
-        model_id=None,
-        background_id=None,
-        symbol_id=None,
-        present_num=present_num,
-        token_id=token_id,
-        metadata_uri=metadata_uri,
-        image_url=collection.collection_image_url,
-        description=description,
-        is_burned=0,
-        is_visible=0,
-    )
-    db.add(present)
-    db.flush()
-
-    transaction = Transaction(
-        buyer_id=receiver_id,
-        seller_id=sender_id,
-        present_id=present.present_id,
-        type_id=1,
-        status_id=2,
-        transaction_price=price,
-        platform_fee=Decimal("0.000000"),
-        seller_received=price,
-        currency="TOKEN",
-        blockchain_tx_hash=tx_hash_hex,
-        block_number=int(receipt["blockNumber"]),
-        transaction_date=datetime.utcnow(),
-    )
-    db.add(transaction)
-
-    increment_purchase_count(db, sender_id, collection_id)
-
-    notification = create_notification(
-        db=db,
-        user_id=receiver_id,
-        type_name="gift_received",
-        entity_type="present",
-        entity_id=present.present_id,
-    )
-    db.commit()
-    db.refresh(present)
+    print(f"[DEBUG 1] Blockchain TX OK: {tx_hash_hex}")
 
     try:
-        notification_dict = notification_to_dict(notification)
-        notification_dict["sender_username"] = sender.username
-        notification_dict["collection_name"] = collection.collection_name
-        notification_dict["description"] = description
-        import asyncio
-        asyncio.create_task(notification_manager.send_to_user(receiver_id, notification_dict))
-    except Exception:
-        pass
+        present_num = get_next_present_num(db, collection_id)
+        print(f"[DEBUG 2] Got present_num: {present_num}")
+
+        token_id = f"{collection_id}-{present_num}"
+        metadata_uri = f"{os.getenv('REACT_APP_API_URL', '')}/metadata/{collection_id}/{present_num}"
+
+        present = Present(
+            collection_id=collection_id,
+            model_id=None,
+            background_id=None,
+            symbol_id=None,
+            present_num=present_num,
+            token_id=token_id,
+            metadata_uri=metadata_uri,
+            image_url=collection.collection_image_url,
+            description=description,
+            is_burned=0,
+            is_visible=0,
+            original_sender_id=sender_id,
+        )
+        print(f"[DEBUG 3] Present object created")
+
+        db.add(present)
+        db.flush()
+        print(f"[DEBUG 4] Present flushed to DB, present_id={present.present_id}")
+
+        transaction = Transaction(
+            buyer_id=receiver_id,
+            seller_id=sender_id,
+            present_id=present.present_id,
+            type_id=1,
+            status_id=2,
+            transaction_price=price,
+            platform_fee=Decimal("0.000000"),
+            seller_received=price,
+            currency="TOKEN",
+            blockchain_tx_hash=tx_hash_hex,
+            block_number=int(receipt["blockNumber"]),
+            transaction_date=datetime.utcnow(),
+        )
+        db.add(transaction)
+        print(f"[DEBUG 5] Transaction added")
+
+        increment_purchase_count(db, sender_id, collection_id)
+        print(f"[DEBUG 6] Purchase count incremented")
+
+        is_self_gift = sender_id == receiver_id
+        price_str = str(price)
+
+        receiver_msg = f"🎁 You received a gift: *{collection.collection_name} \\#{present.present_num}* from *{sender.username}*!"
+        sender_msg = f"📤 You sent a gift: *{collection.collection_name} \\#{present.present_num}* to *{receiver.username}* for *{price_str} TON*."
+
+        if not is_self_gift:
+            notification = create_notification(
+                db=db,
+                user_id=receiver_id,
+                type_name="gift_received",
+                entity_type="present",
+                entity_id=present.present_id,
+            )
+            print(f"[DEBUG 7] Notification created")
+
+        db.commit()
+        print(f"[DEBUG 8] DB COMMIT SUCCESS")
+
+        send_tg_message_sync(receiver.user_tg_id, receiver_msg)
+        send_tg_message_sync(sender.user_tg_id, sender_msg)
+
+    except Exception as e:
+        print(f"[FATAL ERROR] Failed to save gift to DB: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Blockchain TX OK but DB save failed: {str(e)}")
 
     new_balance_raw = get_token_balance_raw(sender.wallet_address)
     new_balance = from_token_units(new_balance_raw)

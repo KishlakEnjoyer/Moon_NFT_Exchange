@@ -116,3 +116,14 @@ class AlbumResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SendGiftRequest(BaseModel):
+    sender_id: int
+    receiver_id: int
+    collection_id: int
+    description: str | None = None
+
+class GeneratePresentRequest(BaseModel):
+    collection_id: int
+    

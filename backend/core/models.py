@@ -226,11 +226,13 @@ class Present(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
     is_burned: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     is_visible: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    original_sender_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True, index=True)
 
     collection: Mapped[Collections] = relationship("Collections", back_populates="presents")
     model: Mapped[Models | None] = relationship("Models", back_populates="presents")
     background: Mapped[Backgrounds | None] = relationship("Backgrounds", back_populates="presents")
     symbol: Mapped[Symbols | None] = relationship("Symbols", back_populates="presents")
+    original_sender: Mapped[User | None] = relationship("User", foreign_keys=[original_sender_id])
 
     listings: Mapped[list[Listing]] = relationship(
         "Listing",

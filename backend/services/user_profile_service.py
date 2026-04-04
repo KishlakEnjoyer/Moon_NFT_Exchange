@@ -184,9 +184,6 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
     user = db.scalar(
         select(User)
         .where(User.username == username)
-        .options(
-            joinedload(User.albums).joinedload(Album.album_presents).joinedload(AlbumPresent.present)
-        )
     )
 
     if not user:
@@ -224,6 +221,12 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
             ).all()
         )
 
+    user_albums = db.scalars(
+        select(Album)
+        .where(Album.album_owner_id == user.user_id)
+        .options(joinedload(Album.album_presents))
+    ).unique().all()
+
     return {
         "user_id": user.user_id,
         "user_tg_id": user.user_tg_id,
@@ -238,10 +241,11 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
         "albums": [
             {
                 "album_id": album.album_id,
+                "album_owner_id": album.album_owner_id,
                 "album_title": album.album_title,
                 "present_ids": [ap.present_id for ap in album.album_presents],
             }
-            for album in user.albums
+            for album in user_albums
         ],
         "presents": [
             {
@@ -254,6 +258,7 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
                 "model_id": p.model_id,
                 "is_visible": p.is_visible,
                 "is_on_sale": p.present_id in active_listing_ids,
+                "original_sender_username": p.original_sender.username if p.original_sender else None,
                 "collection": {
                     "collection_id": p.collection.collection_id,
                     "collection_name": p.collection.collection_name,

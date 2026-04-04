@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
+from core.request_models import SendGiftRequest
 from services.gift_service import purchase_and_send_gift
 
 
@@ -12,11 +13,7 @@ gift_router = APIRouter(
 )
 
 
-class SendGiftRequest(BaseModel):
-    sender_id: int
-    receiver_id: int
-    collection_id: int
-    description: str | None = None
+
 
 
 @gift_router.post("/send")

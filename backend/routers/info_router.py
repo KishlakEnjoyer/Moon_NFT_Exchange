@@ -55,6 +55,9 @@ def get_user_info_by_username(username: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        import traceback
+        print("FULL TRACEBACK:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
