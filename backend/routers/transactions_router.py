@@ -4,31 +4,10 @@ from typing import List
 from pydantic import BaseModel
 
 from core.database import get_db
-from core.models import TransactionHistory
+from core.models import TransactionHistory, User
+from core.request_models import TransactionResponse
 
 transactions_router = APIRouter(prefix="/transactions", tags=["transactions"])
-
-
-class TransactionResponse(BaseModel):
-    transaction_id: int
-    transaction_price: str
-    platform_fee: str
-    seller_received: str
-    transaction_date: str
-    transaction_type: str
-    transaction_status: str
-    present_id: int
-    token_id: str
-    collection_name: str
-    blockchain_network: str
-    buyer_id: int
-    buyer_username: str | None
-    seller_id: int
-    seller_username: str | None
-    blockchain_tx_hash: str | None
-
-    class Config:
-        from_attributes = True
 
 
 @transactions_router.get("/{user_id}", response_model=List[TransactionResponse])
@@ -40,11 +19,18 @@ def get_user_transactions(
     db: Session = Depends(get_db),
 ):
     query = db.query(TransactionHistory)
+    is_collection_purchase = TransactionHistory.transaction_type == "purchase"
 
     if filter_type == "purchases":
-        query = query.filter(TransactionHistory.buyer_id == user_id)
+        query = query.filter(
+            ((is_collection_purchase) & (TransactionHistory.seller_id == user_id)) |
+            ((TransactionHistory.transaction_type != "purchase") & (TransactionHistory.buyer_id == user_id))
+        )
     elif filter_type == "sales":
-        query = query.filter(TransactionHistory.seller_id == user_id)
+        query = query.filter(
+            (TransactionHistory.transaction_type != "purchase") &
+            (TransactionHistory.seller_id == user_id)
+        )
     else:
         query = query.filter(
             (TransactionHistory.buyer_id == user_id) |
@@ -59,6 +45,19 @@ def get_user_transactions(
         .all()
     )
 
+    user_ids = {t.buyer_id for t in transactions} | {t.seller_id for t in transactions}
+    profile_pic_by_user_id = {}
+
+    if user_ids:
+        profile_pic_by_user_id = {
+            user.user_id: user.profile_pic_url
+            for user in (
+                db.query(User.user_id, User.profile_pic_url)
+                .filter(User.user_id.in_(user_ids))
+                .all()
+            )
+        }
+
     return [
         TransactionResponse(
             transaction_id=t.transaction_id,
@@ -69,13 +68,13 @@ def get_user_transactions(
             transaction_type=t.transaction_type,
             transaction_status=t.transaction_status,
             present_id=t.present_id,
-            token_id=t.token_id,
             collection_name=t.collection_name,
-            blockchain_network=t.blockchain_network,
             buyer_id=t.buyer_id,
             buyer_username=t.buyer_username,
+            buyer_profile_pic_url=profile_pic_by_user_id.get(t.buyer_id),
             seller_id=t.seller_id,
             seller_username=t.seller_username,
+            seller_profile_pic_url=profile_pic_by_user_id.get(t.seller_id),
             blockchain_tx_hash=t.blockchain_tx_hash,
         )
         for t in transactions

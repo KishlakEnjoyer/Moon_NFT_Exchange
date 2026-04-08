@@ -2,11 +2,9 @@ export interface ApiListing {
   listing_id: number;
   price: string;
   present_id: number;
-  token_id: string;
   present_image_url: string | null;
   collection_id: number;
   collection_name: string;
-  blockchain_network: string;
   model_name: string | null;
   background_image_url: string | null;
   symbol_name: string | null;
@@ -20,7 +18,6 @@ export interface CartItem {
   listing_id: number;
   price: string;
   present_id: number;
-  token_id: string;
   present_image_url: string | null;
   collection_name: string;
   model_name: string | null;

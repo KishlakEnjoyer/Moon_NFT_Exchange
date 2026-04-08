@@ -12,22 +12,6 @@ class DeclineAuthRequest(BaseModel):
     state: str
 
 
-class WalletTopupRequest(BaseModel):
-    tg_id: int
-    amount: Decimal = Field(gt=0)
-    asset_type: int
-
-
-class WalletTopupResponse(BaseModel):
-    topup_id: int
-    user_id: int
-    amount: Decimal
-    asset_type: int
-    status: int
-    message: str
-
-
-
 class TopUpRequest(BaseModel):
     tg_id: int
     amount: Decimal = Field(gt=0, lt=1000000)
@@ -50,7 +34,6 @@ class CollectionOption(BaseModel):
     image_url: str | None = None
     base_price: str | None = None
     purchase_limit: int | None = None
-    blockchain_network: str | None = None
 
     class Config:
         from_attributes = True
@@ -127,3 +110,24 @@ class SendGiftRequest(BaseModel):
 class GeneratePresentRequest(BaseModel):
     collection_id: int
     
+
+class TransactionResponse(BaseModel):
+    transaction_id: int
+    transaction_price: str
+    platform_fee: str
+    seller_received: str
+    transaction_date: str
+    transaction_type: str
+    transaction_status: str
+    present_id: int
+    collection_name: str
+    buyer_id: int
+    buyer_username: str | None
+    buyer_profile_pic_url: str | None
+    seller_id: int
+    seller_username: str | None
+    seller_profile_pic_url: str | None
+    blockchain_tx_hash: str | None
+
+    class Config:
+        from_attributes = True

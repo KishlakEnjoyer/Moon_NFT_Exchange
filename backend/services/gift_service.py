@@ -180,17 +180,12 @@ def purchase_and_send_gift(
         present_num = get_next_present_num(db, collection_id)
         print(f"[DEBUG 2] Got present_num: {present_num}")
 
-        token_id = f"{collection_id}-{present_num}"
-        metadata_uri = f"{os.getenv('REACT_APP_API_URL', '')}/metadata/{collection_id}/{present_num}"
-
         present = Present(
             collection_id=collection_id,
             model_id=None,
             background_id=None,
             symbol_id=None,
             present_num=present_num,
-            token_id=token_id,
-            metadata_uri=metadata_uri,
             image_url=collection.collection_image_url,
             description=description,
             is_burned=0,
@@ -210,9 +205,8 @@ def purchase_and_send_gift(
             type_id=1,
             status_id=2,
             transaction_price=price,
-            platform_fee=Decimal("0.000000"),
-            seller_received=price,
-            currency="TOKEN",
+            platform_fee=price,
+            seller_received=Decimal("0.000000"),
             blockchain_tx_hash=tx_hash_hex,
             block_number=int(receipt["blockNumber"]),
             transaction_date=datetime.utcnow(),
@@ -258,7 +252,6 @@ def purchase_and_send_gift(
         "present_id": present.present_id,
         "collection_id": present.collection_id,
         "present_num": present.present_num,
-        "token_id": present.token_id,
         "tx_hash": tx_hash_hex,
         "price": str(price),
         "new_balance": new_balance,

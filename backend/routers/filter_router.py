@@ -21,7 +21,6 @@ def get_collections(db: Session = Depends(get_db)):
                 Collections.collection_image_url,
                 Collections.base_price,
                 Collections.purchase_limit,
-                Collections.blockchain_network,
             )
             .where(Collections.is_active == 1)
             .order_by(Collections.collection_name)
@@ -35,7 +34,6 @@ def get_collections(db: Session = Depends(get_db)):
             image_url=r.collection_image_url,
             base_price=str(r.base_price) if r.base_price else "0",
             purchase_limit=r.purchase_limit,
-            blockchain_network=r.blockchain_network,
         )
         for r in rows
     ]

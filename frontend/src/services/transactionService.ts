@@ -7,19 +7,20 @@ export interface Transaction {
   transaction_type: string;
   transaction_status: string;
   present_id: number;
-  token_id: string;
   collection_name: string;
-  blockchain_network: string;
   buyer_id: number;
   buyer_username: string | null;
+  buyer_profile_pic_url: string | null;
   seller_id: number;
   seller_username: string | null;
+  seller_profile_pic_url: string | null;
   blockchain_tx_hash: string | null;
 }
 
 export type TransactionFilter = "all" | "purchases" | "sales";
 
 const API_URL = process.env.REACT_APP_API_URL;
+const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
 
 export const getUserTransactions = async (
   userId: number,
@@ -35,4 +36,9 @@ export const getUserTransactions = async (
   const res = await fetch(`${API_URL}/transactions/${userId}?${params}`);
   if (!res.ok) return [];
   return res.json();
+};
+
+export const getProfileAvatarUrl = (profilePicUrl: string | null | undefined): string => {
+  if (!profilePicUrl) return `${IMAGES_URL}/pfps/example_user.png`;
+  return `${IMAGES_URL}/pfps/${profilePicUrl}`;
 };

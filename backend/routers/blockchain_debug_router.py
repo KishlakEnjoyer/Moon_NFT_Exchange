@@ -3,6 +3,8 @@ from services.blockchain.client import (
     check_rpc_connection,
     get_chain_id,
     get_latest_block_number,
+    get_transaction,
+    get_transaction_receipt,
 )
 from services.blockchain.wallet_service import (
     create_new_wallet,
@@ -62,4 +64,15 @@ def blockchain_wallet_info(address: str):
         "native_balance": get_native_balance_eth(address),
         "token_balance_raw": str(get_token_balance_raw(address)),
         "token_balance": get_token_balance(address),
+    }
+
+
+@blockchain_debug_router.get("/transaction/{tx_hash}")
+def blockchain_transaction_info(tx_hash: str):
+    tx = get_transaction(tx_hash)
+    receipt = get_transaction_receipt(tx_hash)
+    return {
+        "transaction": tx,
+        "receipt": receipt,
+        "found": tx is not None,
     }

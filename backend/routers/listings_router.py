@@ -15,11 +15,9 @@ class ListingResponse(BaseModel):
     listing_id: int
     price: str
     present_id: int
-    token_id: str
     present_image_url: str | None
     collection_id: int
     collection_name: str
-    blockchain_network: str
     model_name: str | None
     background_image_url: str | None
     symbol_name: str | None
@@ -51,11 +49,9 @@ def get_active_listings(db: Session = Depends(get_db)):
             listing_id=l.listing_id,
             price=str(l.price),
             present_id=l.present_id,
-            token_id=l.token_id,
             present_image_url=l.present_image_url,
             collection_id=l.collection_id,
             collection_name=l.collection_name,
-            blockchain_network=l.blockchain_network,
             model_name=l.model_name,
             background_image_url=l.background_image_url,
             symbol_name=l.symbol_name,

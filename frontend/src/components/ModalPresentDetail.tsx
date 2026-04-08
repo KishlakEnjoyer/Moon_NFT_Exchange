@@ -53,14 +53,6 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({ open, item, onC
       key: 'Symbol',
       value: item.symbol_name || '—',
     },
-    {
-      key: 'Network',
-      value: item.blockchain_network,
-    },
-    {
-      key: 'Token ID',
-      value: item.token_id,
-    },
   ];
 
   return (

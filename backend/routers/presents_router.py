@@ -20,7 +20,6 @@ presents_router = APIRouter(prefix="/presents", tags=["presents"])
 class PresentDetailResponse(BaseModel):
     present_id: int
     present_num: int
-    token_id: str
     image_url: str | None
     collection_name: str
     collection_image_url: str | None
@@ -110,7 +109,6 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
     return PresentDetailResponse(
         present_id=present.present_id,
         present_num=present.present_num,
-        token_id=present.token_id,
         image_url=present.image_url,
         collection_name=collection.collection_name if collection else "Unknown",
         collection_image_url=collection.collection_image_url if collection else None,
@@ -248,4 +246,3 @@ def toggle_present_visibility(present_id: int, user_id: int, db: Session = Depen
         present_id=present.present_id,
         is_visible=present.is_visible,
     )
-

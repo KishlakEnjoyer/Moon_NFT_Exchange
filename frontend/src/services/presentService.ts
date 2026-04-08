@@ -3,7 +3,6 @@ const API_URL = process.env.REACT_APP_API_URL;
 export interface PresentDetail {
   present_id: number;
   present_num: number;
-  token_id: string;
   image_url: string | null;
   collection_name: string;
   collection_image_url: string | null;

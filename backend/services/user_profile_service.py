@@ -251,9 +251,7 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
             {
                 "present_id": p.present_id,
                 "present_num": p.present_num,
-                "token_id": p.token_id,
                 "image_url": p.image_url,
-                "metadata_uri": p.metadata_uri,
                 "generated_at": p.generated_at,
                 "model_id": p.model_id,
                 "is_visible": p.is_visible,

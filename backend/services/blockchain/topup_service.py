@@ -112,7 +112,6 @@ def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -
 
     topup = WalletTopup(
         user_id=user.user_id,
-        asset_type=1,
         amount=amount,
         requested_via="telegram_bot",
         requested_by_tg_user_id=tg_id,

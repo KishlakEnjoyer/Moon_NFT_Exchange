@@ -11,7 +11,6 @@ def create_wallet_topup_request(
     db: Session,
     tg_id: int,
     amount: Decimal,
-    asset_type: int,
 ) -> WalletTopup:
     user = db.scalar(
         select(User).where(User.user_tg_id == tg_id)
@@ -22,7 +21,6 @@ def create_wallet_topup_request(
 
     topup = WalletTopup(
         user_id=user.user_id,
-        asset_type=asset_type,
         amount=amount,
         requested_via="telegram_bot",
         requested_by_tg_user_id=tg_id,

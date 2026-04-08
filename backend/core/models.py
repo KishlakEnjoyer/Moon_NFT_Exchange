@@ -4,7 +4,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    JSON,
     BigInteger,
     DateTime,
     ForeignKey,
@@ -82,14 +81,6 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    audit_logs: Mapped[list[AuditLog]] = relationship(
-        "AuditLog",
-        back_populates="user",
-    )
-    blockchain_events: Mapped[list[BlockchainEvent]] = relationship(
-        "BlockchainEvent",
-        back_populates="user",
-    )
     collection_purchases: Mapped[list[UserCollectionPurchase]] = relationship(
         "UserCollectionPurchase",
         back_populates="user",
@@ -143,7 +134,6 @@ class Collections(Base):
     collection_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     collection_limit: Mapped[int] = mapped_column(Integer, nullable=False)
     purchase_limit: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
-    blockchain_network: Mapped[str] = mapped_column(String(50), nullable=False, default="localhost")
     contract_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("100.00"))
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
@@ -219,8 +209,6 @@ class Present(Base):
         index=True,
     )
     present_num: Mapped[int] = mapped_column(Integer, nullable=False)
-    token_id: Mapped[str] = mapped_column(String(78), nullable=False)
-    metadata_uri: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
@@ -243,10 +231,6 @@ class Present(Base):
         "Transaction",
         back_populates="present",
         cascade="all, delete-orphan",
-    )
-    blockchain_events: Mapped[list[BlockchainEvent]] = relationship(
-        "BlockchainEvent",
-        back_populates="present",
     )
     album_links: Mapped[list[AlbumPresent]] = relationship(
         "AlbumPresent",
@@ -358,15 +342,6 @@ class TopupStatuses(Base):
     wallet_topups: Mapped[list[WalletTopup]] = relationship("WalletTopup", back_populates="topup_status")
 
 
-class AssetTypes(Base):
-    __tablename__ = "asset_types"
-
-    asset_type_id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
-    asset_type_name: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    wallet_topups: Mapped[list[WalletTopup]] = relationship("WalletTopup", back_populates="asset_type_rel")
-
-
 class WalletTopup(Base):
     __tablename__ = "wallet_topups"
 
@@ -374,12 +349,6 @@ class WalletTopup(Base):
     user_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("users.user_id"),
-        nullable=False,
-        index=True,
-    )
-    asset_type: Mapped[int] = mapped_column(
-        SmallInteger,
-        ForeignKey("asset_types.asset_type_id"),
         nullable=False,
         index=True,
     )
@@ -398,7 +367,6 @@ class WalletTopup(Base):
     confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
 
     user: Mapped[User] = relationship("User", back_populates="wallet_topups")
-    asset_type_rel: Mapped[AssetTypes] = relationship("AssetTypes", back_populates="wallet_topups")
     topup_status: Mapped[TopupStatuses] = relationship("TopupStatuses", back_populates="wallet_topups")
 
 
@@ -460,7 +428,6 @@ class Transaction(Base):
     transaction_price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     platform_fee: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0.000000"))
     seller_received: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
-    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="TON")
     blockchain_tx_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     transaction_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
@@ -520,81 +487,6 @@ class NotificationTypes(Base):
     )
 
 
-class AuditLog(Base):
-    __tablename__ = "audit_log"
-
-    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("users.user_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    action: Mapped[str] = mapped_column(String(100), nullable=False)
-    entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    entity_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
-    details: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
-
-    user: Mapped[User | None] = relationship("User", back_populates="audit_logs")
-
-
-class BlockchainEventTypes(Base):
-    __tablename__ = "blockchain_event_types"
-
-    event_type_id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
-    event_type_name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    blockchain_events: Mapped[list[BlockchainEvent]] = relationship(
-        "BlockchainEvent",
-        back_populates="event_type",
-    )
-
-
-class BlockchainEvent(Base):
-    __tablename__ = "blockchain_events"
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    event_type_id: Mapped[int] = mapped_column(
-        SmallInteger,
-        ForeignKey("blockchain_event_types.event_type_id"),
-        nullable=False,
-        index=True,
-    )
-    blockchain_network: Mapped[str] = mapped_column(String(50), nullable=False)
-    contract_address: Mapped[str] = mapped_column(String(255), nullable=False)
-    tx_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    event_data: Mapped[dict | list] = mapped_column(JSON, nullable=False)
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
-    log_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    event_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    present_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("presents.present_id"),
-        nullable=True,
-        index=True,
-    )
-    user_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("users.user_id"),
-        nullable=True,
-        index=True,
-    )
-    is_processed: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
-
-    event_type: Mapped[BlockchainEventTypes] = relationship(
-        "BlockchainEventTypes",
-        back_populates="blockchain_events",
-    )
-    present: Mapped[Present | None] = relationship("Present", back_populates="blockchain_events")
-    user: Mapped[User | None] = relationship("User", back_populates="blockchain_events")
-
-
 class UserCollectionPurchase(Base):
     __tablename__ = "user_collection_purchases"
 
@@ -629,13 +521,10 @@ class ActiveListingsView(Base):
     listed_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
 
     present_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    token_id: Mapped[str] = mapped_column(String(78), nullable=False)
     present_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata_uri: Mapped[str] = mapped_column(Text, nullable=False)
 
     collection_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    blockchain_network: Mapped[str] = mapped_column(String(50), nullable=False)
 
     model_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     background_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -655,7 +544,6 @@ class CollectionAvailability(Base):
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     purchase_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    blockchain_network: Mapped[str] = mapped_column(String(50), nullable=False)
     minted_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
     available_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
@@ -678,8 +566,6 @@ class PresentsWithState(Base):
     symbol_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     present_num: Mapped[int] = mapped_column(Integer, nullable=False)
-    token_id: Mapped[str] = mapped_column(String(78), nullable=False)
-    metadata_uri: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     is_burned: Mapped[int] = mapped_column(SmallInteger, nullable=False)
@@ -811,10 +697,8 @@ class TransactionHistory(Base):
     transaction_status: Mapped[str] = mapped_column(String(50), nullable=False)
 
     present_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    token_id: Mapped[str] = mapped_column(String(78), nullable=False)
 
     collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    blockchain_network: Mapped[str] = mapped_column(String(50), nullable=False)
 
     buyer_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     buyer_username: Mapped[str | None] = mapped_column(String(255), nullable=True)

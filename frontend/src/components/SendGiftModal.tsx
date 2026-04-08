@@ -12,7 +12,6 @@ interface CollectionOption {
   image_url: string | null;
   base_price: string | null;
   purchase_limit: number | null;
-  blockchain_network: string | null;
 }
 
 interface UserOption {

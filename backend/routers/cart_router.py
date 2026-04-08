@@ -20,7 +20,6 @@ class CartItemResponse(BaseModel):
     listing_id: int
     price: str
     present_id: int
-    token_id: str
     present_image_url: str | None
     collection_name: str
     model_name: str | None
@@ -62,7 +61,6 @@ def get_cart(user_id: int, db: Session = Depends(get_db)):
                 listing_id=ci.listing_id,
                 price=str(listing.price),
                 present_id=listing.present_id,
-                token_id=listing.token_id,
                 present_image_url=listing.present_image_url,
                 collection_name=listing.collection_name,
                 model_name=listing.model_name,
@@ -104,7 +102,6 @@ def add_to_cart(req: AddToCartRequest, db: Session = Depends(get_db)):
         listing_id=cart_item.listing_id,
         price=str(listing.price),
         present_id=listing.present_id,
-        token_id=listing.token_id,
         present_image_url=listing.present_image_url,
         collection_name=listing.collection_name,
         model_name=listing.model_name,
