@@ -24,7 +24,7 @@ interface SendGiftModalProps {
   open: boolean;
   senderId: number;
   onClose: () => void;
-  onSent: () => void;
+  onSent: (newBalance?: number) => void;
   initialReceiverId?: number | null;
 }
 
@@ -118,8 +118,11 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
         throw new Error(error.detail || "Failed to send gift");
       }
 
+      const data = await res.json();
+      const newBalance = data.new_balance ? parseFloat(data.new_balance) : undefined;
+
       messageApi.success("Gift sent successfully!");
-      onSent();
+      onSent(newBalance);
       onClose();
     } catch (error) {
       console.error("Failed to send gift:", error);

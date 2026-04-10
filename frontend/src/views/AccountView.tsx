@@ -161,6 +161,17 @@ const AccountView = () => {
     () => loadUser()
   );
 
+  const handleGiftSent = (newBalance?: number) => {
+    loadUser();
+
+    if (newBalance !== undefined && isOwn) {
+      const currentUser = getStoredCurrentUser();
+      const updated = { ...currentUser, balance: newBalance };
+      localStorage.setItem("currentUser", JSON.stringify(updated));
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
   useEffect(() => {
     if (!username) {
       setUser(null);
@@ -672,7 +683,7 @@ const AccountView = () => {
           open={isGiftOpen}
           senderId={getStoredCurrentUser().user_id}
           onClose={() => setIsGiftOpen(false)}
-          onSent={loadUser}
+          onSent={handleGiftSent}
           initialReceiverId={isOwn ? null : user.user_id}
         />
 

@@ -153,7 +153,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   useEffect(() => {
     const syncCurrentUser = () => {
-      setCurrentUser(getStoredCurrentUser());
+      const updatedUser = getStoredCurrentUser();
+      setCurrentUser(updatedUser);
+      setBalance(updatedUser.balance ?? 0);
     };
 
     window.addEventListener("storage", syncCurrentUser);
