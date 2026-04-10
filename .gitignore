@@ -49,4 +49,7 @@ backend/contract_info.json
 *.jpeg
 *.jpg
 
+# Qwen
+.qwen
+
 

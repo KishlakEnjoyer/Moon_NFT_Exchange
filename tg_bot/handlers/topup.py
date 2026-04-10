@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 import os
 from dotenv import load_dotenv
+import requests as rq
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -11,7 +12,7 @@ from services.topup_api import (
     TopupCooldownError,
     TopupUserNotFoundError,
     TopupWalletNotFoundError,
-    topup_topup_by_tg_id,
+    topup_topup_by_wal_adr,
 )
 from states.TopupState import TopupStates
 
@@ -20,6 +21,7 @@ load_dotenv()
 router = Router()
 
 SITE_URL = os.getenv("REACT_APP_FRONT_URL")
+API_URL = os.getenv("API_DOCKER_URL")
 
 
 def get_site_link_keyboard() -> InlineKeyboardMarkup:
@@ -49,6 +51,14 @@ async def top_up_amount_handler(message: Message, state: FSMContext) -> None:
     raw_amount = (message.text or "").strip().replace(",", ".")
     tg_id = message.from_user.id
 
+    res = rq.get(f"{API_URL}/user-info/tg/{tg_id}")
+
+    if res.status_code != 200:
+        await message.answer(f"It looks like you don't have an account on the site yet.\n\nPlease, visit the site and log in to create your profile.\n\n{res.text[:3900]}", reply_markup=contacts)
+        return
+    
+    profile = res.json()
+
     try:
         amount = Decimal(raw_amount)
     except InvalidOperation:
@@ -64,8 +74,8 @@ async def top_up_amount_handler(message: Message, state: FSMContext) -> None:
         return
 
     try:
-        result = await topup_topup_by_tg_id(
-            tg_id=tg_id,
+        result = await topup_topup_by_wal_adr(
+            wallet_adr=profile['wallet_address'],
             amount=str(amount),
         )
     except TopupUserNotFoundError:

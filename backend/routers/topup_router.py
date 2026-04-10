@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from services.user_wallet_service import get_user_wallet_balances
 from core.database import get_db
 from core.request_models import TopUpRequest, TopUpResponse
-from services.blockchain.topup_service import transfer_tokens_to_user_by_tg_id
+from services.blockchain.topup_service import transfer_tokens_to_user_by_wallet_address
 
 from utils.websocket_manager import ws_manager
 import asyncio
@@ -19,9 +19,9 @@ async def topup(
 ) -> TopUpResponse:
     try:
         result = await asyncio.to_thread( 
-            transfer_tokens_to_user_by_tg_id,
+            transfer_tokens_to_user_by_wallet_address,
             db=db,
-            tg_id=payload.tg_id,
+            wallet_address=payload.wallet_address,
             amount=payload.amount,
         )
 

@@ -346,15 +346,14 @@ class WalletTopup(Base):
     __tablename__ = "wallet_topups"
 
     topup_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("users.user_id"),
+    wallet_address: Mapped[str] = mapped_column(
+        String(42),
+        ForeignKey("users.wallet_address"),
         nullable=False,
         index=True,
     )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     requested_via: Mapped[str] = mapped_column(String(50), nullable=False)
-    requested_by_tg_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     status: Mapped[int] = mapped_column(
         SmallInteger,
         ForeignKey("topup_statuses.status_id"),

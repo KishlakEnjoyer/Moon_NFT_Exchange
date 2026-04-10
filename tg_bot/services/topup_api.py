@@ -19,10 +19,10 @@ class TopupWalletNotFoundError(Exception):
     pass
 
 
-async def topup_topup_by_tg_id(tg_id: int, amount: str) -> dict:
+async def topup_topup_by_wal_adr(wallet_adr: str, amount: str) -> dict:
     url = f"{BACKEND_URL}/topup/topup"
     payload = {
-        "tg_id": tg_id,
+        "wallet_address": wallet_adr,
         "amount": amount,
     }
 

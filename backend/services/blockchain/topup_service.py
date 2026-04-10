@@ -51,10 +51,10 @@ def _validate_amount(amount: Decimal) -> None:
         raise ValueError("Amount must be less than 1000000")
 
 
-def _check_cooldown(db: Session, user_id: int) -> tuple[bool, int]:
+def _check_cooldown(db: Session, wallet_adr: int) -> tuple[bool, int]:
     latest_topup = db.scalar(
         select(WalletTopup)
-        .where(WalletTopup.user_id == user_id)
+        .where(WalletTopup.wallet_address == wallet_adr)
         .order_by(desc(WalletTopup.created_at))
         .limit(1)
     )
@@ -72,11 +72,11 @@ def _check_cooldown(db: Session, user_id: int) -> tuple[bool, int]:
     return False, remaining_seconds
 
 
-def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -> dict:
+def transfer_tokens_to_user_by_wallet_address(db: Session, wallet_address, amount: Decimal) -> dict:
     _validate_amount(amount)
 
-    user = db.scalar(
-        select(User).where(User.user_tg_id == tg_id)
+    user: User = db.scalar(
+        select(User).where(User.wallet_address == wallet_address)
     )
 
     if not user:
@@ -85,7 +85,7 @@ def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -
     if not user.wallet_address:
         raise ValueError("User wallet not found")
 
-    allowed, remaining_seconds = _check_cooldown(db, user.user_id)
+    allowed, remaining_seconds = _check_cooldown(db, user.wallet_address)
     if not allowed:
         raise RuntimeError(f"Cooldown active:{remaining_seconds}")
 
@@ -111,10 +111,9 @@ def transfer_tokens_to_user_by_tg_id(db: Session, tg_id: int, amount: Decimal) -
     failed_status_id = _get_failed_status_id(db)
 
     topup = WalletTopup(
-        user_id=user.user_id,
+        wallet_address=user.wallet_address,
         amount=amount,
         requested_via="telegram_bot",
-        requested_by_tg_user_id=tg_id,
         status=pending_status_id,
         tx_hash=None,
         block_number=None,

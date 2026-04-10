@@ -26,6 +26,9 @@ from services.blockchain.token_service import (
     get_token_balance_raw,
     get_token_contract,
     to_token_units,
+    approve_tokens,
+    get_allowance,
+    transfer_from_tokens,
 )
 from services.notification_service import (
     NotificationManager,
@@ -143,28 +146,71 @@ def purchase_and_send_gift(
     platform_account = Account.from_key(platform_owner_key)
     platform_address = Web3.to_checksum_address(platform_account.address)
 
-    
-    
+    # Check if gas sponsorship is enabled
+    gas_sponsor_enabled = os.getenv("GAS_SPONSOR_ENABLED", "true").lower() == "true"
+
     try:
-        nonce = w3.eth.get_transaction_count(sender_address)
-        gas_price = w3.eth.gas_price
+        if gas_sponsor_enabled:
+            # Platform pays gas using transferFrom
+            print(f"[GAS SPONSOR] Checking allowance for sender {sender_address}")
+            
+            # Check if user has approved platform to spend tokens
+            current_allowance = get_allowance(sender_address, platform_address)
+            
+            # If allowance is less than price, approve first (auto-approve for seamless UX)
+            if current_allowance < price_units:
+                print(f"[GAS SPONSOR] Insufficient allowance ({current_allowance} < {price_units}), approving...")
+                # Use MAX_UINT256 for one-time approval
+                max_uint256 = 2**256 - 1
+                approve_tx_hash = approve_tokens(
+                    spender_address=platform_address,
+                    amount=max_uint256,
+                    user_address=sender_address,
+                    user_private_key=sender_private_key
+                )
+                print(f"[GAS SPONSOR] Approve TX: {approve_tx_hash}")
+            
+            # Now use transferFrom - platform pays gas
+            print(f"[GAS SPONSOR] Executing transferFrom: {sender_address} -> {platform_address}, amount: {price_units}")
+            tx_hash_hex = transfer_from_tokens(
+                from_address=sender_address,
+                to_address=platform_address,
+                amount=price_units,
+                platform_address=platform_account.address,
+                platform_private_key=platform_owner_key
+            )
+            print(f"[GAS SPONSOR] TransferFrom TX: {tx_hash_hex}")
+            
+            receipt = w3.eth.wait_for_transaction_receipt(Web3.to_bytes(hexstr=tx_hash_hex), timeout=30)
+            
+            # Log gas cost
+            gas_used = receipt.get('gasUsed', 0)
+            gas_price = receipt.get('effectiveGasPrice', 0)
+            total_gas_cost_wei = gas_used * gas_price
+            total_gas_cost_eth = Web3.from_wei(total_gas_cost_wei, 'ether')
+            print(f"[GAS SPONSOR] TX confirmed. Gas used: {gas_used}, Cost: {total_gas_cost_eth} ETH")
+        else:
+            # Legacy mode: user pays gas (original behavior)
+            nonce = w3.eth.get_transaction_count(sender_address)
+            gas_price = w3.eth.gas_price
 
-        tx = contract.functions.transfer(platform_address, price_units).build_transaction(
-            {
-                "from": sender_address,
-                "nonce": nonce,
-                "gasPrice": gas_price,
-                "chainId": w3.eth.chain_id,
-            }
-        )
+            tx = contract.functions.transfer(platform_address, price_units).build_transaction(
+                {
+                    "from": sender_address,
+                    "nonce": nonce,
+                    "gasPrice": gas_price,
+                    "chainId": w3.eth.chain_id,
+                }
+            )
 
-        tx["gas"] = 100000
+            tx["gas"] = 100000
 
-        signed_tx = w3.eth.account.sign_transaction(tx, private_key=sender_private_key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-        tx_hash_hex = tx_hash.hex()
+            signed_tx = w3.eth.account.sign_transaction(tx, private_key=sender_private_key)
+            tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            tx_hash_hex = tx_hash.hex()
 
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+            print(f"[LEGACY TX] User pays gas. TX: {tx_hash_hex}")
 
         if receipt["status"] != 1:
             raise HTTPException(status_code=500, detail="Blockchain transaction failed")

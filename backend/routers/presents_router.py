@@ -8,7 +8,7 @@ import os
 
 from core.database import get_db
 from core.models import Present, CurrentOwner, Collections, Listing, User, Models, Transaction
-from services.blockchain.token_service import from_token_units, get_token_balance_raw, to_token_units, get_token_contract
+from services.blockchain.token_service import from_token_units, get_token_balance_raw, to_token_units, get_token_contract, approve_tokens, get_allowance
 from services.blockchain.crypto_service import decrypt_private_key
 from services.blockchain.client import get_web3
 from web3 import Web3
@@ -139,6 +139,101 @@ class BurnResponse(BaseModel):
     present_id: int
     refund_amount: str
     tx_hash: str
+
+
+class ApprovePlatformResponse(BaseModel):
+    status: str
+    tx_hash: str | None = None
+    allowance: str
+    platform_address: str
+
+
+class AllowanceResponse(BaseModel):
+    allowance: str
+    platform_address: str
+
+
+@presents_router.post("/approve-platform", response_model=ApprovePlatformResponse)
+def approve_platform_spending(user_id: int, db: Session = Depends(get_db)):
+    """
+    Approve platform wallet to spend user's tokens.
+    This enables gasless transactions where the platform pays for gas.
+    Uses MAX_UINT256 for one-time approval.
+    """
+    user = db.scalar(select(User).where(User.user_id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.wallet_address:
+        raise HTTPException(status_code=400, detail="User wallet not found")
+    
+    if not user.wallet_private_key_encrypted:
+        raise HTTPException(status_code=400, detail="Wallet private key not found")
+    
+    platform_private_key = os.getenv("PLATFORM_OWNER_PRIVATE_KEY")
+    if not platform_private_key:
+        raise HTTPException(status_code=500, detail="Platform key not configured")
+    
+    platform_account = Account.from_key(platform_private_key)
+    platform_address = platform_account.address
+    
+    private_key = decrypt_private_key(user.wallet_private_key_encrypted)
+    w3 = get_web3()
+    
+    # Check current allowance
+    current_allowance = get_allowance(user.wallet_address, platform_address)
+    
+    # If already approved with sufficient allowance, skip
+    max_uint256 = 2**256 - 1
+    if current_allowance >= max_uint256:
+        return ApprovePlatformResponse(
+            status="already_approved",
+            tx_hash=None,
+            allowance=str(current_allowance),
+            platform_address=platform_address
+        )
+    
+    # Approve platform to spend tokens (MAX_UINT256 for one-time approval)
+    tx_hash = approve_tokens(
+        spender_address=platform_address,
+        amount=max_uint256,
+        user_address=user.wallet_address,
+        user_private_key=private_key
+    )
+    
+    new_allowance = get_allowance(user.wallet_address, platform_address)
+    
+    return ApprovePlatformResponse(
+        status="approved",
+        tx_hash=tx_hash,
+        allowance=str(new_allowance),
+        platform_address=platform_address
+    )
+
+
+@presents_router.get("/allowance", response_model=AllowanceResponse)
+def check_user_allowance(user_id: int, db: Session = Depends(get_db)):
+    """Check user's current allowance for platform wallet."""
+    user = db.scalar(select(User).where(User.user_id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.wallet_address:
+        raise HTTPException(status_code=400, detail="User wallet not found")
+    
+    platform_private_key = os.getenv("PLATFORM_OWNER_PRIVATE_KEY")
+    if not platform_private_key:
+        raise HTTPException(status_code=500, detail="Platform key not configured")
+    
+    platform_account = Account.from_key(platform_private_key)
+    platform_address = platform_account.address
+    
+    allowance = get_allowance(user.wallet_address, platform_address)
+    
+    return AllowanceResponse(
+        allowance=str(allowance),
+        platform_address=platform_address
+    )
 
 
 @presents_router.post("/{present_id}/burn", response_model=BurnResponse)

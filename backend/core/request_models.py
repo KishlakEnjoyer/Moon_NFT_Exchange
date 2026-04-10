@@ -13,7 +13,7 @@ class DeclineAuthRequest(BaseModel):
 
 
 class TopUpRequest(BaseModel):
-    tg_id: int
+    wallet_address: str
     amount: Decimal = Field(gt=0, lt=1000000)
 
 
