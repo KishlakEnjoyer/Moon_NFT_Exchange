@@ -2,6 +2,7 @@ import os
 import json
 from pathlib import Path
 from decimal import Decimal
+from eth_account import Account
 from web3 import Web3
 
 from services.blockchain.client import get_web3
@@ -97,20 +98,38 @@ def burn_tokens(wallet_address: str, amount: str, private_key: str) -> str:
     return tx_hash_hex
 
 
+def send_eth(user_address: str, amount_wei: int, platform_private_key: str) -> str:
+    w3 = get_web3()
+    contract = get_token_contract()
+    platform_account = Account.from_key(platform_private_key)
+    platform_address = Web3.to_checksum_address(platform_account.address)
+    checksum_user = Web3.to_checksum_address(user_address)
+    
+    nonce = w3.eth.get_transaction_count(platform_address)
+    gas_price = w3.eth.gas_price
+    
+    tx = {
+        "from": platform_address,
+        "to": checksum_user,
+        "value": amount_wei,
+        "nonce": nonce,
+        "gasPrice": gas_price,
+        "chainId": w3.eth.chain_id,
+        "gas": 21000,  
+    }
+    
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key=platform_private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    tx_hash_hex = tx_hash.hex()
+    
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+    if receipt["status"] != 1:
+        raise Exception("ETH transfer failed")
+    
+    return tx_hash_hex
+
+
 def approve_tokens(spender_address: str, amount: int, user_address: str, user_private_key: str) -> str:
-    """
-    Approve another address (typically platform wallet) to spend tokens on behalf of the user.
-    This is required for gasless transactions где платформа платит за газ.
-    
-    Args:
-        spender_address: Address being approved to spend tokens (platform wallet)
-        amount: Amount in token units (use to_token_units to convert)
-        user_address: User's wallet address
-        user_private_key: User's decrypted private key
-    
-    Returns:
-        Transaction hash hex
-    """
     w3 = get_web3()
     contract = get_token_contract()
     checksum_user = Web3.to_checksum_address(user_address)
@@ -126,12 +145,10 @@ def approve_tokens(spender_address: str, amount: int, user_address: str, user_pr
         "chainId": w3.eth.chain_id,
     })
 
-    # Estimate gas with buffer
     try:
         estimated_gas = w3.eth.estimate_gas(tx)
         tx["gas"] = int(estimated_gas * 1.2)
     except Exception:
-        # Fallback to safe default for approve
         tx["gas"] = 100000
 
     signed_tx = w3.eth.account.sign_transaction(tx, private_key=user_private_key)
@@ -155,20 +172,7 @@ def get_allowance(owner_address: str, spender_address: str) -> int:
 
 def transfer_from_tokens(from_address: str, to_address: str, amount: int, 
                          platform_address: str, platform_private_key: str) -> str:
-    """
-    Transfer tokens from one address to another using approved allowance.
-    Платформа платит газ сама.
-    
-    Args:
-        from_address: Source address (user)
-        to_address: Destination address (platform or recipient)
-        amount: Amount in token units
-        platform_address: Platform wallet address (the spender that was approved)
-        platform_private_key: Platform's private key to sign and pay gas
-    
-    Returns:
-        Transaction hash hex
-    """
+
     w3 = get_web3()
     contract = get_token_contract()
     checksum_from = Web3.to_checksum_address(from_address)
@@ -185,12 +189,10 @@ def transfer_from_tokens(from_address: str, to_address: str, amount: int,
         "chainId": w3.eth.chain_id,
     })
 
-    # Estimate gas with buffer
     try:
         estimated_gas = w3.eth.estimate_gas(tx)
         tx["gas"] = int(estimated_gas * 1.2)
     except Exception:
-        # Fallback to safe default for transferFrom
         tx["gas"] = 150000
 
     signed_tx = w3.eth.account.sign_transaction(tx, private_key=platform_private_key)

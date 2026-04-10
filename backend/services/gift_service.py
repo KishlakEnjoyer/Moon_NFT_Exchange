@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime
 from decimal import Decimal
@@ -29,15 +30,14 @@ from services.blockchain.token_service import (
     approve_tokens,
     get_allowance,
     transfer_from_tokens,
+    send_eth,
 )
 from services.notification_service import (
-    NotificationManager,
+    manager,
     create_notification,
     notification_to_dict,
 )
 from utils.tg_bot import send_tg_message, send_tg_message_sync
-
-notification_manager = NotificationManager()
 
 
 def get_next_present_num(db: Session, collection_id: int) -> int:
@@ -116,6 +116,9 @@ def purchase_and_send_gift(
     minted_count = db.scalar(
         select(func.count(Present.present_id)).where(Present.collection_id == collection_id)
     ) or 0
+
+    
+    
     available = collection.collection_limit - minted_count
     if available <= 0:
         raise HTTPException(status_code=400, detail="Collection is sold out")
@@ -146,21 +149,25 @@ def purchase_and_send_gift(
     platform_account = Account.from_key(platform_owner_key)
     platform_address = Web3.to_checksum_address(platform_account.address)
 
-    # Check if gas sponsorship is enabled
     gas_sponsor_enabled = os.getenv("GAS_SPONSOR_ENABLED", "true").lower() == "true"
 
     try:
         if gas_sponsor_enabled:
-            # Platform pays gas using transferFrom
-            print(f"[GAS SPONSOR] Checking allowance for sender {sender_address}")
             
-            # Check if user has approved platform to spend tokens
             current_allowance = get_allowance(sender_address, platform_address)
             
-            # If allowance is less than price, approve first (auto-approve for seamless UX)
             if current_allowance < price_units:
                 print(f"[GAS SPONSOR] Insufficient allowance ({current_allowance} < {price_units}), approving...")
-                # Use MAX_UINT256 for one-time approval
+         
+                eth_for_gas = Web3.to_wei(0.001, 'ether')
+                print(f"[GAS SPONSOR] Sending {eth_for_gas} wei ({Web3.from_wei(eth_for_gas, 'ether')} ETH) to user {sender_address} for gas")
+                send_eth(
+                    user_address=sender_address,
+                    amount_wei=eth_for_gas,
+                    platform_private_key=platform_owner_key
+                )
+                print(f"[GAS SPONSOR] ETH sent successfully")
+                
                 max_uint256 = 2**256 - 1
                 approve_tx_hash = approve_tokens(
                     spender_address=platform_address,
@@ -170,7 +177,6 @@ def purchase_and_send_gift(
                 )
                 print(f"[GAS SPONSOR] Approve TX: {approve_tx_hash}")
             
-            # Now use transferFrom - platform pays gas
             print(f"[GAS SPONSOR] Executing transferFrom: {sender_address} -> {platform_address}, amount: {price_units}")
             tx_hash_hex = transfer_from_tokens(
                 from_address=sender_address,
@@ -183,14 +189,12 @@ def purchase_and_send_gift(
             
             receipt = w3.eth.wait_for_transaction_receipt(Web3.to_bytes(hexstr=tx_hash_hex), timeout=30)
             
-            # Log gas cost
             gas_used = receipt.get('gasUsed', 0)
             gas_price = receipt.get('effectiveGasPrice', 0)
             total_gas_cost_wei = gas_used * gas_price
             total_gas_cost_eth = Web3.from_wei(total_gas_cost_wei, 'ether')
             print(f"[GAS SPONSOR] TX confirmed. Gas used: {gas_used}, Cost: {total_gas_cost_eth} ETH")
         else:
-            # Legacy mode: user pays gas (original behavior)
             nonce = w3.eth.get_transaction_count(sender_address)
             gas_price = w3.eth.gas_price
 
@@ -220,11 +224,10 @@ def purchase_and_send_gift(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Blockchain error: {str(e)}")
 
-    print(f"[DEBUG 1] Blockchain TX OK: {tx_hash_hex}")
 
     try:
         present_num = get_next_present_num(db, collection_id)
-        print(f"[DEBUG 2] Got present_num: {present_num}")
+        print(f"[DEBUG] Got present_num: {present_num}")
 
         present = Present(
             collection_id=collection_id,
@@ -238,11 +241,9 @@ def purchase_and_send_gift(
             is_visible=0,
             original_sender_id=sender_id,
         )
-        print(f"[DEBUG 3] Present object created")
 
         db.add(present)
         db.flush()
-        print(f"[DEBUG 4] Present flushed to DB, present_id={present.present_id}")
 
         transaction = Transaction(
             buyer_id=receiver_id,
@@ -258,10 +259,8 @@ def purchase_and_send_gift(
             transaction_date=datetime.utcnow(),
         )
         db.add(transaction)
-        print(f"[DEBUG 5] Transaction added")
 
         increment_purchase_count(db, sender_id, collection_id)
-        print(f"[DEBUG 6] Purchase count incremented")
 
         is_self_gift = sender_id == receiver_id
         price_str = str(price)
@@ -277,10 +276,14 @@ def purchase_and_send_gift(
                 entity_type="present",
                 entity_id=present.present_id,
             )
-            print(f"[DEBUG 7] Notification created")
+            
+            notif_dict = notification_to_dict(notification)
+            try:
+                asyncio.get_event_loop().create_task(manager.send_to_user(receiver_id, notif_dict))
+            except Exception as ws_err:
+                print(f"[DEBUG 7.1] WebSocket send failed (non-critical): {ws_err}")
 
         db.commit()
-        print(f"[DEBUG 8] DB COMMIT SUCCESS")
 
         send_tg_message_sync(receiver.user_tg_id, receiver_msg)
         send_tg_message_sync(sender.user_tg_id, sender_msg)
