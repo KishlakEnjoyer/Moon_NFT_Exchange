@@ -2,7 +2,6 @@ import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfir
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RightOutlined, CheckOutlined, FireOutlined } from "@ant-design/icons";
-import TONIcon from "./icons/TONIcon";
 import { PresentDetail, getPresentDetail, togglePresentVisibility } from "../services/presentService";
 
 const { Text, Title } = Typography;
@@ -76,8 +75,22 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     }
   };
 
+  const handleSenderClick = () => {
+    if (detail?.original_sender_username) {
+      onClose();
+      navigate(`/account/${detail.original_sender_username}`);
+    }
+  };
+
   const burnRefundPercent = parseFloat(process.env.REACT_APP_BURN_REFUND_PERCENT || "75");
   const burnRefundAmount = (parseFloat(detail?.base_price || "0") * burnRefundPercent / 100).toFixed(2);
+  const ownerAvatarUrl = detail?.owner_profile_pic_url
+    ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.owner_profile_pic_url}`
+    : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
+  const senderAvatarUrl = detail?.original_sender_profile_pic_url
+    ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.original_sender_profile_pic_url}`
+    : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
+  const giftDescription = detail?.description?.trim();
 
   const attributes = [
     {
@@ -89,7 +102,7 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
           className="cursor-pointer hover:opacity-75 transition-opacity"
           onClick={handleOwnerClick}
         >
-          <Avatar size={24} src={`${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`} />
+          <Avatar size={24} src={ownerAvatarUrl} />
           <Text className="!text-[var(--accent-150)]">{detail?.owner_username || "Unknown"}</Text>
         </Flex>
       ),
@@ -97,7 +110,15 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     ...(detail?.original_sender_username ? [{
       key: "From",
       value: (
-        <Text className="!text-[var(--accent-150)]">{detail.original_sender_username}</Text>
+        <Flex
+          align="center"
+          gap={8}
+          className="cursor-pointer hover:opacity-75 transition-opacity"
+          onClick={handleSenderClick}
+        >
+          <Avatar size={24} src={senderAvatarUrl} />
+          <Text className="!text-[var(--accent-150)]">{detail.original_sender_username}</Text>
+        </Flex>
       ),
     }] : []),
     {
@@ -112,6 +133,14 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
       key: "Base Price",
       value: `${parseFloat(detail?.base_price || "0").toFixed(2)} TON`,
     },
+    ...(giftDescription ? [{
+      key: "Message",
+      value: (
+        <Text className="max-w-[220px] whitespace-pre-wrap break-words text-right">
+          {giftDescription}
+        </Text>
+      ),
+    }] : [])
   ];
 
   if (detail?.is_upgraded) {

@@ -21,6 +21,7 @@ class PresentDetailResponse(BaseModel):
     present_id: int
     present_num: int
     image_url: str | None
+    description: str | None
     collection_name: str
     collection_image_url: str | None
     base_price: str
@@ -33,11 +34,13 @@ class PresentDetailResponse(BaseModel):
     symbol_image_url: str | None
     owner_username: str | None
     owner_id: int | None
+    owner_profile_pic_url: str | None
     is_on_sale: bool
     is_visible: int
     is_upgraded: bool
     has_models: bool
     original_sender_username: str | None
+    original_sender_profile_pic_url: str | None
 
 
 @presents_router.get("/{present_id}/detail", response_model=PresentDetailResponse)
@@ -110,6 +113,7 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         present_id=present.present_id,
         present_num=present.present_num,
         image_url=present.image_url,
+        description=present.description,
         collection_name=collection.collection_name if collection else "Unknown",
         collection_image_url=collection.collection_image_url if collection else None,
         base_price=str(collection.base_price) if collection else "0",
@@ -122,11 +126,13 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         symbol_image_url=symbol_image_url,
         owner_username=owner_user.username if owner_user else None,
         owner_id=owner_record.owner_id if owner_record else None,
-    is_on_sale=active_listing is not None,
+        owner_profile_pic_url=owner_user.profile_pic_url if owner_user else None,
+        is_on_sale=active_listing is not None,
         is_visible=present.is_visible,
         is_upgraded=present.model_id is not None,
         has_models=has_models > 0,
         original_sender_username=original_sender.username if original_sender else None,
+        original_sender_profile_pic_url=original_sender.profile_pic_url if original_sender else None,
     )
 
 

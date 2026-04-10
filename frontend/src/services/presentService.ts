@@ -4,6 +4,7 @@ export interface PresentDetail {
   present_id: number;
   present_num: number;
   image_url: string | null;
+  description: string | null;
   collection_name: string;
   collection_image_url: string | null;
   base_price: string;
@@ -16,12 +17,14 @@ export interface PresentDetail {
   symbol_image_url: string | null;
   owner_username: string | null;
   owner_id: number | null;
+  owner_profile_pic_url: string | null;
   is_on_sale: boolean;
   is_visible: number;
   is_upgraded: boolean;
   is_burned?: boolean;
   has_models: boolean;
   original_sender_username: string | null;
+  original_sender_profile_pic_url: string | null;
 }
 
 export const getPresentDetail = async (presentId: number): Promise<PresentDetail> => {
