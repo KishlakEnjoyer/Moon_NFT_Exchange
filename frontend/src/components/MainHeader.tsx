@@ -23,6 +23,7 @@ import ModalCart from "./ModalCart";
 import { useBalanceSocket } from "../hooks/useBalanceSocket";
 import { useNotifications } from "../hooks/useNotifications";
 import PeopleSearchModal from "./PeopleSearchModal";
+import QrModal from "./QrModal";
 
 const { Text } = Typography;
 
@@ -52,6 +53,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const pollingRef = useRef<number | null>(null);
   const initAbortRef = useRef<AbortController | null>(null);
   const authAttemptRef = useRef(0);
+  const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [currentUser, setCurrentUser] = useState(getStoredCurrentUser);
   const [cartOpen, setCartOpen] = useState(false);
@@ -60,6 +62,11 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasPendingAuth, setHasPendingAuth] = useState(false);
   const [balance, setBalance] = useState<number>(currentUser.balance ?? 0);
+  
+  // QR Modal states
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrDeepLink, setQrDeepLink] = useState<string>("");
+  const [isQrLoading, setIsQrLoading] = useState(false);
 
   const navigate = useNavigate();
   const { token } = theme.useToken();
@@ -72,6 +79,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
+    }
+  };
+
+  const clearQrTimeout = () => {
+    if (qrTimeoutRef.current) {
+      clearTimeout(qrTimeoutRef.current);
+      qrTimeoutRef.current = null;
     }
   };
 
@@ -103,11 +117,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
         if (data.status === "confirmed") {
           clearPolling();
+          clearQrTimeout();
           localStorage.setItem("isAuth", "true");
           localStorage.setItem("currentUser", JSON.stringify(data.user));
           setCurrentUser(data.user);
           clearPendingAuth();
           setIsAuthenticated(true);
+          setQrModalOpen(false);
           window.dispatchEvent(new Event("storage"));
           onAuthSuccess?.();
           return;
@@ -119,7 +135,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           data.status === "declined"
         ) {
           clearPolling();
+          clearQrTimeout();
           clearPendingAuth();
+          setQrModalOpen(false);
           onAuthFail?.();
         }
       } catch (err) {
@@ -127,6 +145,12 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         console.error("Polling failed:", err);
       }
     }, 2000);
+  };
+
+  const handleQrTimeout = () => {
+    // Когда время вышло — не закрываем модалку, просто показываем состояние
+    // Пользователь может нажать "Попробовать снова" через кнопку в модалке
+    console.log("QR auth timeout reached");
   };
 
   useEffect(() => {
@@ -139,11 +163,16 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     const savedState = localStorage.getItem("auth_state");
     if (savedState) {
       setHasPendingAuth(true);
+      const savedLink = localStorage.getItem("auth_deep_link");
+      if (savedLink) {
+        setQrDeepLink(savedLink);
+      }
       startAuthPolling(savedState);
     }
 
     return () => {
       clearPolling();
+      clearQrTimeout();
       if (initAbortRef.current) {
         initAbortRef.current.abort();
         initAbortRef.current = null;
@@ -190,6 +219,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const handleLogIn = async () => {
     try {
       setIsConnecting(true);
+      setIsQrLoading(true);
 
       const existingState = localStorage.getItem("auth_state");
       const existingLink = localStorage.getItem("auth_deep_link");
@@ -197,7 +227,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       if (existingState && existingLink) {
         setHasPendingAuth(true);
         if (!pollingRef.current) startAuthPolling(existingState);
-        window.open(existingLink, "_blank", "noopener,noreferrer");
+        setQrDeepLink(existingLink);
+        setQrModalOpen(true);
+        setIsQrLoading(false);
         return;
       }
 
@@ -205,6 +237,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       const currentAttempt = authAttemptRef.current;
 
       clearPolling();
+      clearQrTimeout();
 
       if (initAbortRef.current) initAbortRef.current.abort();
 
@@ -233,9 +266,18 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       localStorage.setItem("auth_deep_link", data.deep_link);
       setHasPendingAuth(true);
 
-      window.open(data.deep_link, "_blank", "noopener,noreferrer");
+      setQrDeepLink(data.deep_link);
+      setQrModalOpen(true);
+      setIsQrLoading(false);
+      
+      // На мобильных сразу открываем deep link
+      if (window.innerWidth < 768) {
+        window.open(data.deep_link, "_blank", "noopener,noreferrer");
+      }
+      
       startAuthPolling(data.state);
     } catch (err) {
+      setIsQrLoading(false);
       if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Request failed:", err);
     } finally {
@@ -246,10 +288,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const handleLogout = () => {
     setIsAuthenticated(false);
     clearPolling();
+    clearQrTimeout();
     clearPendingAuth();
     localStorage.setItem("isAuth", "");
     localStorage.removeItem("currentUser");
     setCurrentUser({});
+    setQrModalOpen(false);
+    setQrDeepLink("");
     window.dispatchEvent(new Event("storage"));
     onLogout?.();
   };
@@ -416,6 +461,15 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           </div>
         )}
       </div>
+
+      {/* QR Auth Modal */}
+      <QrModal
+        open={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        deepLink={qrDeepLink}
+        isLoading={isQrLoading}
+        onTimeout={handleQrTimeout}
+      />
 
       <ModalCart
         open={cartOpen}

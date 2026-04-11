@@ -38,6 +38,8 @@ from services.notification_service import (
     notification_to_dict,
 )
 from utils.tg_bot import send_tg_message, send_tg_message_sync
+from utils.websocket_manager import ws_manager
+import asyncio
 
 
 def get_next_present_num(db: Session, collection_id: int) -> int:
@@ -296,6 +298,15 @@ def purchase_and_send_gift(
 
     new_balance_raw = get_token_balance_raw(sender.wallet_address)
     new_balance = from_token_units(new_balance_raw)
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(ws_manager.send_balance(sender_id, new_balance))
+        else:
+            asyncio.run(ws_manager.send_balance(sender_id, new_balance))
+    except Exception as e:
+        print(f"[DEBUG] Failed to send balance via WebSocket: {e}")
 
     return {
         "present_id": present.present_id,
