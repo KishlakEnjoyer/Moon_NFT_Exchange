@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 from pydantic import BaseModel
 from typing import List
 
 from core.database import get_db
-from core.models import Cart, CartItem, Listing, ActiveListingsView
+from core.models import ActiveListingsView, CartItem, User
 
 cart_router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -33,25 +32,15 @@ class CartResponse(BaseModel):
     total: str
 
 
-def get_or_create_cart(db: Session, user_id: int) -> Cart:
-    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
-    if not cart:
-        cart = Cart(user_id=user_id)
-        db.add(cart)
-        db.commit()
-        db.refresh(cart)
-    return cart
-
-
 @cart_router.get("/{user_id}", response_model=CartResponse)
 def get_cart(user_id: int, db: Session = Depends(get_db)):
-    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
-    if not cart:
+    cart_items = db.query(CartItem).filter(CartItem.user_id == user_id).all()
+    if not cart_items:
         return CartResponse(user_id=user_id, items=[], total="0")
 
     items = []
     total = 0
-    for ci in cart.items:
+    for ci in cart_items:
         listing = db.query(ActiveListingsView).filter(
             ActiveListingsView.listing_id == ci.listing_id
         ).first()
@@ -74,6 +63,10 @@ def get_cart(user_id: int, db: Session = Depends(get_db)):
 
 @cart_router.post("/add", response_model=CartItemResponse)
 def add_to_cart(req: AddToCartRequest, db: Session = Depends(get_db)):
+    user = db.query(User.user_id).filter(User.user_id == req.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     listing = db.query(ActiveListingsView).filter(
         ActiveListingsView.listing_id == req.listing_id
     ).first()
@@ -83,16 +76,14 @@ def add_to_cart(req: AddToCartRequest, db: Session = Depends(get_db)):
     if listing.seller_id == req.user_id:
         raise HTTPException(status_code=400, detail="Cannot add your own listing to cart")
 
-    cart = get_or_create_cart(db, req.user_id)
-
     existing = db.query(CartItem).filter(
-        CartItem.cart_id == cart.cart_id,
+        CartItem.user_id == req.user_id,
         CartItem.listing_id == req.listing_id,
     ).first()
     if existing:
         raise HTTPException(status_code=409, detail="Item already in cart")
 
-    cart_item = CartItem(cart_id=cart.cart_id, listing_id=req.listing_id)
+    cart_item = CartItem(user_id=req.user_id, listing_id=req.listing_id)
     db.add(cart_item)
     db.commit()
     db.refresh(cart_item)
@@ -122,8 +113,6 @@ def remove_from_cart(cart_item_id: int, db: Session = Depends(get_db)):
 
 @cart_router.delete("/clear/{user_id}")
 def clear_cart(user_id: int, db: Session = Depends(get_db)):
-    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
-    if cart:
-        db.query(CartItem).filter(CartItem.cart_id == cart.cart_id).delete()
-        db.commit()
+    db.query(CartItem).filter(CartItem.user_id == user_id).delete()
+    db.commit()
     return {"ok": True}

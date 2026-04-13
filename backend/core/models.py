@@ -86,10 +86,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    cart: Mapped[Cart | None] = relationship(
-        "Cart",
+    cart_items: Mapped[list[CartItem]] = relationship(
+        "CartItem",
         back_populates="user",
-        uselist=False,
         cascade="all, delete-orphan",
     )
 
@@ -134,7 +133,6 @@ class Collections(Base):
     collection_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     collection_limit: Mapped[int] = mapped_column(Integer, nullable=False)
     purchase_limit: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
-    contract_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("100.00"))
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
@@ -633,40 +631,13 @@ class Report(Base):
     moderator: Mapped[User | None] = relationship("User", foreign_keys=[moderator_id])
 
 
-class Cart(Base):
-    __tablename__ = "carts"
-
-    cart_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("users.user_id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False),
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
-
-    user: Mapped[User] = relationship("User", back_populates="cart")
-    items: Mapped[list[CartItem]] = relationship(
-        "CartItem",
-        back_populates="cart",
-        cascade="all, delete-orphan",
-    )
-
-
 class CartItem(Base):
     __tablename__ = "cart_items"
 
     cart_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    cart_id: Mapped[int] = mapped_column(
+    user_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey("carts.cart_id", ondelete="CASCADE"),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -678,7 +649,7 @@ class CartItem(Base):
     )
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
 
-    cart: Mapped[Cart] = relationship("Cart", back_populates="items")
+    user: Mapped[User] = relationship("User", back_populates="cart_items")
     listing: Mapped[Listing] = relationship("Listing")
 
 
