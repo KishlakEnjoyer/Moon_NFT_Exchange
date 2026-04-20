@@ -1,31 +1,39 @@
-import { Modal, Button, Spin, Alert, Typography } from "antd";
+import { Alert, Button, Flex, Modal, Spin, Typography } from "antd";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
+
+type AuthProvider = "tg" | "vk";
 
 interface QrModalProps {
   open: boolean;
   onClose: () => void;
-  deepLink: string;
+  provider: AuthProvider;
+  stateValue: string;
+  authLink: string;
+  instruction?: string;
   isLoading?: boolean;
   onTimeout?: () => void;
+  onSelectProvider: (provider: AuthProvider) => void;
 }
 
-const QR_TIMEOUT_MS = 5 * 60 * 1000; // 5 минут
+const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
 
-const { Text } = Typography;
-
+const { Paragraph, Text, Title } = Typography;
 
 export const QrModal: React.FC<QrModalProps> = ({
   open,
   onClose,
-  deepLink,
+  provider,
+  stateValue,
+  authLink,
+  instruction = "",
   isLoading = false,
   onTimeout,
+  onSelectProvider,
 }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(QR_TIMEOUT_MS);
+  const [timeLeft, setTimeLeft] = useState<number>(AUTH_TIMEOUT_MS);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
-  // Определяем мобильный экран
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -33,20 +41,16 @@ export const QrModal: React.FC<QrModalProps> = ({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Авто-открытие deep link на мобильных
   useEffect(() => {
-    if (open && deepLink && isMobile) {
-      window.open(deepLink, "_blank", "noopener,noreferrer");
-      // На мобильных можно сразу закрыть модалку, но оставим на усмотрение
-      // onClose(); 
+    if (open && provider === "tg" && authLink && isMobile) {
+      window.open(authLink, "_blank", "noopener,noreferrer");
     }
-  }, [open, deepLink, isMobile]);
+  }, [open, provider, authLink, isMobile]);
 
-  // Таймер обратного отсчёта
   useEffect(() => {
-    if (!open || !deepLink) return;
+    if (!open || !stateValue) return;
 
-    setTimeLeft(QR_TIMEOUT_MS);
+    setTimeLeft(AUTH_TIMEOUT_MS);
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1000) {
@@ -59,22 +63,114 @@ export const QrModal: React.FC<QrModalProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [open, deepLink, onTimeout]);
+  }, [open, stateValue, provider, onTimeout]);
 
-  // Форматируем время мм:сс
   const formatTime = (ms: number) => {
     const totalSec = Math.floor(ms / 1000);
-    const m = Math.floor(totalSec / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (totalSec % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
+    const minutes = Math.floor(totalSec / 60).toString().padStart(2, "0");
+    const seconds = (totalSec % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
   };
 
-  const handleOpenTelegram = () => {
-    if (deepLink) {
-      window.open(deepLink, "_blank", "noopener,noreferrer");
+  const handleOpenLink = () => {
+    if (authLink) {
+      window.open(authLink, "_blank", "noopener,noreferrer");
     }
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <Flex vertical align="center" gap={12} className="py-8">
+          <Spin size="large" />
+          <Text type="secondary">Preparing authorization...</Text>
+        </Flex>
+      );
+    }
+
+    if (!authLink && provider === "tg") {
+      return (
+        <Alert
+          message="Authorization error"
+          description="Unable to generate Telegram login link."
+          type="error"
+          showIcon
+        />
+      );
+    }
+
+    if (!stateValue) {
+      return (
+        <Alert
+          message="Authorization error"
+          description="Unable to generate login state."
+          type="error"
+          showIcon
+        />
+      );
+    }
+
+    if (provider === "tg") {
+      return (
+        <Flex vertical align="center" gap={16}>
+          <QRCodeSVG
+            value={authLink}
+            size={200}
+            level="H"
+            includeMargin
+            className="rounded-lg border border-gray-200"
+          />
+
+          <Text className="text-center text-gray-500">
+            Scan the QR code in Telegram or open the bot directly.
+          </Text>
+
+          <Button
+            type="primary"
+            icon={<img src="/icons/tg-icon-png.png" alt="TG" width={16} />}
+            onClick={handleOpenLink}
+            size="large"
+          >
+            Open Telegram
+          </Button>
+        </Flex>
+      );
+    }
+
+    return (
+      <Flex vertical align="center" gap={16} className="w-full">
+        <Title level={5} className="!mb-0">
+          VK login
+        </Title>
+
+        <Text className="text-center text-gray-500">
+          Open the VK bot and send the state below.
+        </Text>
+
+        <div className="w-full rounded-xl border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4 text-center">
+          <Text type="secondary" className="block mb-2">
+            State
+          </Text>
+          <Paragraph copyable={{ text: stateValue }} className="!mb-0 !font-mono !text-base break-all">
+            {stateValue}
+          </Paragraph>
+        </div>
+
+        {instruction ? (
+          <Text type="secondary" className="text-center whitespace-pre-line">
+            {instruction}
+          </Text>
+        ) : null}
+
+        <Button
+          type="primary"
+          onClick={handleOpenLink}
+          size="large"
+        >
+          Open VK Bot
+        </Button>
+      </Flex>
+    );
   };
 
   return (
@@ -84,80 +180,56 @@ export const QrModal: React.FC<QrModalProps> = ({
       footer={null}
       centered
       closable
-      title="Авторизация через Telegram"
+      title="Authorization"
       destroyOnClose
     >
-      <div className="flex flex-col items-center gap-4 py-4">
-        {isLoading ? (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <Spin size="large" />
-            <Text className="text-gray-500">Генерация кода...</Text>
-          </div>
-        ) : deepLink ? (
-          <>
-            <QRCodeSVG
-              value={deepLink}
-              size={200}
-              level="H"
-              includeMargin
-              className="rounded-lg border border-gray-200 dark:border-gray-700"
-            />
+      <Flex vertical gap={16} className="py-2">
+        <Flex gap={8}>
+          <Button
+            type={provider === "tg" ? "primary" : "default"}
+            onClick={() => onSelectProvider("tg")}
+            className="flex-1"
+          >
+            Connect TG
+          </Button>
+          <Button
+            type={provider === "vk" ? "primary" : "default"}
+            onClick={() => onSelectProvider("vk")}
+            className="flex-1"
+          >
+            Connect VK
+          </Button>
+        </Flex>
 
-            <Text className="text-center text-gray-500">
-              Отсканируйте код в Telegram,<br />или нажмите кнопку ниже
-            </Text>
+        <div className="flex flex-col items-center gap-4 py-2">
+          {renderContent()}
 
-            <Button
-              type="primary"
-              icon={
-                <img
-                  src="/icons/tg-icon-png.png"
-                  alt="TG"
-                  width={16}
-                  style={{ filter: "brightness(0) invert(1)" }}
-                />
-              }
-              onClick={handleOpenTelegram}
-              size="large"
-            >
-              Открыть Telegram
-            </Button>
-
-            {/* Таймер и прогресс */}
-            <div className="w-full max-w-[200px]">
+          {stateValue ? (
+            <div className="w-full max-w-[240px]">
               <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <Text>Время на сканирование</Text>
+                <Text>Time left</Text>
                 <Text>{formatTime(timeLeft)}</Text>
               </div>
-              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-500 transition-all duration-1000 ease-linear"
-                  style={{
-                    width: `${(timeLeft / QR_TIMEOUT_MS) * 100}%`,
-                  }}
+                  style={{ width: `${(timeLeft / AUTH_TIMEOUT_MS) * 100}%` }}
                 />
               </div>
             </div>
+          ) : null}
 
-            {timeLeft <= 0 && (
-              <Alert
-                message="Время вышло"
-                description="Нажмите «Попробовать снова», чтобы получить новый код"
-                type="warning"
-                showIcon
-                className="w-full"
-              />
-            )}
-          </>
-        ) : (
-          <Alert
-            message="Ошибка"
-            description="Не удалось получить ссылку для авторизации"
-            type="error"
-            showIcon
-          />
-        )}
-      </div>
+          {timeLeft <= 0 ? (
+            <Alert
+              message="Code expired"
+              description="Switch provider or reopen authorization to get a new state."
+              type="warning"
+              showIcon
+              className="w-full"
+            />
+          ) : null}
+        </div>
+      </Flex>
     </Modal>
   );
 };

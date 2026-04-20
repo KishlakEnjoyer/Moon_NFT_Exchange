@@ -24,8 +24,10 @@ import { useBalanceSocket } from "../hooks/useBalanceSocket";
 import { useNotifications } from "../hooks/useNotifications";
 import PeopleSearchModal from "./PeopleSearchModal";
 import QrModal from "./QrModal";
+import { clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
 
 const { Text } = Typography;
+type AuthProvider = "tg" | "vk";
 
 interface MainHeaderProps {
   darkMode: boolean;
@@ -62,10 +64,11 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasPendingAuth, setHasPendingAuth] = useState(false);
   const [balance, setBalance] = useState<number>(currentUser.balance ?? 0);
-  
-  // QR Modal states
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrDeepLink, setQrDeepLink] = useState<string>("");
+  const [authProvider, setAuthProvider] = useState<AuthProvider>("tg");
+  const [authStateValue, setAuthStateValue] = useState<string>("");
+  const [authLink, setAuthLink] = useState<string>("");
+  const [authInstruction, setAuthInstruction] = useState<string>("");
   const [isQrLoading, setIsQrLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -91,8 +94,14 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   const clearPendingAuth = () => {
     localStorage.removeItem("auth_state");
+    localStorage.removeItem("auth_link");
+    localStorage.removeItem("auth_provider");
+    localStorage.removeItem("auth_instruction");
     localStorage.removeItem("auth_deep_link");
     setHasPendingAuth(false);
+    setAuthStateValue("");
+    setAuthLink("");
+    setAuthInstruction("");
   };
 
   const startAuthPolling = (state: string) => {
@@ -116,10 +125,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         const data = await res.json();
 
         if (data.status === "confirmed") {
+          if (!data.access_token) {
+            throw new Error("Missing access token");
+          }
+
           clearPolling();
           clearQrTimeout();
-          localStorage.setItem("isAuth", "true");
-          localStorage.setItem("currentUser", JSON.stringify(data.user));
+          setAuthSession(data.access_token, data.user, data.token_type || "Bearer");
           setCurrentUser(data.user);
           clearPendingAuth();
           setIsAuthenticated(true);
@@ -148,26 +160,113 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   };
 
   const handleQrTimeout = () => {
-    // Когда время вышло — не закрываем модалку, просто показываем состояние
-    // Пользователь может нажать "Попробовать снова" через кнопку в модалке
     console.log("QR auth timeout reached");
   };
 
+  const restorePendingAuth = () => {
+    const savedState = localStorage.getItem("auth_state");
+    const savedProvider = localStorage.getItem("auth_provider");
+    const savedLink = localStorage.getItem("auth_link") || localStorage.getItem("auth_deep_link") || "";
+    const savedInstruction = localStorage.getItem("auth_instruction") || "";
+
+    if (!savedState || !savedLink) {
+      return false;
+    }
+
+    const provider: AuthProvider = savedProvider === "vk" ? "vk" : "tg";
+    setHasPendingAuth(true);
+    setAuthProvider(provider);
+    setAuthStateValue(savedState);
+    setAuthLink(savedLink);
+    setAuthInstruction(savedInstruction);
+    return true;
+  };
+
+  const startProviderAuth = async (provider: AuthProvider) => {
+    try {
+      setAuthProvider(provider);
+      setIsConnecting(true);
+      setIsQrLoading(true);
+      setQrModalOpen(true);
+
+      authAttemptRef.current += 1;
+      const currentAttempt = authAttemptRef.current;
+
+      clearPolling();
+      clearQrTimeout();
+
+      if (initAbortRef.current) initAbortRef.current.abort();
+
+      const controller = new AbortController();
+      initAbortRef.current = controller;
+
+      clearPendingAuth();
+
+      const endpoint = provider === "tg" ? "init_tg" : "init_vk";
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/auth/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+
+      const data = await res.json();
+
+      if (currentAttempt !== authAttemptRef.current) return;
+
+      const state = data.state;
+      const link = provider === "tg" ? data.deep_link : data.bot_link;
+      const instruction = provider === "vk" ? data.instruction || "" : "";
+
+      localStorage.setItem("auth_state", state);
+      localStorage.setItem("auth_provider", provider);
+      localStorage.setItem("auth_link", link);
+      if (instruction) {
+        localStorage.setItem("auth_instruction", instruction);
+      } else {
+        localStorage.removeItem("auth_instruction");
+      }
+
+      setHasPendingAuth(true);
+      setAuthProvider(provider);
+      setAuthStateValue(state);
+      setAuthLink(link);
+      setAuthInstruction(instruction);
+      setIsQrLoading(false);
+
+      if (provider === "tg" && window.innerWidth < 768) {
+        window.open(link, "_blank", "noopener,noreferrer");
+      }
+
+      startAuthPolling(state);
+    } catch (err) {
+      setIsQrLoading(false);
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      console.error("Request failed:", err);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuth");
-    if (isAuth === "true") {
+    if (getAccessToken()) {
       setIsAuthenticated(true);
       setCurrentUser(getStoredCurrentUser());
+    } else if (localStorage.getItem("isAuth") === "true" || getStoredCurrentUser().user_id) {
+      clearAuthSession();
+      setCurrentUser({});
     }
 
     const savedState = localStorage.getItem("auth_state");
     if (savedState) {
-      setHasPendingAuth(true);
-      const savedLink = localStorage.getItem("auth_deep_link");
-      if (savedLink) {
-        setQrDeepLink(savedLink);
+      if (restorePendingAuth()) {
+        startAuthPolling(savedState);
       }
-      startAuthPolling(savedState);
     }
 
     return () => {
@@ -185,6 +284,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       const updatedUser = getStoredCurrentUser();
       setCurrentUser(updatedUser);
       setBalance(updatedUser.balance ?? 0);
+      setIsAuthenticated(Boolean(getAccessToken()));
     };
 
     window.addEventListener("storage", syncCurrentUser);
@@ -217,72 +317,17 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const handleHomeClick = () => navigate("/");
 
   const handleLogIn = async () => {
-    try {
-      setIsConnecting(true);
-      setIsQrLoading(true);
+    setQrModalOpen(true);
 
+    if (restorePendingAuth()) {
       const existingState = localStorage.getItem("auth_state");
-      const existingLink = localStorage.getItem("auth_deep_link");
-
-      if (existingState && existingLink) {
-        setHasPendingAuth(true);
-        if (!pollingRef.current) startAuthPolling(existingState);
-        setQrDeepLink(existingLink);
-        setQrModalOpen(true);
-        setIsQrLoading(false);
-        return;
+      if (existingState && !pollingRef.current) {
+        startAuthPolling(existingState);
       }
-
-      authAttemptRef.current += 1;
-      const currentAttempt = authAttemptRef.current;
-
-      clearPolling();
-      clearQrTimeout();
-
-      if (initAbortRef.current) initAbortRef.current.abort();
-
-      const controller = new AbortController();
-      initAbortRef.current = controller;
-
-      clearPendingAuth();
-
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/auth/init`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-
-      if (currentAttempt !== authAttemptRef.current) return;
-
-      localStorage.setItem("auth_state", data.state);
-      localStorage.setItem("auth_deep_link", data.deep_link);
-      setHasPendingAuth(true);
-
-      setQrDeepLink(data.deep_link);
-      setQrModalOpen(true);
-      setIsQrLoading(false);
-      
-      // На мобильных сразу открываем deep link
-      if (window.innerWidth < 768) {
-        window.open(data.deep_link, "_blank", "noopener,noreferrer");
-      }
-      
-      startAuthPolling(data.state);
-    } catch (err) {
-      setIsQrLoading(false);
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      console.error("Request failed:", err);
-    } finally {
-      setIsConnecting(false);
+      return;
     }
+
+    await startProviderAuth("tg");
   };
 
   const handleLogout = () => {
@@ -290,11 +335,10 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     clearPolling();
     clearQrTimeout();
     clearPendingAuth();
-    localStorage.setItem("isAuth", "");
-    localStorage.removeItem("currentUser");
+    clearAuthSession();
     setCurrentUser({});
     setQrModalOpen(false);
-    setQrDeepLink("");
+    setAuthProvider("tg");
     window.dispatchEvent(new Event("storage"));
     onLogout?.();
   };
@@ -396,8 +440,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               loading={isConnecting}
               disabled={isConnecting}
             >
-              {isConnecting ? "Connecting..." : hasPendingAuth ? "Open TG again" : "Connect TG"}
-              <Avatar src="/icons/tg-icon-png.png" alt="TgIcon" />
+              {isConnecting ? "Connecting..." : hasPendingAuth ? "Continue Login" : "Connect"}
+              {authProvider === "vk" ? (
+                <Avatar src="/icons/vk-icon-png.png" alt="VK" />
+
+              ) : (
+                <Avatar src="/icons/tg-icon-png.png" alt="TG" />
+              )}
             </Button>
           </div>
         )}
@@ -466,9 +515,24 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       <QrModal
         open={qrModalOpen}
         onClose={() => setQrModalOpen(false)}
-        deepLink={qrDeepLink}
+        provider={authProvider}
+        stateValue={authStateValue}
+        authLink={authLink}
+        instruction={authInstruction}
         isLoading={isQrLoading}
         onTimeout={handleQrTimeout}
+        onSelectProvider={(provider) => {
+          if (
+            hasPendingAuth &&
+            provider === authProvider &&
+            authStateValue &&
+            authLink
+          ) {
+            return;
+          }
+
+          void startProviderAuth(provider);
+        }}
       />
 
       <ModalCart

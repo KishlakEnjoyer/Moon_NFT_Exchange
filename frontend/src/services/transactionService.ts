@@ -1,3 +1,5 @@
+import { authFetch } from "./auth";
+
 export interface Transaction {
   transaction_id: number;
   transaction_price: string;
@@ -33,7 +35,7 @@ export const getUserTransactions = async (
     limit: String(limit),
     offset: String(offset),
   });
-  const res = await fetch(`${API_URL}/transactions/${userId}?${params}`);
+  const res = await authFetch(`${API_URL}/transactions/${userId}?${params}`);
   if (!res.ok) return [];
   return res.json();
 };

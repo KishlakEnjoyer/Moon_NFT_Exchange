@@ -1,3 +1,5 @@
+import { authFetch } from "./auth";
+
 export interface AlbumServiceResponse {
   album_id: number;
   album_owner_id: number;
@@ -28,7 +30,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function createAlbum(userId: number, title: string): Promise<AlbumServiceResponse> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/albums`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -43,7 +45,7 @@ export async function createAlbum(userId: number, title: string): Promise<AlbumS
 }
 
 export async function renameAlbum(albumId: number, newTitle: string): Promise<AlbumServiceResponse> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -57,7 +59,7 @@ export async function renameAlbum(albumId: number, newTitle: string): Promise<Al
 }
 
 export async function deleteAlbum(albumId: number): Promise<void> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}`, {
     method: "DELETE",
   });
 
@@ -77,14 +79,14 @@ export async function getAlbums(userId: number): Promise<Album[]> {
 }
 
 export async function addPresentToAlbum(albumId: number, presentId: number): Promise<void> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
     method: "POST",
   });
   await parseResponse(response);
 }
 
 export async function removePresentFromAlbum(albumId: number, presentId: number): Promise<void> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/albums/${albumId}/presents/${presentId}`, {
     method: "DELETE",
   });
   await parseResponse(response);

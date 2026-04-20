@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel
 from decimal import Decimal
 
+from core.auth import get_current_user
 from core.database import get_db
 from core.models import ActiveListingsView, Listing, Present, User, CurrentOwner
 
@@ -31,7 +32,7 @@ class ListingResponse(BaseModel):
 
 class CreateListingRequest(BaseModel):
     present_id: int
-    seller_id: int
+    seller_id: int | None = None
     price: str
 
 
@@ -64,7 +65,14 @@ def get_active_listings(db: Session = Depends(get_db)):
 
 
 @listings_router.post("/create", response_model=CreateListingResponse)
-def create_listing(req: CreateListingRequest, db: Session = Depends(get_db)):
+def create_listing(
+    req: CreateListingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if req.seller_id is not None and req.seller_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Cannot create listings for another user")
+
     present = db.scalar(select(Present).where(Present.present_id == req.present_id))
     if not present:
         raise HTTPException(status_code=404, detail="Present not found")
@@ -78,7 +86,7 @@ def create_listing(req: CreateListingRequest, db: Session = Depends(get_db)):
     owner = db.scalar(
         select(CurrentOwner).where(
             CurrentOwner.present_id == req.present_id,
-            CurrentOwner.owner_id == req.seller_id,
+            CurrentOwner.owner_id == current_user.user_id,
         )
     )
     if not owner:
@@ -99,7 +107,7 @@ def create_listing(req: CreateListingRequest, db: Session = Depends(get_db)):
 
     listing = Listing(
         present_id=req.present_id,
-        seller_id=req.seller_id,
+        seller_id=current_user.user_id,
         status_id=1,
         price=price,
     )

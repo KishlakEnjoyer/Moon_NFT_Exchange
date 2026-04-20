@@ -1,3 +1,5 @@
+import { authFetch } from "./auth";
+
 const API_URL = process.env.REACT_APP_API_URL;
 
 export interface PresentDetail {
@@ -37,7 +39,7 @@ export const getPresentDetail = async (presentId: number): Promise<PresentDetail
 };
 
 export const createListing = async (presentId: number, userId: number, price: string) => {
-  const res = await fetch(`${API_URL}/listings/create`, {
+  const res = await authFetch(`${API_URL}/listings/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ present_id: presentId, seller_id: userId, price }),
@@ -50,7 +52,7 @@ export const createListing = async (presentId: number, userId: number, price: st
 };
 
 export const togglePresentVisibility = async (presentId: number, userId: number) => {
-  const res = await fetch(`${API_URL}/presents/${presentId}/toggle-visibility?user_id=${userId}`, {
+  const res = await authFetch(`${API_URL}/presents/${presentId}/toggle-visibility?user_id=${userId}`, {
     method: "POST",
   });
   if (!res.ok) {

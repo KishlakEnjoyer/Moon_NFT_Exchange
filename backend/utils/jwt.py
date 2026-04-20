@@ -6,14 +6,11 @@ import os
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
+ALGORITHM = os.getenv("ALGORITHM") or "HS256"
 
-def generate_jwt(tg_id: int, role_id: int) -> str:
-    """
-    Function for generate new JWT
-    """
+def generate_jwt(user_id: int, role_id: int) -> str:
     payload = {
-        "sub": str(tg_id),
+        "sub": str(user_id),
         "role_id": role_id,
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
         "iat": datetime.now(timezone.utc)
@@ -21,9 +18,6 @@ def generate_jwt(tg_id: int, role_id: int) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_jwt(token: str) -> dict:
-    """
-    Function for decode existing JWT
-    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload

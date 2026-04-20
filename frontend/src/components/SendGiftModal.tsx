@@ -1,5 +1,6 @@
 import { Avatar, Button, Flex, Image, Input, Modal, message, Typography } from "antd";
 import { useEffect, useState } from "react";
+import { authFetch } from "../services/auth";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -102,7 +103,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
     setIsSending(true);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/gifts/send`, {
+      const res = await authFetch(`${process.env.REACT_APP_API_URL}/gifts/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

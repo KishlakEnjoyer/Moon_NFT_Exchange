@@ -29,8 +29,11 @@ class User(Base):
         default=1,
     )
     user_tg_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True, index=True)
+    user_vk_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True, index=True)
     tg_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vk_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tg_visibility: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    vk_visibility: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     username: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     profile_pic_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

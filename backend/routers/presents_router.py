@@ -6,6 +6,7 @@ from decimal import Decimal
 from datetime import datetime
 import os
 
+from core.auth import get_current_user
 from core.database import get_db
 from core.models import Present, CurrentOwner, Collections, Listing, User, Models, Transaction
 from services.blockchain.token_service import from_token_units, get_token_balance_raw, to_token_units, get_token_contract, approve_tokens, get_allowance
@@ -15,6 +16,13 @@ from web3 import Web3
 from eth_account import Account
 
 presents_router = APIRouter(prefix="/presents", tags=["presents"])
+
+
+def _resolve_current_user_id(requested_user_id: int | None, current_user: User) -> int:
+    if requested_user_id is not None and requested_user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Cannot act as another user")
+
+    return current_user.user_id
 
 
 class PresentDetailResponse(BaseModel):
@@ -160,12 +168,12 @@ class AllowanceResponse(BaseModel):
 
 
 @presents_router.post("/approve-platform", response_model=ApprovePlatformResponse)
-def approve_platform_spending(user_id: int, db: Session = Depends(get_db)):
-    """
-    Approve platform wallet to spend user's tokens.
-    This enables gasless transactions where the platform pays for gas.
-    Uses MAX_UINT256 for one-time approval.
-    """
+def approve_platform_spending(
+    user_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = _resolve_current_user_id(user_id, current_user)
     user = db.scalar(select(User).where(User.user_id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -186,10 +194,7 @@ def approve_platform_spending(user_id: int, db: Session = Depends(get_db)):
     private_key = decrypt_private_key(user.wallet_private_key_encrypted)
     w3 = get_web3()
     
-    # Check current allowance
     current_allowance = get_allowance(user.wallet_address, platform_address)
-    
-    # If already approved with sufficient allowance, skip
     max_uint256 = 2**256 - 1
     if current_allowance >= max_uint256:
         return ApprovePlatformResponse(
@@ -199,7 +204,6 @@ def approve_platform_spending(user_id: int, db: Session = Depends(get_db)):
             platform_address=platform_address
         )
     
-    # Approve platform to spend tokens (MAX_UINT256 for one-time approval)
     tx_hash = approve_tokens(
         spender_address=platform_address,
         amount=max_uint256,
@@ -218,8 +222,12 @@ def approve_platform_spending(user_id: int, db: Session = Depends(get_db)):
 
 
 @presents_router.get("/allowance", response_model=AllowanceResponse)
-def check_user_allowance(user_id: int, db: Session = Depends(get_db)):
-    """Check user's current allowance for platform wallet."""
+def check_user_allowance(
+    user_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = _resolve_current_user_id(user_id, current_user)
     user = db.scalar(select(User).where(User.user_id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -243,7 +251,13 @@ def check_user_allowance(user_id: int, db: Session = Depends(get_db)):
 
 
 @presents_router.post("/{present_id}/burn", response_model=BurnResponse)
-def burn_present(present_id: int, user_id: int, db: Session = Depends(get_db)):
+def burn_present(
+    present_id: int,
+    user_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = _resolve_current_user_id(user_id, current_user)
     present = db.scalar(select(Present).where(Present.present_id == present_id))
     if not present:
         raise HTTPException(status_code=404, detail="Present not found")
@@ -325,7 +339,13 @@ def burn_present(present_id: int, user_id: int, db: Session = Depends(get_db)):
 
 
 @presents_router.post("/{present_id}/toggle-visibility", response_model=ToggleVisibilityResponse)
-def toggle_present_visibility(present_id: int, user_id: int, db: Session = Depends(get_db)):
+def toggle_present_visibility(
+    present_id: int,
+    user_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = _resolve_current_user_id(user_id, current_user)
     present = db.scalar(select(Present).where(Present.present_id == present_id))
     if not present:
         raise HTTPException(status_code=404, detail="Present not found")

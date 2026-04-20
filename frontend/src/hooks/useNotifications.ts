@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { appendAccessToken, authFetch } from "../services/auth";
 
 export interface AppNotification {
   notification_id: number;
@@ -15,7 +16,7 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
 
   useEffect(() => {
     if (!userId) return;
-    fetch(`${process.env.REACT_APP_API_URL}/notifications/${userId}`)
+    authFetch(`${process.env.REACT_APP_API_URL}/notifications/${userId}`)
       .then(r => r.json())
       .then(data => setNotifications(data))
       .catch(() => {});
@@ -28,7 +29,7 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
       .replace("https://", "wss://")
       .replace("http://", "ws://");
 
-    const ws = new WebSocket(`${wsUrl}/notifications/ws/${userId}`);
+    const ws = new WebSocket(appendAccessToken(`${wsUrl}/notifications/ws/${userId}`));
 
     ws.onmessage = (event) => {
       const notification: AppNotification = JSON.parse(event.data);
@@ -50,7 +51,7 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
 
   const markAllRead = useCallback(async () => {
     if (!userId) return;
-    await fetch(`${process.env.REACT_APP_API_URL}/notifications/${userId}/read-all`, {
+    await authFetch(`${process.env.REACT_APP_API_URL}/notifications/${userId}/read-all`, {
       method: "POST",
     });
     setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));

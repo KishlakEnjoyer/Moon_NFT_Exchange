@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { appendAccessToken } from "../services/auth";
 
 export const useBalanceSocket = (
   userId: number | null,
@@ -50,7 +51,7 @@ export const useBalanceSocket = (
       if (cancelled) return;
 
       const ws = new WebSocket(
-        `${process.env.REACT_APP_WS_URL}/auth/ws/${userId}`
+        appendAccessToken(`${process.env.REACT_APP_WS_URL}/auth/ws/${userId}`)
       );
       wsRef.current = ws;
 

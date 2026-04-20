@@ -1,7 +1,14 @@
-import { CameraOutlined, EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
+import {
+  CameraOutlined,
+  CheckCircleOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
+} from "@ant-design/icons";
 import { Avatar, Button, Flex, Input, Modal, Switch, Typography, message } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import QrModal from "./QrModal";
+import { authFetch, setAuthSession } from "../services/auth";
 import { updateProfile, UpdateProfileResponse } from "../services/profileService";
 
 const { Text, Title } = Typography;
@@ -12,12 +19,18 @@ const MAX_ABOUT_ME_LENGTH = 150;
 const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
+type AuthProvider = "tg" | "vk";
+
 interface EditableProfileData {
   about_me: string | null;
   profile_pic_url: string | null;
   tg_username: string | null;
+  vk_username: string | null;
   tg_visibility: number;
+  vk_visibility: number;
   user_id: number;
+  user_tg_id: number | null;
+  user_vk_id: number | null;
   username: string;
 }
 
@@ -26,6 +39,7 @@ interface EditProfileModalProps {
   profile: EditableProfileData | null;
   onClose: () => void;
   onSaved: (profile: UpdateProfileResponse) => void;
+  onLinked: () => void;
 }
 
 const readFileAsDataUrl = (file: File) =>
@@ -45,15 +59,25 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalProps) => {
+const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditProfileModalProps) => {
   const [messageApi, contextHolder] = message.useMessage();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pollingRef = useRef<number | null>(null);
+  const authAbortRef = useRef<AbortController | null>(null);
 
   const [username, setUsername] = useState("");
   const [aboutMe, setAboutMe] = useState("");
   const [tgVisible, setTgVisible] = useState(true);
+  const [vkVisible, setVkVisible] = useState(true);
   const [profilePicDataUrl, setProfilePicDataUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authProvider, setAuthProvider] = useState<AuthProvider>("tg");
+  const [authStateValue, setAuthStateValue] = useState("");
+  const [authLink, setAuthLink] = useState("");
+  const [authInstruction, setAuthInstruction] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   useEffect(() => {
     if (!open || !profile) {
@@ -63,8 +87,23 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
     setUsername(profile.username ?? "");
     setAboutMe(profile.about_me ?? "");
     setTgVisible(Number(profile.tg_visibility) === 1);
+    setVkVisible(Number(profile.vk_visibility) === 1);
     setProfilePicDataUrl(null);
   }, [open, profile]);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+
+      if (authAbortRef.current) {
+        authAbortRef.current.abort();
+        authAbortRef.current = null;
+      }
+    };
+  }, []);
 
   const previewSrc = useMemo(() => {
     if (profilePicDataUrl) {
@@ -77,6 +116,129 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
 
     return `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
   }, [profile, profilePicDataUrl]);
+
+  const clearAuthPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const closeAuthModal = () => {
+    clearAuthPolling();
+    if (authAbortRef.current) {
+      authAbortRef.current.abort();
+      authAbortRef.current = null;
+    }
+    setAuthModalOpen(false);
+    setIsAuthLoading(false);
+    setAuthStateValue("");
+    setAuthLink("");
+    setAuthInstruction("");
+  };
+
+  const startAuthPolling = (state: string, provider: AuthProvider) => {
+    clearAuthPolling();
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/auth/status/${state}`);
+        if (!res.ok) {
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data.status === "confirmed") {
+          if (!data.access_token) {
+            throw new Error("Missing access token");
+          }
+
+          clearAuthPolling();
+          setAuthSession(data.access_token, data.user, data.token_type || "Bearer");
+          window.dispatchEvent(new Event("storage"));
+          setAuthModalOpen(false);
+          setIsAuthLoading(false);
+          messageApi.success(provider === "tg" ? "Telegram connected" : "VK connected");
+          onLinked();
+          return;
+        }
+
+        if (data.status === "expired" || data.status === "failed" || data.status === "declined") {
+          clearAuthPolling();
+          setIsAuthLoading(false);
+          messageApi.error("Connection request expired");
+        }
+      } catch (error) {
+        clearAuthPolling();
+        setIsAuthLoading(false);
+        console.error("Auth polling failed:", error);
+      }
+    }, 2000);
+  };
+
+  const startLinkAuth = async (provider: AuthProvider) => {
+    if (!profile) {
+      return;
+    }
+
+    const alreadyConnected =
+      provider === "tg" ? Boolean(profile.user_tg_id) : Boolean(profile.user_vk_id);
+
+    if (alreadyConnected) {
+      return;
+    }
+
+    try {
+      setAuthProvider(provider);
+      setAuthModalOpen(true);
+      setIsAuthLoading(true);
+      setAuthStateValue("");
+      setAuthLink("");
+      setAuthInstruction("");
+
+      clearAuthPolling();
+      if (authAbortRef.current) {
+        authAbortRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      authAbortRef.current = controller;
+
+      const endpoint = provider === "tg" ? "tg" : "vk";
+      const response = await authFetch(`${process.env.REACT_APP_API_URL}/auth/link/${endpoint}/init`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to start linking");
+      }
+
+      const data = await response.json();
+      const state = data.state;
+      const link = provider === "tg" ? data.deep_link : data.bot_link;
+      const instruction = provider === "vk" ? data.instruction || "" : "";
+
+      setAuthProvider(provider);
+      setAuthStateValue(state);
+      setAuthLink(link);
+      setAuthInstruction(instruction);
+      setIsAuthLoading(false);
+
+      startAuthPolling(state, provider);
+    } catch (error) {
+      setIsAuthLoading(false);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("Failed to start linking:", error);
+      messageApi.error(error instanceof Error ? error.message : "Failed to start linking");
+    }
+  };
 
   const handlePickImage = () => {
     fileInputRef.current?.click();
@@ -129,6 +291,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
         username: trimmedUsername,
         about_me: trimmedAboutMe || null,
         tg_visibility: tgVisible ? 1 : 0,
+        vk_visibility: vkVisible ? 1 : 0,
         profile_pic_data_url: profilePicDataUrl,
       });
 
@@ -141,6 +304,56 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const renderPlatformCard = (
+    provider: AuthProvider,
+    connected: boolean,
+    usernameValue: string | null,
+    switchValue: boolean,
+    onSwitchChange: (checked: boolean) => void,
+  ) => {
+    const title = provider === "tg" ? "Telegram" : "VK";
+    const statusText = connected
+      ? provider === "tg"
+        ? "TG connected"
+        : "VK connected"
+      : provider === "tg"
+        ? "Telegram is not connected"
+        : "VK is not connected";
+
+    return (
+      <Flex
+        align="center"
+        justify="space-between"
+        className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4"
+      >
+        <Flex vertical gap={4}>
+          <Text strong>{title}</Text>
+          <Text type="secondary">
+            {usernameValue || statusText}
+          </Text>
+        </Flex>
+
+        <Flex align="center" gap={12}>
+          {connected ? (
+            <Flex align="center" gap={6}>
+              <CheckCircleOutlined style={{ color: "#52c41a" }} />
+              <Text style={{ color: "#52c41a" }}>{provider === "tg" ? "TG connected" : "VK connected"}</Text>
+            </Flex>
+          ) : (
+            <Button onClick={() => void startLinkAuth(provider)} className="!bg-[var(--liquid-glass-bg)]">
+              {provider === "tg" ? "Connect TG" : "Connect VK"}
+            </Button>
+          )}
+
+          <Flex align="center" gap={10}>
+            {switchValue ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+            <Switch checked={switchValue} onChange={onSwitchChange} disabled={!connected} />
+          </Flex>
+        </Flex>
+      </Flex>
+    );
   };
 
   return (
@@ -198,23 +411,8 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
             />
           </div>
 
-          <Flex
-            align="center"
-            justify="space-between"
-            className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4"
-          >
-            <Flex vertical gap={4}>
-              <Text strong>Telegram Visibility</Text>
-              <Text type="secondary">
-                {profile?.tg_username ? `@${profile.tg_username}` : "Telegram account"}
-              </Text>
-            </Flex>
-
-            <Flex align="center" gap={10}>
-              {tgVisible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-              <Switch checked={tgVisible} onChange={setTgVisible} />
-            </Flex>
-          </Flex>
+          {renderPlatformCard("tg", Boolean(profile?.user_tg_id), profile?.tg_username ?? null, tgVisible, setTgVisible)}
+          {renderPlatformCard("vk", Boolean(profile?.user_vk_id), profile?.vk_username ?? null, vkVisible, setVkVisible)}
 
           <input
             ref={fileInputRef}
@@ -225,6 +423,27 @@ const EditProfileModal = ({ open, profile, onClose, onSaved }: EditProfileModalP
           />
         </Flex>
       </Modal>
+
+      <QrModal
+        open={authModalOpen}
+        onClose={closeAuthModal}
+        provider={authProvider}
+        stateValue={authStateValue}
+        authLink={authLink}
+        instruction={authInstruction}
+        isLoading={isAuthLoading}
+        onSelectProvider={(provider) => {
+          if (provider === "tg" && profile?.user_tg_id) {
+            return;
+          }
+
+          if (provider === "vk" && profile?.user_vk_id) {
+            return;
+          }
+
+          void startLinkAuth(provider);
+        }}
+      />
     </>
   );
 };

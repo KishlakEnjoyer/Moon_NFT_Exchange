@@ -1,15 +1,22 @@
+import { authFetch } from "./auth";
+
 export interface UpdateProfilePayload {
   username: string;
   about_me: string | null;
   tg_visibility: number;
+  vk_visibility: number;
   profile_pic_data_url?: string | null;
 }
 
 export interface UpdateProfileResponse {
   user_id: number;
+  user_tg_id: number | null;
+  user_vk_id: number | null;
   username: string;
   tg_username: string | null;
+  vk_username: string | null;
   tg_visibility: number;
+  vk_visibility: number;
   profile_pic_url: string | null;
   about_me: string | null;
 }
@@ -37,7 +44,7 @@ export async function updateProfile(
   userId: number,
   payload: UpdateProfilePayload,
 ): Promise<UpdateProfileResponse> {
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/user-info/${userId}`, {
+  const response = await authFetch(`${process.env.REACT_APP_API_URL}/user-info/${userId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

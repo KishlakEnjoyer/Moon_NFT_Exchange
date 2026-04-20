@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
 
+from core.auth import get_current_user
 from core.database import get_db
 from core.models import TransactionHistory, User
 from core.request_models import TransactionResponse
@@ -16,8 +17,12 @@ def get_user_transactions(
     filter_type: str = Query(default="all", pattern="^(all|purchases|sales)$"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Cannot access another user's transactions")
+
     query = db.query(TransactionHistory)
     is_collection_purchase = TransactionHistory.transaction_type == "purchase"
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RightOutlined, CheckOutlined, FireOutlined } from "@ant-design/icons";
 import { PresentDetail, getPresentDetail, togglePresentVisibility } from "../services/presentService";
+import { authFetch } from "../services/auth";
 
 const { Text, Title } = Typography;
 
@@ -50,7 +51,7 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     if (!detail) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/presents/${detail.present_id}/burn?user_id=${userId}`, {
+      const res = await authFetch(`${API_URL}/presents/${detail.present_id}/burn?user_id=${userId}`, {
         method: "POST",
       });
       if (!res.ok) {

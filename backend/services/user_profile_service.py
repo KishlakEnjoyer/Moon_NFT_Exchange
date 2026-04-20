@@ -40,9 +40,13 @@ def _get_profile_picture_dir() -> Path:
 def _serialize_editable_profile(user: User) -> dict:
     return {
         "user_id": user.user_id,
+        "user_tg_id": user.user_tg_id,
+        "user_vk_id": user.user_vk_id,
         "username": user.username,
         "tg_username": user.tg_username,
+        "vk_username": user.vk_username,
         "tg_visibility": user.tg_visibility,
+        "vk_visibility": user.vk_visibility,
         "profile_pic_url": user.profile_pic_url,
         "about_me": user.about_me,
     }
@@ -74,11 +78,11 @@ def _validate_about_me(about_me: str | None) -> str | None:
     return about_me
 
 
-def _validate_tg_visibility(tg_visibility: int) -> int:
-    if tg_visibility not in (0, 1):
-        raise ValueError("Telegram visibility must be 0 or 1")
+def _validate_platform_visibility(platform_name: str, visibility: int) -> int:
+    if visibility not in (0, 1):
+        raise ValueError(f"{platform_name} visibility must be 0 or 1")
 
-    return tg_visibility
+    return visibility
 
 
 def _delete_old_profile_picture(filename: str | None) -> None:
@@ -165,8 +169,12 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
     return {
         "user_id": user.user_id,
         "user_tg_id": user.user_tg_id,
+        "user_vk_id": user.user_vk_id,
         "username": user.username,
         "tg_username": user.tg_username,
+        "vk_username": user.vk_username,
+        "tg_visibility": user.tg_visibility,
+        "vk_visibility": user.vk_visibility,
         "wallet_address": user.wallet_address,
         "profile_pic_url": user.profile_pic_url,
         "about_me": user.about_me,
@@ -230,9 +238,12 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
     return {
         "user_id": user.user_id,
         "user_tg_id": user.user_tg_id,
+        "user_vk_id": user.user_vk_id,
         "username": user.username,
         "tg_username": user.tg_username,
+        "vk_username": user.vk_username,
         "tg_visibility": user.tg_visibility,
+        "vk_visibility": user.vk_visibility,
         "profile_pic_url": user.profile_pic_url,
         "about_me": user.about_me,
         "is_active": user.is_active,
@@ -274,19 +285,17 @@ def update_user_profile(
     username: str,
     about_me: str | None,
     tg_visibility: int,
+    vk_visibility: int,
     profile_pic_data_url: str | None = None,
 ) -> dict:
-    """
-    Update editable user profile fields and optionally save a new profile picture.
-    Returns the updated profile payload for the client.
-    """
     user = db.scalar(select(User).where(User.user_id == user_id))
     if not user:
         raise ValueError("User not found")
 
     username = _validate_username(username)
     about_me = _validate_about_me(about_me)
-    tg_visibility = _validate_tg_visibility(tg_visibility)
+    tg_visibility = _validate_platform_visibility("Telegram", tg_visibility)
+    vk_visibility = _validate_platform_visibility("VK", vk_visibility)
 
     existing_user = db.scalar(
         select(User).where(User.username == username, User.user_id != user_id)
@@ -297,6 +306,7 @@ def update_user_profile(
     user.username = username
     user.about_me = about_me
     user.tg_visibility = tg_visibility
+    user.vk_visibility = vk_visibility
 
     if profile_pic_data_url:
         user.profile_pic_url = _save_profile_picture(profile_pic_data_url, user.profile_pic_url)

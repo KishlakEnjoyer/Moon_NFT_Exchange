@@ -7,6 +7,11 @@ class ConfirmAuthRequest(BaseModel):
     tg_id: int
     tg_username: str | None = None
 
+class ConfirmVkAuthRequest(BaseModel):
+    state: str
+    vk_id: int
+    vk_username: str | None = None
+
 
 class DeclineAuthRequest(BaseModel):
     state: str
@@ -68,8 +73,8 @@ class SymbolOption(BaseModel):
 
 
 class CreateAlbumRequest(BaseModel):
-    user_id: int      
-    title: str        
+    user_id: int | None = None
+    title: str
 
 
 class RenameAlbumRequest(BaseModel):
@@ -80,14 +85,19 @@ class UpdateProfileRequest(BaseModel):
     username: str
     about_me: str | None = None
     tg_visibility: int
+    vk_visibility: int
     profile_pic_data_url: str | None = None
 
 
 class UpdateProfileResponse(BaseModel):
     user_id: int
+    user_tg_id: int | None = None
+    user_vk_id: int | None = None
     username: str
     tg_username: str | None = None
+    vk_username: str | None = None
     tg_visibility: int
+    vk_visibility: int
     profile_pic_url: str | None = None
     about_me: str | None = None
 
@@ -102,7 +112,7 @@ class AlbumResponse(BaseModel):
 
 
 class SendGiftRequest(BaseModel):
-    sender_id: int
+    sender_id: int | None = None
     receiver_id: int
     collection_id: int
     description: str | None = None

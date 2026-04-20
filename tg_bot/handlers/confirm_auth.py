@@ -30,7 +30,7 @@ async def confirm_auth(callback: CallbackQuery, state: FSMContext):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{REACT_APP_API_URL}/auth/confirm", json=payload) as resp:
+            async with session.post(f"{REACT_APP_API_URL}/auth/tg/confirm", json=payload) as resp:
                 text = await resp.text()
 
                 if resp.status != 200:
@@ -58,11 +58,11 @@ async def decline_auth(callback: CallbackQuery, state: FSMContext):
 
     payload = {
         "state": auth_state,
-    }
+        }
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{REACT_APP_API_URL}/auth/decline", json=payload) as resp:
+            async with session.post(f"{REACT_APP_API_URL}/auth/tg/decline", json=payload) as resp:
                 text = await resp.text()
 
                 if resp.status != 200:

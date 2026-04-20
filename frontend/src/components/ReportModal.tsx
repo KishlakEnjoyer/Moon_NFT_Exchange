@@ -1,6 +1,7 @@
 import { Button, Flex, Modal, Radio, message, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { FlagOutlined } from "@ant-design/icons";
+import { authFetch } from "../services/auth";
 
 const { Text, Title } = Typography;
 
@@ -42,7 +43,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/reports/submit`, {
+      const res = await authFetch(`${process.env.REACT_APP_API_URL}/reports/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -24,7 +24,7 @@ import {
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "spoilerjs/spoiler-span";
 
 import AlbumContextMenu from "../components/AlbumContextMenu";
@@ -64,9 +64,12 @@ interface Album {
 interface UserProfile {
   user_id: number;
   user_tg_id?: number | null;
+  user_vk_id?: number | null;
   username: string;
   tg_username: string | null;
+  vk_username: string | null;
   tg_visibility: number;
+  vk_visibility: number;
   profile_pic_url: string | null;
   about_me: string | null;
   presents: Present[];
@@ -371,7 +374,12 @@ const AccountView = () => {
       return {
         ...prev,
         username: updatedProfile.username,
+        user_tg_id: updatedProfile.user_tg_id,
+        user_vk_id: updatedProfile.user_vk_id,
+        tg_username: updatedProfile.tg_username,
+        vk_username: updatedProfile.vk_username,
         tg_visibility: updatedProfile.tg_visibility,
+        vk_visibility: updatedProfile.vk_visibility,
         profile_pic_url: updatedProfile.profile_pic_url,
         about_me: updatedProfile.about_me,
       };
@@ -384,7 +392,12 @@ const AccountView = () => {
         JSON.stringify({
           ...currentUser,
           username: updatedProfile.username,
+          user_tg_id: updatedProfile.user_tg_id,
+          user_vk_id: updatedProfile.user_vk_id,
+          tg_username: updatedProfile.tg_username,
+          vk_username: updatedProfile.vk_username,
           tg_visibility: updatedProfile.tg_visibility,
+          vk_visibility: updatedProfile.vk_visibility,
           profile_pic_url: updatedProfile.profile_pic_url,
           about_me: updatedProfile.about_me,
         }),
@@ -460,6 +473,56 @@ const AccountView = () => {
   const activeSegmentedValue: SegmentedValue = activeAlbumId ?? ALL_TAB;
   const activeAlbumTitle = activeAlbum?.album_title ?? ALL_TAB;
   const hasReachedAlbumLimit = user.albums.length >= MAX_ALBUMS_PER_USER;
+  const renderSocialAccount = (
+    provider: "tg" | "vk",
+    usernameValue: string | null,
+    userIdValue: number | null | undefined,
+    visibility: number,
+  ) => {
+    const isVisible = Number(visibility) === 1;
+    const label = provider === "tg"
+      ? usernameValue || (userIdValue ? "Telegram connected" : "Telegram not connected")
+      : usernameValue || (userIdValue ? `id${userIdValue}` : "VK not connected");
+
+    const href = provider === "tg"
+      ? (usernameValue ? `https://t.me/${usernameValue}` : null)
+      : (userIdValue ? `https://vk.com/id${userIdValue}` : null);
+
+    return (
+      <div className="flex items-center gap-2">
+        {provider === "tg" ? (
+          <Image
+            src="/icons/tg-icon-png.png"
+            alt="TgIcon"
+            style={{ width: "var(--size-lg)", marginBottom: "10px" }}
+            preview={false}
+          />
+        ) : (
+          <Image
+            src="/icons/vk-icon-png.png"
+            alt="VKIcon"
+            style={{ width: "var(--size-lg)" }}
+            preview={false}
+          />
+        )}
+
+        {isVisible && href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1"
+          >
+            {label}
+          </a>
+        ) : (
+          <SpoilerSpan pointerEvents={isOwn ? "auto" : "none"} className="text-[var(--liquid-glass-fg)]">
+            {label}
+          </SpoilerSpan>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Layout className="min-h-screen">
@@ -483,23 +546,8 @@ const AccountView = () => {
                 {user.username}
               </Title>
 
-              <div className="flex items-center gap-1">
-                <Image
-                  src="/icons/tg-icon-png.png"
-                  alt="TgIcon"
-                  style={{ width: "var(--size-lg)" }}
-                  preview={false}
-                />
-                {Number(user.tg_visibility) === 1 ? (
-                  <Link to={`https://t.me/${user.tg_username}`} className="flex items-center gap-1">
-                    {user.tg_username}
-                  </Link>
-                ) : (
-                  <SpoilerSpan pointerEvents={isOwn ? "auto" : "none"} className="text-[var(--liquid-glass-fg)]">
-                    {user.tg_username || ""}
-                  </SpoilerSpan>
-                )}
-              </div>
+              {renderSocialAccount("tg", user.tg_username, user.user_tg_id, user.tg_visibility)}
+              {renderSocialAccount("vk", user.vk_username, user.user_vk_id, user.vk_visibility)}
 
               <Text className="mt-3 leading-relaxed">{user.about_me}</Text>
             </Flex>
@@ -662,14 +710,19 @@ const AccountView = () => {
           open={isEditProfileOpen}
           profile={{
             user_id: user.user_id,
+            user_tg_id: user.user_tg_id ?? null,
+            user_vk_id: user.user_vk_id ?? null,
             username: user.username,
             tg_username: user.tg_username,
+            vk_username: user.vk_username,
             tg_visibility: user.tg_visibility,
+            vk_visibility: user.vk_visibility,
             profile_pic_url: user.profile_pic_url,
             about_me: user.about_me,
           }}
           onClose={() => setIsEditProfileOpen(false)}
           onSaved={handleProfileSaved}
+          onLinked={loadUser}
         />
 
         <ReportModal

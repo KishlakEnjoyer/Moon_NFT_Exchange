@@ -1,3 +1,5 @@
+import { authFetch } from "./auth";
+
 export interface ApiListing {
   listing_id: number;
   price: string;
@@ -41,13 +43,13 @@ export const getActiveListings = async (): Promise<ApiListing[]> => {
 };
 
 export const getCart = async (userId: number): Promise<Cart> => {
-  const res = await fetch(`${API_URL}/cart/${userId}`);
+  const res = await authFetch(`${API_URL}/cart/${userId}`);
   if (!res.ok) return { user_id: userId, items: [], total: "0" };
   return res.json();
 };
 
 export const addToCart = async (userId: number, listingId: number): Promise<CartItem> => {
-  const res = await fetch(`${API_URL}/cart/add`, {
+  const res = await authFetch(`${API_URL}/cart/add`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: userId, listing_id: listingId }),
@@ -60,7 +62,7 @@ export const addToCart = async (userId: number, listingId: number): Promise<Cart
 };
 
 export const removeFromCart = async (cartItemId: number): Promise<void> => {
-  const res = await fetch(`${API_URL}/cart/${cartItemId}`, {
+  const res = await authFetch(`${API_URL}/cart/${cartItemId}`, {
     method: "DELETE",
   });
   if (!res.ok) {
@@ -70,7 +72,7 @@ export const removeFromCart = async (cartItemId: number): Promise<void> => {
 };
 
 export const clearCart = async (userId: number): Promise<void> => {
-  const res = await fetch(`${API_URL}/cart/clear/${userId}`, {
+  const res = await authFetch(`${API_URL}/cart/clear/${userId}`, {
     method: "DELETE",
   });
   if (!res.ok) {

@@ -32,6 +32,19 @@ services:
     networks:
       - moon_net
 
+  vk-bot:
+    build:
+      context: ./vk_bot
+      dockerfile: Dockerfile
+    container_name: moon_vkbot
+    env_file:
+      - ./.env
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - moon_net
+
   db:
     image: mysql:8.0
     container_name: moon_db

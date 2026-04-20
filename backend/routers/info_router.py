@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from core.auth import get_current_user
 from core.database import get_db
 from core.models import User
 from core.request_models import UpdateProfileRequest, UpdateProfileResponse
@@ -65,21 +66,24 @@ def get_user_info_by_username(username: str, db: Session = Depends(get_db)):
 def update_user_profile_endpoint(
     user_id: int,
     payload: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> UpdateProfileResponse:
-    """
-    Update editable user profile fields and optionally replace the profile picture.
-    Accepts a username, about text, Telegram visibility, and an optional image data URL.
-    """
     try:
+        if user_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Cannot update another user's profile")
+
         return update_user_profile(
             db=db,
-            user_id=user_id,
+            user_id=current_user.user_id,
             username=payload.username,
             about_me=payload.about_me,
             tg_visibility=payload.tg_visibility,
+            vk_visibility=payload.vk_visibility,
             profile_pic_data_url=payload.profile_pic_data_url,
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         detail = str(e)
         if detail == "User not found":

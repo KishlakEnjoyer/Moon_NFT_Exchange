@@ -1,8 +1,9 @@
-import { Dropdown, MenuProps, message, Tag, Spin } from "antd";
+import { Dropdown, MenuProps, message, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { CheckOutlined, EyeOutlined, EyeInvisibleOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { togglePresentVisibility } from "../services/presentService";
 import { addPresentToAlbum, removePresentFromAlbum, Album } from "../services/albumService";
+import { authFetch } from "../services/auth";
 
 interface PresentCardContextMenuProps {
   presentId: number;
@@ -24,7 +25,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
   useEffect(() => {
     if (!isOwner) return;
     setLoading(true);
-    fetch(`${process.env.REACT_APP_API_URL}/albums/${userId}/presents`)
+    authFetch(`${process.env.REACT_APP_API_URL}/albums/${userId}/presents`)
       .then(r => r.json())
       .then((data) => {
         const arr = Array.isArray(data) ? data : [];
