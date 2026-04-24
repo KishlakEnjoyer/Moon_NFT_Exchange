@@ -84,6 +84,9 @@ def purchase_and_send_gift(
     collection_id: int,
     description: str | None = None,
 ) -> dict:
+    if description is not None and len(description) > 100:
+        raise HTTPException(status_code=400, detail="Description must be 100 characters or less")
+
     sender = db.scalar(select(User).where(User.user_id == sender_id))
     if not sender:
         raise HTTPException(status_code=404, detail="Sender not found")

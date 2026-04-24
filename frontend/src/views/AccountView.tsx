@@ -38,6 +38,7 @@ import SendGiftModal from "../components/SendGiftModal";
 import TransactionHistoryModal from "../components/TransactionHistoryModal";
 import SpoilerSpan from "../components/SpoilerSpan";
 import { createAlbum, deleteAlbum, renameAlbum } from "../services/albumService";
+import { getPresentDisplayImageUrl } from "../services/presentService";
 import { UpdateProfileResponse } from "../services/profileService";
 import { useNotifications } from "../hooks/useNotifications";
 import NotFound from "./NotFound";
@@ -690,7 +691,7 @@ const AccountView = () => {
                   onRefresh={loadUser}
                 >
                   <ProfileGiftCard
-                    cardImage={item.model_id !== null ? `${process.env.REACT_APP_IMAGES_URL}/presents/${`${item.image_url}.webp` || "placeholder.png"}` : `${process.env.REACT_APP_IMAGES_URL}/collections/${item.image_url}.webp`}
+                    cardImage={getPresentDisplayImageUrl(item.image_url, item.model_id !== null)}
                     name={item.collection?.collection_name}
                     number={item.present_num}
                     isOnSale={item.is_on_sale}
@@ -751,6 +752,7 @@ const AccountView = () => {
           open={!!selectedGiftId}
           presentId={selectedGiftId}
           userId={user.user_id}
+          canManage={isOwn}
           onClose={() => setSelectedGiftId(null)}
           onRefresh={loadUser}
         />

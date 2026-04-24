@@ -4,6 +4,7 @@ export interface ApiListing {
   listing_id: number;
   price: string;
   present_id: number;
+  present_num: number;
   present_image_url: string | null;
   collection_id: number;
   collection_name: string;
@@ -12,6 +13,7 @@ export interface ApiListing {
   symbol_name: string | null;
   seller_id: number;
   seller_username: string | null;
+  seller_profile_pic_url: string | null;
   seller_wallet: string | null;
 }
 
@@ -20,6 +22,7 @@ export interface CartItem {
   listing_id: number;
   price: string;
   present_id: number;
+  present_num: number;
   present_image_url: string | null;
   collection_name: string;
   model_name: string | null;
@@ -33,8 +36,39 @@ export interface Cart {
   total: string;
 }
 
+export interface BuyListingResponse {
+  listing_id: number;
+  present_id: number;
+  buyer_id: number;
+  seller_id: number;
+  price: string;
+  platform_fee: string;
+  seller_received: string;
+  buyer_tx_hash: string;
+  seller_tx_hash: string | null;
+  new_balance: string | null;
+  seller_new_balance: string | null;
+}
+
 const API_URL = process.env.REACT_APP_API_URL;
 const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
+
+export const formatTonPrice = (price: string | number, compact = false): string => {
+  const amount = Number(price);
+  if (!Number.isFinite(amount)) return "0.00";
+
+  if (compact && Math.abs(amount) >= 1_000_000) {
+    return new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
 
 export const getActiveListings = async (): Promise<ApiListing[]> => {
   const res = await fetch(`${API_URL}/listings/active`);
@@ -79,6 +113,17 @@ export const clearCart = async (userId: number): Promise<void> => {
     const error = await res.json();
     throw new Error(error.detail || "Failed to clear cart");
   }
+};
+
+export const buyListing = async (listingId: number): Promise<BuyListingResponse> => {
+  const res = await authFetch(`${API_URL}/listings/${listingId}/buy`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to buy listing");
+  }
+  return res.json();
 };
 
 export const getPresentImageUrl = (imageUrl: string | null | undefined): string => {

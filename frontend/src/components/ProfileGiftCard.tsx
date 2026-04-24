@@ -5,7 +5,7 @@ interface ProfileGiftCardProps {
   cardImage?: string;
   name?: string;
   number?: string | number;
-  isOnSale?: boolean;
+  isOnSale?: boolean | number;
   isVisible?: boolean;
   isUpgraded?: boolean;
   onClick?: () => void;
@@ -20,6 +20,7 @@ const ProfileGiftCard = ({
   isUpgraded = false,
   onClick
 }: ProfileGiftCardProps) => {
+  const showOnSale = isOnSale === true || isOnSale === 1;
 
   return (
     <div className={`relative w-full h-full z-4 cursor-pointer`} onClick={onClick}>
@@ -30,12 +31,12 @@ const ProfileGiftCard = ({
       )}
 
       <div className="flex flex-row gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">
-        {isOnSale && 
+        {showOnSale &&
           <div className="text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
             On Sale
           </div>
         }
-        {number && 
+        {number &&
           <div className="text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--accent-50)]">
             #{number?.toLocaleString('en-US') ?? '0'}
           </div>

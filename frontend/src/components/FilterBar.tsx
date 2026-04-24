@@ -188,7 +188,7 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   };
 
   const handleClear = () => {
-    setPriceRange([0, 3000]);
+    setPriceRange([0, 100000]);
     setSortOrder(null);
     updateFilters({ price_min: 0, price_max: 3000, sort: null });
   };

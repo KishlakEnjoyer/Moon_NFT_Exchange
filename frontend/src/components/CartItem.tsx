@@ -37,7 +37,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onC
             className="cursor-pointer hover:opacity-75 transition-opacity text-[var(--size-base)]"
             onClick={() => onPresentClick?.(item)}
           >
-            {item.collection_name} #{item.present_id}
+            {item.collection_name} # {item.present_num}
           </Text>
           <Text
             type="secondary"

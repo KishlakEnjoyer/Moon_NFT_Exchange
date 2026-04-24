@@ -8,12 +8,13 @@ import os
 
 from core.auth import get_current_user
 from core.database import get_db
-from core.models import Present, CurrentOwner, Collections, Listing, User, Models, Transaction
+from core.models import Present, CurrentOwner, Collections, Listing, ListingStatuses, User, Models, Transaction
 from services.blockchain.token_service import from_token_units, get_token_balance_raw, to_token_units, get_token_contract, approve_tokens, get_allowance
 from services.blockchain.crypto_service import decrypt_private_key
 from services.blockchain.client import get_web3
 from web3 import Web3
 from eth_account import Account
+from services.upgrade_service import upgrade_present
 
 presents_router = APIRouter(prefix="/presents", tags=["presents"])
 
@@ -89,7 +90,7 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
     active_listing = db.scalar(
         select(Listing).where(
             Listing.present_id == present_id,
-            Listing.status_id == 1,
+            Listing.status.has(ListingStatuses.status_name == "active"),
         )
     )
 
@@ -153,6 +154,20 @@ class BurnResponse(BaseModel):
     present_id: int
     refund_amount: str
     tx_hash: str
+
+
+class UpgradeResponse(BaseModel):
+    present_id: int
+    image_url: str | None
+    model_id: int | None
+    model_name: str | None
+    background_id: int | None
+    background_name: str | None
+    symbol_id: int | None
+    symbol_name: str | None
+    tx_hash: str
+    price: str
+    new_balance: str
 
 
 class ApprovePlatformResponse(BaseModel):
@@ -277,7 +292,7 @@ def burn_present(
     active_listing = db.scalar(
         select(Listing).where(
             Listing.present_id == present_id,
-            Listing.status_id == 1,
+            Listing.status.has(ListingStatuses.status_name == "active"),
         )
     )
     if active_listing:
@@ -336,6 +351,17 @@ def burn_present(
         refund_amount=str(refund_amount),
         tx_hash=tx_hash.hex(),
     )
+
+
+@presents_router.post("/{present_id}/upgrade", response_model=UpgradeResponse)
+def upgrade_present_endpoint(
+    present_id: int,
+    user_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = _resolve_current_user_id(user_id, current_user)
+    return upgrade_present(db=db, user_id=user_id, present_id=present_id)
 
 
 @presents_router.post("/{present_id}/toggle-visibility", response_model=ToggleVisibilityResponse)

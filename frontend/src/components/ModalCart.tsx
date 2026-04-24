@@ -1,7 +1,7 @@
 import { Modal, Button, Flex, Divider, Typography, Empty, message } from "antd";
 import { useState, useEffect, useCallback } from "react";
 import TONIcon from "./icons/TONIcon";
-import { CartItem, getCart, removeFromCart, clearCart } from "../services/listingService";
+import { CartItem, getCart, removeFromCart, clearCart, buyListing } from "../services/listingService";
 import CartItemRow from "./CartItem";
 
 const { Text, Title } = Typography;
@@ -14,6 +14,17 @@ const getStoredCurrentUser = () => {
   }
 };
 
+const updateStoredBalance = (newBalance: string | null) => {
+  if (!newBalance) return;
+  const currentUser = getStoredCurrentUser();
+  if (!currentUser.user_id) return;
+  localStorage.setItem(
+    "currentUser",
+    JSON.stringify({ ...currentUser, balance: parseFloat(newBalance) }),
+  );
+  window.dispatchEvent(new Event("storage"));
+};
+
 interface ModalCartProps {
   open: boolean;
   onClose: () => void;
@@ -23,6 +34,7 @@ interface ModalCartProps {
 const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
   const [messageApi, contextHolder] = message.useMessage();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [purchasing, setPurchasing] = useState(false);
 
   const currentUserId = getStoredCurrentUser().user_id;
 
@@ -58,6 +70,31 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       setCartItems([]);
     } catch (e: any) {
       messageApi.error(e.message || "Failed to clear cart");
+    }
+  };
+
+  const handleBuyCart = async () => {
+    if (!currentUserId || cartItems.length === 0) return;
+
+    setPurchasing(true);
+    const purchasedListingIds: number[] = [];
+
+    try {
+      for (const item of cartItems) {
+        const result = await buyListing(item.listing_id);
+        purchasedListingIds.push(item.listing_id);
+        updateStoredBalance(result.new_balance);
+      }
+
+      setCartItems([]);
+      window.dispatchEvent(new Event("listingsChanged"));
+      messageApi.success("Purchase completed");
+    } catch (e: any) {
+      setCartItems((prev) => prev.filter((item) => !purchasedListingIds.includes(item.listing_id)));
+      window.dispatchEvent(new Event("listingsChanged"));
+      messageApi.error(e.message || "Failed to buy cart");
+    } finally {
+      setPurchasing(false);
     }
   };
 
@@ -111,7 +148,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
                   <TONIcon />
                 </Flex>
               </Flex>
-              <Button type="primary" size="large" block>
+              <Button type="primary" size="large" block loading={purchasing} onClick={handleBuyCart}>
                 Buy
               </Button>
             </>

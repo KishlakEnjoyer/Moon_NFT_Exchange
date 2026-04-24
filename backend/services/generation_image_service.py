@@ -120,11 +120,11 @@ def save_image(image: Image.Image) -> str:
     return filename
 
 
-def generate_image(payload: GeneratePresentRequest, db: Session):
+def generate_present_art(collection_id: int, db: Session):
     models = (
         db.query(Models)
         .filter(
-            Models.collection_id == payload.collection_id,
+            Models.collection_id == collection_id,
             Models.model_image_url.isnot(None),
             Models.model_image_url != "",
         )
@@ -156,7 +156,17 @@ def generate_image(payload: GeneratePresentRequest, db: Session):
         "image_url": result_filename,
         "present_image": image_url("presents", result_filename, "png"),
         "present_image_url": result_filename,
+        "model_id": model.model_id,
+        "model_name": model.model_name,
         "model": image_url("models", model.model_image_url, "webp"),
+        "background_id": background.background_id,
+        "background_name": background.background_name,
         "background": image_url("bgs", background.background_image_url, "png"),
+        "symbol_id": symbol.symbol_id,
+        "symbol_name": symbol.symbol_name,
         "symbol": image_url("symbols", symbol.symbol_image_url, "webp"),
     }
+
+
+def generate_image(payload: GeneratePresentRequest, db: Session):
+    return generate_present_art(payload.collection_id, db)

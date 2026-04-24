@@ -20,13 +20,14 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
       },
       { threshold: 1.0 }
     );
-    if (sentinelRef.current) observer.observe(sentinelRef.current);
-    return () => { if (sentinelRef.current) observer.unobserve(sentinelRef.current); };
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) observer.observe(currentSentinel);
+    return () => { if (currentSentinel) observer.unobserve(currentSentinel); };
   }, [visibleCount, items.length, loadMore]);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
         {items.slice(0, visibleCount).map((item, index) => (
           <div key={index} className="w-full">
             {renderCard(item, index)}

@@ -5,7 +5,7 @@ from typing import List
 
 from core.auth import get_current_user
 from core.database import get_db
-from core.models import ActiveListingsView, CartItem, User
+from core.models import ActiveListingsView, CartItem, Present, User
 
 cart_router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -20,6 +20,7 @@ class CartItemResponse(BaseModel):
     listing_id: int
     price: str
     present_id: int
+    present_num: int
     present_image_url: str | None
     collection_name: str
     model_name: str | None
@@ -46,18 +47,34 @@ def get_cart(
     if not cart_items:
         return CartResponse(user_id=current_user.user_id, items=[], total="0")
 
+    listing_ids = [ci.listing_id for ci in cart_items]
+    listings = db.query(ActiveListingsView).filter(
+        ActiveListingsView.listing_id.in_(listing_ids)
+    ).all()
+    listing_by_id = {listing.listing_id: listing for listing in listings}
+    present_ids = [listing.present_id for listing in listings]
+    present_num_by_id = {}
+    if present_ids:
+        present_num_by_id = {
+            present.present_id: present.present_num
+            for present in (
+                db.query(Present.present_id, Present.present_num)
+                .filter(Present.present_id.in_(present_ids))
+                .all()
+            )
+        }
+
     items = []
     total = 0
     for ci in cart_items:
-        listing = db.query(ActiveListingsView).filter(
-            ActiveListingsView.listing_id == ci.listing_id
-        ).first()
+        listing = listing_by_id.get(ci.listing_id)
         if listing:
             items.append(CartItemResponse(
                 cart_item_id=ci.cart_item_id,
                 listing_id=ci.listing_id,
                 price=str(listing.price),
                 present_id=listing.present_id,
+                present_num=present_num_by_id.get(listing.present_id, listing.present_id),
                 present_image_url=listing.present_image_url,
                 collection_name=listing.collection_name,
                 model_name=listing.model_name,
@@ -104,6 +121,12 @@ def add_to_cart(
         listing_id=cart_item.listing_id,
         price=str(listing.price),
         present_id=listing.present_id,
+        present_num=(
+            db.query(Present.present_num)
+            .filter(Present.present_id == listing.present_id)
+            .scalar()
+            or listing.present_id
+        ),
         present_image_url=listing.present_image_url,
         collection_name=listing.collection_name,
         model_name=listing.model_name,

@@ -1,8 +1,16 @@
-import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfirm } from "antd";
+import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfirm, InputNumber } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { RightOutlined, CheckOutlined, FireOutlined } from "@ant-design/icons";
-import { PresentDetail, getPresentDetail, togglePresentVisibility } from "../services/presentService";
+import { RightOutlined, CheckOutlined, FireOutlined, TagOutlined, StopOutlined } from "@ant-design/icons";
+import {
+  PresentDetail,
+  cancelListing,
+  createListing,
+  getPresentDetail,
+  getPresentDisplayImageUrl,
+  togglePresentVisibility,
+  upgradePresent,
+} from "../services/presentService";
 import { authFetch } from "../services/auth";
 
 const { Text, Title } = Typography;
@@ -13,21 +21,26 @@ interface GiftDetailModalProps {
   open: boolean;
   presentId: number | null;
   userId: number;
+  canManage?: boolean;
   onClose: () => void;
   onRefresh: () => void;
 }
 
-const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDetailModalProps) => {
+const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, onRefresh }: GiftDetailModalProps) => {
   const [messageApi, contextHolder] = message.useMessage();
   const [detail, setDetail] = useState<PresentDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isListingFormOpen, setIsListingFormOpen] = useState(false);
+  const [listingPrice, setListingPrice] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!open || !presentId) return;
     setLoading(true);
     setDetail(null);
+    setIsListingFormOpen(false);
+    setListingPrice(null);
     getPresentDetail(presentId)
       .then((data) => setDetail(data))
       .catch(() => setDetail(null))
@@ -69,6 +82,73 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     }
   };
 
+  const handleUpgrade = async () => {
+    if (!detail) return;
+    setSubmitting(true);
+    try {
+      const data = await upgradePresent(detail.present_id, userId);
+      const refreshed = await getPresentDetail(detail.present_id);
+      setDetail(refreshed);
+      onRefresh();
+
+      try {
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        if (currentUser.user_id === userId) {
+          localStorage.setItem(
+            "currentUser",
+            JSON.stringify({ ...currentUser, balance: parseFloat(data.new_balance) }),
+          );
+          window.dispatchEvent(new Event("storage"));
+        }
+      } catch {
+      }
+
+      messageApi.success(`Upgraded! Paid ${parseFloat(data.price).toFixed(2)} TON`);
+    } catch (e: any) {
+      messageApi.error(e.message || "Failed to upgrade");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateListing = async () => {
+    if (!detail) return;
+    if (!listingPrice || listingPrice <= 0) {
+      messageApi.error("Enter a valid price");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await createListing(detail.present_id, userId, listingPrice.toFixed(2));
+      setDetail({ ...detail, is_on_sale: true });
+      setIsListingFormOpen(false);
+      setListingPrice(null);
+      onRefresh();
+      messageApi.success("Gift listed for sale");
+    } catch (e: any) {
+      messageApi.error(e.message || "Failed to create listing");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelListing = async () => {
+    if (!detail) return;
+
+    setSubmitting(true);
+    try {
+      await cancelListing(detail.present_id);
+      setDetail({ ...detail, is_on_sale: false });
+      onRefresh();
+      messageApi.success("Gift removed from sale");
+    } catch (e: any) {
+      messageApi.error(e.message || "Failed to remove listing");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleOwnerClick = () => {
     if (detail?.owner_username) {
       onClose();
@@ -83,8 +163,11 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     }
   };
 
+  const basePrice = parseFloat(detail?.base_price || "0");
   const burnRefundPercent = parseFloat(process.env.REACT_APP_BURN_REFUND_PERCENT || "75");
-  const burnRefundAmount = (parseFloat(detail?.base_price || "0") * burnRefundPercent / 100).toFixed(2);
+  const upgradePercent = parseFloat(process.env.REACT_APP_UPGRADE_PERCENT || "25");
+  const burnRefundAmount = (basePrice * burnRefundPercent / 100).toFixed(2);
+  const upgradePriceAmount = (basePrice * upgradePercent / 100).toFixed(2);
   const ownerAvatarUrl = detail?.owner_profile_pic_url
     ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.owner_profile_pic_url}`
     : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
@@ -124,7 +207,7 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     }] : []),
     {
       key: "Collection",
-      value: detail?.collection_name || "—",
+      value: detail?.collection_name || "-",
     },
     {
       key: "Total Supply",
@@ -156,11 +239,14 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
     }
   }
 
-  const imageUrl = detail?.image_url
-    ? `${process.env.REACT_APP_IMAGES_URL}/collections/${detail.image_url}.webp`
-    : `${process.env.REACT_APP_IMAGES_URL}/presents/placeholder.png`;
+  const imageUrl = getPresentDisplayImageUrl(
+    detail?.image_url || detail?.collection_image_url,
+    !!detail?.is_upgraded,
+  );
 
   const hasModels = detail?.has_models;
+  const canListForSale = canManage && !!detail?.is_upgraded && !detail?.is_on_sale;
+  const canRemoveFromSale = canManage && !!detail?.is_on_sale;
 
   return (
     <>
@@ -218,26 +304,28 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
           </div>
 
           <Flex vertical gap={8} className="w-full">
-            <Flex
-              align="center"
-              justify="space-between"
-              className="cursor-pointer px-2 py-1 rounded hover:bg-[var(--black-transparent-05)] transition-colors"
-              onClick={handleToggleVisibility}
-            >
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                {detail?.is_visible === 1
-                  ? "This gift is visible"
-                  : "This gift is hidden"}
-              </Text>
-              <Text
-                className="!text-[var(--accent-150)]"
-                style={{ fontSize: 13 }}
+            {canManage && (
+              <Flex
+                align="center"
+                justify="space-between"
+                className="cursor-pointer px-2 py-1 rounded hover:bg-[var(--black-transparent-05)] transition-colors"
+                onClick={handleToggleVisibility}
               >
-                {detail?.is_visible === 1 ? "Hide from Profile" : "Show"} <RightOutlined style={{ fontSize: 10 }} />
-              </Text>
-            </Flex>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  {detail?.is_visible === 1
+                    ? "This gift is visible"
+                    : "This gift is hidden"}
+                </Text>
+                <Text
+                  className="!text-[var(--accent-150)]"
+                  style={{ fontSize: 13 }}
+                >
+                  {detail?.is_visible === 1 ? "Hide from Profile" : "Show"} <RightOutlined style={{ fontSize: 10 }} />
+                </Text>
+              </Flex>
+            )}
 
-            {!detail?.is_on_sale && (
+            {canManage && !detail?.is_on_sale && !detail?.is_upgraded && (
               <Popconfirm
                 title="Burn to Redeem"
                 description={
@@ -262,26 +350,88 @@ const GiftDetailModal = ({ open, presentId, userId, onClose, onRefresh }: GiftDe
                   icon={<FireOutlined />}
                   loading={submitting}
                 >
-                  Burn to Redeem — {burnRefundAmount} TON
+                  Burn to Redeem - {burnRefundAmount} TON
                 </Button>
               </Popconfirm>
             )}
 
-            {hasModels && !detail?.is_upgraded && (
+            {canManage && hasModels && !detail?.is_upgraded && (
               <Button
                 type="primary"
                 size="large"
                 block
                 icon={<FireOutlined />}
-                onClick={() => {
-                  messageApi.info("Upgrade feature coming soon!");
-                }}
+                loading={submitting}
+                onClick={handleUpgrade}
               >
-                Upgrade
+                Upgrade - {upgradePriceAmount} TON
               </Button>
             )}
 
-            {!hasModels && (
+            {canListForSale && !isListingFormOpen && (
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<TagOutlined />}
+                onClick={() => setIsListingFormOpen(true)}
+              >
+                List for Sale
+              </Button>
+            )}
+
+            {canListForSale && isListingFormOpen && (
+              <Flex vertical gap={8}>
+                <InputNumber
+                  min={0.01}
+                  step={0.01}
+                  precision={2}
+                  value={listingPrice}
+                  onChange={(value) => setListingPrice(typeof value === "number" ? value : null)}
+                  placeholder="Price"
+                  addonAfter="TON"
+                  size="large"
+                  className="w-full"
+                />
+                <Flex gap={8}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    block
+                    icon={<TagOutlined />}
+                    loading={submitting}
+                    onClick={handleCreateListing}
+                  >
+                    Confirm
+                  </Button>
+                  <Button
+                    size="large"
+                    block
+                    onClick={() => {
+                      setIsListingFormOpen(false);
+                      setListingPrice(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Flex>
+              </Flex>
+            )}
+
+            {canRemoveFromSale && (
+              <Button
+                danger
+                size="large"
+                block
+                icon={<StopOutlined />}
+                loading={submitting}
+                onClick={handleCancelListing}
+              >
+                Remove from Sale
+              </Button>
+            )}
+
+            {(!canManage || !hasModels) && (
               <Button
                 type="default"
                 size="large"

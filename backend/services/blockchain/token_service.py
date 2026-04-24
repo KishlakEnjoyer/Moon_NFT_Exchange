@@ -204,3 +204,83 @@ def transfer_from_tokens(from_address: str, to_address: str, amount: int,
         raise Exception("TransferFrom transaction failed")
 
     return tx_hash_hex
+
+
+def charge_tokens_to_platform(user_address: str, user_private_key: str, amount_units: int) -> tuple[str, dict]:
+    w3 = get_web3()
+    platform_private_key = os.getenv("PLATFORM_OWNER_PRIVATE_KEY")
+    if not platform_private_key:
+        raise ValueError("PLATFORM_OWNER_PRIVATE_KEY is not set")
+
+    platform_account = Account.from_key(platform_private_key)
+    platform_address = Web3.to_checksum_address(platform_account.address)
+    checksum_user = Web3.to_checksum_address(user_address)
+    gas_sponsor_enabled = os.getenv("GAS_SPONSOR_ENABLED", "true").lower() == "true"
+
+    if gas_sponsor_enabled:
+        if get_allowance(checksum_user, platform_address) < amount_units:
+            send_eth(
+                user_address=checksum_user,
+                amount_wei=Web3.to_wei(0.001, "ether"),
+                platform_private_key=platform_private_key,
+            )
+            approve_tokens(
+                spender_address=platform_address,
+                amount=2**256 - 1,
+                user_address=checksum_user,
+                user_private_key=user_private_key,
+            )
+
+        tx_hash = transfer_from_tokens(
+            from_address=checksum_user,
+            to_address=platform_address,
+            amount=amount_units,
+            platform_address=platform_address,
+            platform_private_key=platform_private_key,
+        )
+        receipt = w3.eth.wait_for_transaction_receipt(Web3.to_bytes(hexstr=tx_hash), timeout=30)
+        return tx_hash, receipt
+
+    contract = get_token_contract()
+    tx = contract.functions.transfer(platform_address, amount_units).build_transaction({
+        "from": checksum_user,
+        "nonce": w3.eth.get_transaction_count(checksum_user),
+        "gasPrice": w3.eth.gas_price,
+        "chainId": w3.eth.chain_id,
+        "gas": 100000,
+    })
+
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key=user_private_key)
+    raw_tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    receipt = w3.eth.wait_for_transaction_receipt(raw_tx_hash, timeout=30)
+    return raw_tx_hash.hex(), receipt
+
+
+def send_tokens_from_platform(to_address: str, amount_units: int) -> tuple[str, dict]:
+    w3 = get_web3()
+    contract = get_token_contract()
+    platform_private_key = os.getenv("PLATFORM_OWNER_PRIVATE_KEY")
+    if not platform_private_key:
+        raise ValueError("PLATFORM_OWNER_PRIVATE_KEY is not set")
+
+    platform_account = Account.from_key(platform_private_key)
+    platform_address = Web3.to_checksum_address(platform_account.address)
+    checksum_to = Web3.to_checksum_address(to_address)
+
+    tx = contract.functions.transfer(checksum_to, amount_units).build_transaction({
+        "from": platform_address,
+        "nonce": w3.eth.get_transaction_count(platform_address),
+        "gasPrice": w3.eth.gas_price,
+        "chainId": w3.eth.chain_id,
+    })
+
+    try:
+        estimated_gas = w3.eth.estimate_gas(tx)
+        tx["gas"] = int(estimated_gas * 1.2)
+    except Exception:
+        tx["gas"] = 100000
+
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key=platform_private_key)
+    raw_tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    receipt = w3.eth.wait_for_transaction_receipt(raw_tx_hash, timeout=30)
+    return raw_tx_hash.hex(), receipt

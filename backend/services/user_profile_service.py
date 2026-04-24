@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from core.models import Album, AlbumPresent, CurrentOwner, Listing, Present, Transaction, User
+from core.models import Album, AlbumPresent, CurrentOwner, Listing, ListingStatuses, Present, Transaction, User
 from services.blockchain.token_service import get_token_balance
 from services.blockchain.wallet_service import get_native_balance_eth
 
@@ -139,7 +139,7 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
         .select_from(Listing)
         .where(
             Listing.seller_id == user.user_id,
-            Listing.status_id == 1,
+            Listing.status.has(ListingStatuses.status_name == "active"),
         )
     ) or 0
 
@@ -218,13 +218,13 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
 
     present_ids = [p.present_id for p in presents]
 
-    active_listing_ids = set()
+    active_listing_present_ids = set()
     if present_ids:
-        active_listing_ids = set(
+        active_listing_present_ids = set(
             db.scalars(
-                select(Listing.listing_id).where(
-                    Listing.status_id == 1,
-                    Listing.present_id.in_(present_ids)
+                select(Listing.present_id).where(
+                    Listing.present_id.in_(present_ids),
+                    Listing.status.has(ListingStatuses.status_name == "active"),
                 )
             ).all()
         )
@@ -266,7 +266,7 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
                 "generated_at": p.generated_at,
                 "model_id": p.model_id,
                 "is_visible": p.is_visible,
-                "is_on_sale": p.present_id in active_listing_ids,
+                "is_on_sale": p.present_id in active_listing_present_ids,
                 "original_sender_username": p.original_sender.username if p.original_sender else None,
                 "collection": {
                     "collection_id": p.collection.collection_id,

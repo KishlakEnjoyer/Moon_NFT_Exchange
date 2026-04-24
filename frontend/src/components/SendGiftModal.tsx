@@ -5,7 +5,7 @@ import { authFetch } from "../services/auth";
 const { Text, Title } = Typography;
 const { TextArea } = Input;
 
-const MAX_DESCRIPTION_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 100;
 
 interface CollectionOption {
   id: number;
@@ -312,11 +312,13 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                     <Text strong className="block mb-2">Message (optional)</Text>
                     <TextArea
                       value={description}
-                      maxLength={MAX_DESCRIPTION_LENGTH}
-                      showCount
+                      maxLength={100}
+                      showCount={{
+                        formatter: ({ count }) => `${count} / ${MAX_DESCRIPTION_LENGTH}`,
+                      }}
                       rows={3}
                       placeholder="Write a message..."
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
                     />
                   </div>
                 </>

@@ -115,7 +115,7 @@ class SendGiftRequest(BaseModel):
     sender_id: int | None = None
     receiver_id: int
     collection_id: int
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=100)
 
 class GeneratePresentRequest(BaseModel):
     collection_id: int
