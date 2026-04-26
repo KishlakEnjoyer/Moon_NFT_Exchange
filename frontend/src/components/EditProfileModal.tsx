@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import QrModal from "./QrModal";
 import { authFetch, setAuthSession } from "../services/auth";
+import { detectNsfwImage } from "../services/nsfwDetectorService";
 import { updateProfile, UpdateProfileResponse } from "../services/profileService";
 
 const { Text, Title } = Typography;
@@ -64,6 +65,8 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pollingRef = useRef<number | null>(null);
   const authAbortRef = useRef<AbortController | null>(null);
+  const profilePhotoCheckAbortRef = useRef<AbortController | null>(null);
+  const profilePhotoCheckIdRef = useRef(0);
 
   const [username, setUsername] = useState("");
   const [aboutMe, setAboutMe] = useState("");
@@ -71,6 +74,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
   const [vkVisible, setVkVisible] = useState(true);
   const [profilePicDataUrl, setProfilePicDataUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingProfilePhoto, setIsCheckingProfilePhoto] = useState(false);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authProvider, setAuthProvider] = useState<AuthProvider>("tg");
@@ -81,6 +85,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
 
   useEffect(() => {
     if (!open || !profile) {
+      if (profilePhotoCheckAbortRef.current) {
+        profilePhotoCheckIdRef.current += 1;
+        profilePhotoCheckAbortRef.current.abort();
+        profilePhotoCheckAbortRef.current = null;
+      }
+      setIsCheckingProfilePhoto(false);
       return;
     }
 
@@ -101,6 +111,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
       if (authAbortRef.current) {
         authAbortRef.current.abort();
         authAbortRef.current = null;
+      }
+
+      if (profilePhotoCheckAbortRef.current) {
+        profilePhotoCheckIdRef.current += 1;
+        profilePhotoCheckAbortRef.current.abort();
+        profilePhotoCheckAbortRef.current = null;
       }
     };
   }, []);
@@ -252,6 +268,16 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
       return;
     }
 
+    profilePhotoCheckIdRef.current += 1;
+    const checkId = profilePhotoCheckIdRef.current;
+
+    if (profilePhotoCheckAbortRef.current) {
+      profilePhotoCheckAbortRef.current.abort();
+      profilePhotoCheckAbortRef.current = null;
+    }
+
+    setIsCheckingProfilePhoto(false);
+
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       messageApi.error("Use PNG, JPG, or WEBP for the profile photo");
       return;
@@ -263,16 +289,45 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     }
 
     try {
+      const controller = new AbortController();
+      profilePhotoCheckAbortRef.current = controller;
+      setIsCheckingProfilePhoto(true);
+
       const dataUrl = await readFileAsDataUrl(file);
+      const isSafe = await detectNsfwImage({ image_data_url: dataUrl }, controller.signal);
+
+      if (checkId !== profilePhotoCheckIdRef.current) {
+        return;
+      }
+
+      if (!isSafe) {
+        setProfilePicDataUrl(null);
+        messageApi.error("Profile photo did not pass moderation");
+        return;
+      }
+
       setProfilePicDataUrl(dataUrl);
     } catch (error) {
-      console.error("Failed to read profile photo:", error);
-      messageApi.error("Failed to read profile photo");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("Failed to check profile photo:", error);
+      messageApi.error(error instanceof Error ? error.message : "Failed to check profile photo");
+    } finally {
+      if (checkId === profilePhotoCheckIdRef.current) {
+        profilePhotoCheckAbortRef.current = null;
+        setIsCheckingProfilePhoto(false);
+      }
     }
   };
 
   const handleSave = async () => {
     if (!profile) {
+      return;
+    }
+
+    if (isCheckingProfilePhoto) {
+      messageApi.warning("Wait until the profile photo check finishes");
       return;
     }
 
@@ -365,7 +420,8 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         onOk={handleSave}
         okText="Save"
         cancelText="Cancel"
-        confirmLoading={isSaving}
+        confirmLoading={isSaving || isCheckingProfilePhoto}
+        okButtonProps={{ disabled: isCheckingProfilePhoto }}
         width={560}
         title={<Title level={4} className="!mb-0">Edit Profile</Title>}
       >
@@ -383,7 +439,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
               </Flex>
             </Flex>
 
-            <Button icon={<CameraOutlined />} onClick={handlePickImage} className="!bg-[var(--liquid-glass-bg)]">
+            <Button
+              icon={<CameraOutlined />}
+              onClick={handlePickImage}
+              loading={isCheckingProfilePhoto}
+              className="!bg-[var(--liquid-glass-bg)]"
+            >
               Change
             </Button>
           </Flex>

@@ -50,6 +50,18 @@ export interface BuyListingResponse {
   seller_new_balance: string | null;
 }
 
+export interface ListingSearchParams {
+  search?: string;
+  smart?: boolean;
+  collection_ids?: number[];
+  model_ids?: number[];
+  background_ids?: number[];
+  symbol_ids?: number[];
+  price_min?: number;
+  price_max?: number;
+  sort?: string | null;
+}
+
 const API_URL = process.env.REACT_APP_API_URL;
 const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
 
@@ -70,9 +82,45 @@ export const formatTonPrice = (price: string | number, compact = false): string 
   }).format(amount);
 };
 
-export const getActiveListings = async (): Promise<ApiListing[]> => {
-  const res = await fetch(`${API_URL}/listings/active`);
-  if (!res.ok) return [];
+const setArrayParam = (searchParams: URLSearchParams, name: string, values?: number[]) => {
+  if (values?.length) {
+    searchParams.set(name, values.join(","));
+  }
+};
+
+export const getActiveListings = async (params: ListingSearchParams = {}): Promise<ApiListing[]> => {
+  const searchParams = new URLSearchParams();
+  const search = params.search?.trim();
+
+  if (search) {
+    searchParams.set("search", search);
+    searchParams.set("smart", String(Boolean(params.smart)));
+  }
+
+  setArrayParam(searchParams, "collection_ids", params.collection_ids);
+  setArrayParam(searchParams, "model_ids", params.model_ids);
+  setArrayParam(searchParams, "background_ids", params.background_ids);
+  setArrayParam(searchParams, "symbol_ids", params.symbol_ids);
+
+  if (params.price_min !== undefined) {
+    searchParams.set("price_min", String(params.price_min));
+  }
+
+  if (params.price_max !== undefined) {
+    searchParams.set("price_max", String(params.price_max));
+  }
+
+  if (params.sort) {
+    searchParams.set("sort", params.sort);
+  }
+
+  const query = searchParams.toString();
+  const res = await fetch(`${API_URL}/listings/active${query ? `?${query}` : ""}`);
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || "Failed to load listings");
+  }
+
   return res.json();
 };
 

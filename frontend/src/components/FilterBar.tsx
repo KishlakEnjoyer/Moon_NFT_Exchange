@@ -1,4 +1,4 @@
-import { FilterOutlined, CloseOutlined } from "@ant-design/icons";
+import { FilterOutlined, CloseOutlined, ThunderboltOutlined, SearchOutlined } from "@ant-design/icons";
 import {
   Input,
   Select,
@@ -9,6 +9,8 @@ import {
   Slider,
   Typography,
   Avatar,
+  Space,
+  Tooltip
 } from "antd";
 import { useState, useEffect, useCallback } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
@@ -37,6 +39,7 @@ interface SelectOption {
 
 export interface FilterState {
   search: string;
+  smart: boolean;
   collection_ids: number[];
   model_ids: number[];
   background_ids: number[];
@@ -48,6 +51,7 @@ export interface FilterState {
 
 interface FilterBarProps {
   onFilterChange?: (filters: FilterState) => void;
+  loading?: boolean;
 }
 
 const MAX_INPUT_LENGTH = 50;
@@ -111,6 +115,7 @@ const OptionWithImage = ({
 
 const EMPTY_FILTERS: FilterState = {
   search: "",
+  smart: false,
   collection_ids: [],
   model_ids: [],
   background_ids: [],
@@ -120,7 +125,7 @@ const EMPTY_FILTERS: FilterState = {
   sort: null,
 };
 
-const FilterBar = ({ onFilterChange }: FilterBarProps) => {
+const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const popupContainer = () => document.body;
 
   const [collections, setCollections] = useState<Option[]>([]);
@@ -138,6 +143,8 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   const [open, setOpen] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000]);
   const [sortOrder, setSortOrder] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [smart, setSmart] = useState(false);
 
   useEffect(() => {
     setLoadingCollections(true);
@@ -162,7 +169,6 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   useEffect(() => {
     if (filters.collection_ids.length === 0) {
       setModels([]);
-      setFilters((prev) => ({ ...prev, model_ids: [] }));
       return;
     }
 
@@ -188,9 +194,14 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   };
 
   const handleClear = () => {
-    setPriceRange([0, 100000]);
+    setSearch("");
+    setSmart(false);
+    setPriceRange([0, 3000]);
     setSortOrder(null);
-    updateFilters({ price_min: 0, price_max: 3000, sort: null });
+    setModels([]);
+    setFilters(EMPTY_FILTERS);
+    notify(EMPTY_FILTERS);
+    setOpen(false);
   };
 
   const handleApply = () => {
@@ -284,10 +295,25 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
     ),
   };
 
+  const runSearch = () => {
+    updateFilters({ search: search.trim(), smart });
+  };
+
+  const toggleSmart = () => {
+    const nextSmart = !smart;
+    setSmart(nextSmart);
+    updateFilters({ smart: nextSmart });
+  };
+
+  const handleCollectionChange = (ids: number[]) => {
+    setModels([]);
+    updateFilters({ collection_ids: ids, model_ids: [] });
+  };
+
   return (
     <Row className="w-full" gutter={[12, 12]} align="middle">
       <Col flex="auto">
-        <Input.Search
+        {/* <Input.Search
           className="w-full"
           placeholder="Search"
           allowClear
@@ -295,7 +321,43 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
           maxLength={MAX_INPUT_LENGTH}
           onSearch={(val) => updateFilters({ search: val })}
           onChange={(e) => !e.target.value && updateFilters({ search: "" })}
-        />
+        /> */}
+        <Space.Compact className="w-full">
+          <Input
+            placeholder={smart ? "Smart search" : "Search"}
+            allowClear
+            size="large"
+            maxLength={MAX_INPUT_LENGTH}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              if (!e.target.value) {
+                updateFilters({ search: "", smart });
+              }
+            }}
+            onPressEnter={runSearch}
+          />
+
+          <Tooltip title={smart ? "Smart search enabled" : "Enable smart search"}>
+            <Button
+              size="large"
+              type={smart ? "primary" : "default"}
+              icon={<ThunderboltOutlined />}
+              disabled={loading}
+              onClick={toggleSmart}
+            />
+          </Tooltip>
+
+          <Tooltip title="Search">
+            <Button
+              size="large"
+              icon={<SearchOutlined />}
+              loading={loading}
+              onClick={runSearch}
+            />
+          </Tooltip>
+        </Space.Compact>
+
       </Col>
 
       <Col flex="1 1 200px">
@@ -305,7 +367,7 @@ const FilterBar = ({ onFilterChange }: FilterBarProps) => {
           loading={loadingCollections}
           options={toSelectOptions(collections, "collections")}
           value={filters.collection_ids}
-          onChange={(ids: number[]) => updateFilters({ collection_ids: ids })}
+          onChange={handleCollectionChange}
         />
       </Col>
 

@@ -2,6 +2,7 @@ import useDocumentTitle from "../hooks/useDocumentTitle";
 import { FloatButton, Layout, Spin, Empty, Flex, Typography } from "antd";
 import { Content } from "antd/es/layout/layout";
 import FilterBar from "../components/FilterBar";
+import type { FilterState } from "../components/FilterBar";
 import { InboxOutlined, UpOutlined } from "@ant-design/icons";
 import ListingCard from "../components/ListingCard";
 import CardList from "../components/CardList";
@@ -11,6 +12,18 @@ import ModalPresentDetail from "../components/ModalPresentDetail";
 import { message } from "antd";
 
 const { Text } = Typography;
+
+const DEFAULT_LISTING_FILTERS: FilterState = {
+  search: "",
+  smart: false,
+  collection_ids: [],
+  model_ids: [],
+  background_ids: [],
+  symbol_ids: [],
+  price_min: 0,
+  price_max: 3000,
+  sort: null,
+};
 
 const getStoredCurrentUser = () => {
   try {
@@ -40,6 +53,7 @@ const MainView = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedPresent, setSelectedPresent] = useState<ApiListing | null>(null);
   const [buyingListingId, setBuyingListingId] = useState<number | null>(null);
+  const [listingFilters, setListingFilters] = useState<FilterState>(DEFAULT_LISTING_FILTERS);
 
   const currentUserId = getStoredCurrentUser().user_id;
 
@@ -56,14 +70,15 @@ const MainView = () => {
   const loadListings = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getActiveListings();
+      const data = await getActiveListings(listingFilters);
       setListings(data);
-    } catch {
+    } catch (e: any) {
       setListings([]);
+      messageApi.error(e.message || "Failed to load listings");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listingFilters, messageApi]);
 
   useEffect(() => {
     loadListings();
@@ -119,12 +134,16 @@ const MainView = () => {
 
   const cartListingIds = new Set(cartItems.map((i) => i.listing_id));
 
+  const handleFilterChange = useCallback((filters: FilterState) => {
+    setListingFilters(filters);
+  }, []);
+
   return (
     <Layout className="min-h-screen">
       {contextHolder}
       <Content className="py-[var(--size-2xs)] px-2 sm:px-4 lg:px-[var(--size-4xl)]">
         <div className="sticky top-0 z-[200] py-2 sm:py-[var(--size-sm)] h-auto">
-          <FilterBar />
+          <FilterBar loading={loading} onFilterChange={handleFilterChange} />
         </div>
 
         {loading ? (

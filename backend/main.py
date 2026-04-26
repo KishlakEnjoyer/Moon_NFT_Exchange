@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routers.nsfw_detector_router import nsfw_detector_router
 from routers.auth_router import auth_router
 from routers.blockchain_debug_router import blockchain_debug_router
 from routers.user_wallet_router import user_wallet_router
@@ -49,3 +50,4 @@ app.include_router(cart_router)
 app.include_router(transactions_router)
 app.include_router(presents_router)
 app.include_router(image_generator_router)
+app.include_router(nsfw_detector_router)
