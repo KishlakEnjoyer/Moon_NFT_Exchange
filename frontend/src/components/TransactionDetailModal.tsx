@@ -187,7 +187,7 @@ const TransactionDetailModal = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      width={640}
+      width="min(640px, calc(100vw - 24px))"
       zIndex={1100}
       title={<Title level={4} className="!mb-0">Transaction Details</Title>}
     >
@@ -242,7 +242,7 @@ const TransactionDetailModal = ({
               key: "tx_hash",
               label: "Blockchain Tx Hash",
               children: transaction.blockchain_tx_hash ? (
-                <Text code copyable>
+                <Text code copyable className="break-all">
                   {transaction.blockchain_tx_hash}
                 </Text>
               ) : (

@@ -32,20 +32,6 @@ export const QrModal: React.FC<QrModalProps> = ({
   onSelectProvider,
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(AUTH_TIMEOUT_MS);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  useEffect(() => {
-    if (open && provider === "tg" && authLink && isMobile) {
-      window.open(authLink, "_blank", "noopener,noreferrer");
-    }
-  }, [open, provider, authLink, isMobile]);
 
   useEffect(() => {
     if (!open || !stateValue) return;
@@ -180,6 +166,7 @@ export const QrModal: React.FC<QrModalProps> = ({
       footer={null}
       centered
       closable
+      width="min(480px, calc(100vw - 24px))"
       title="Authorization"
       destroyOnClose
     >

@@ -148,13 +148,13 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
         open={open}
         onCancel={onClose}
         footer={
-          <Flex justify="space-between" gap={8}>
+          <Flex justify="space-between" gap={8} wrap="wrap">
             {step === "collection" && (
               <Button onClick={() => setStep("user")} className="!bg-[var(--liquid-glass-bg)]">
                 Back
               </Button>
             )}
-            <Flex justify="flex-end" gap={8} className="flex-1">
+            <Flex justify="flex-end" gap={8} className="flex-1" wrap="wrap">
               <Button onClick={onClose} className="!bg-[var(--liquid-glass-bg)]">
                 Cancel
               </Button>
@@ -170,7 +170,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
             </Flex>
           </Flex>
         }
-        width={560}
+        width="min(560px, calc(100vw - 24px))"
         title={<Title level={4} className="!mb-0">Send Gift</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
@@ -184,7 +184,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                 className="mb-4"
                 allowClear
               />
-              <Flex vertical gap={8} className="max-h-64 overflow-y-auto">
+              <Flex vertical gap={8} className="max-h-64 overflow-y-auto moon-mobile-scroll">
                 {users.map((user) => {
                   const isSelf = user.user_id === senderId;
                   return (
@@ -192,7 +192,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                       key={user.user_id}
                       align="center"
                       gap={12}
-                      className={`cursor-pointer rounded-[var(--size-smm)] p-3 transition-colors ${isSelf ? 'bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]' : 'hover:bg-[var(--black-transparent-05)]'}`}
+                      className={`min-w-0 cursor-pointer rounded-[var(--size-smm)] p-3 transition-colors ${isSelf ? 'bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]' : 'hover:bg-[var(--black-transparent-05)]'}`}
                       onClick={() => handleUserSelect(user.user_id)}
                     >
                       <Avatar
@@ -203,8 +203,8 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                             : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
                         }
                       />
-                      <Flex vertical>
-                        <Text strong>{user.username}</Text>
+                      <Flex vertical className="min-w-0">
+                        <Text strong ellipsis={{ tooltip: user.username }}>{user.username}</Text>
                         {isSelf && (
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             Gift yourself
@@ -245,7 +245,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
               {!selectedCollectionId ? (
                 <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
                   <Text strong className="block mb-3">Select a collection</Text>
-                  <div className="grid grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1 moon-mobile-scroll">
                     {collections.map((col) => (
                       <div
                         key={col.id}

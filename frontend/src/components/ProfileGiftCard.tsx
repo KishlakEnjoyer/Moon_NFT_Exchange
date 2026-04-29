@@ -30,14 +30,14 @@ const ProfileGiftCard = ({
         </div>
       )}
 
-      <div className="flex flex-row gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">
+      <div className="flex max-w-[calc(100%-16px)] flex-row flex-wrap justify-end gap-1 sm:gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">
         {showOnSale &&
-          <div className="text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
+          <div className="text-[11px] sm:text-[var(--size-base)] text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
             On Sale
           </div>
         }
         {number &&
-          <div className="text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--accent-50)]">
+          <div className="max-w-full truncate text-[11px] sm:text-[var(--size-base)] text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--accent-50)]">
             #{number?.toLocaleString('en-US') ?? '0'}
           </div>
         }
@@ -49,7 +49,7 @@ const ProfileGiftCard = ({
           cover: { padding: 0, margin: 0, background: "none", width: "100%", justifyContent: "center" },
           body: { display: "none", width: "100%" },
         }}
-        className="rounded-[18px] overflow-hidden aspect-square"
+        className="rounded-[var(--size-smm)] sm:rounded-[18px] overflow-hidden aspect-square"
         cover={
           <Image
             src={cardImage}

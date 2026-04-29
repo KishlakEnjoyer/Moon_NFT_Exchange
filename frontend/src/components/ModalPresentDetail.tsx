@@ -102,12 +102,14 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
               key={attr.key}
               justify="space-between"
               align="center"
+              gap={12}
+              wrap="wrap"
               className={`px-4 py-3 ${i % 2 === 0 ? 'bg-[var(--liquid-glass-bg)]' : ''} ${i !== attributes.length - 1 ? 'border-b border-[var(--black-transparent)]' : ''}`}
             >
               <Text type="secondary" className="shrink-0 mr-4">{attr.key}</Text>
-              <Flex align="center" gap={8}>
+              <Flex align="center" gap={8} className="min-w-0">
                 {typeof attr.value === 'string' ? (
-                  <Text>{attr.value}</Text>
+                  <Text className="break-words text-right">{attr.value}</Text>
                 ) : (
                   attr.value
                 )}

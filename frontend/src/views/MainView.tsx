@@ -20,8 +20,6 @@ const DEFAULT_LISTING_FILTERS: FilterState = {
   model_ids: [],
   background_ids: [],
   symbol_ids: [],
-  price_min: 0,
-  price_max: 3000,
   sort: null,
 };
 

@@ -57,7 +57,7 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
       open={open}
       onCancel={onClose}
       footer={null}
-      width={480}
+      width="min(480px, calc(100vw - 24px))"
       title={<Title level={4} className="!mb-0">People</Title>}
     >
       <Flex vertical gap={16} className="mt-4">
@@ -67,13 +67,13 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
           onChange={(e) => setSearchQuery(e.target.value)}
           allowClear
         />
-        <Flex vertical gap={8} className="max-h-80 overflow-y-auto">
+        <Flex vertical gap={8} className="max-h-80 overflow-y-auto moon-mobile-scroll">
           {users.map((user) => (
             <Flex
               key={user.user_id}
               align="center"
               gap={12}
-              className="cursor-pointer rounded-[var(--size-smm)] p-3 hover:bg-[var(--black-transparent-05)] transition-colors"
+              className="min-w-0 cursor-pointer rounded-[var(--size-smm)] p-3 hover:bg-[var(--black-transparent-05)] transition-colors"
               onClick={() => handleUserClick(user.username)}
             >
               <Avatar
@@ -84,7 +84,7 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
                     : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
                 }
               />
-              <Text strong>{user.username}</Text>
+              <Text strong ellipsis={{ tooltip: user.username }} className="min-w-0">{user.username}</Text>
             </Flex>
           ))}
           {users.length === 0 && searchQuery === "" && (

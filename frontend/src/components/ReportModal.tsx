@@ -75,7 +75,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
         open={open}
         onCancel={onClose}
         footer={
-          <Flex justify="flex-end" gap={8}>
+          <Flex justify="flex-end" gap={8} wrap="wrap">
             <Button onClick={onClose} className="!bg-[var(--liquid-glass-bg)]">
               Cancel
             </Button>
@@ -90,7 +90,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
             </Button>
           </Flex>
         }
-        width={480}
+        width="min(480px, calc(100vw - 24px))"
         title={
           <Flex align="center" gap={8}>
             <FlagOutlined />

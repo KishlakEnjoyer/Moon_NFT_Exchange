@@ -112,10 +112,10 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
         onCancel={onClose}
         footer={null}
         title={<Title level={4} className="!mb-0">Cart</Title>}
-        width={780}
+        width="min(780px, calc(100vw - 24px))"
       >
-        <Flex vertical gap={12} className="mt-4 max-h-[65vh]">
-          <Flex vertical gap={12} className="mt-4 max-h-[50vh] overflow-y-auto">
+        <Flex vertical gap={12} className="mt-4 max-h-[70vh]">
+          <Flex vertical gap={12} className="mt-2 sm:mt-4 max-h-[52vh] overflow-y-auto moon-mobile-scroll">
             {cartItems.length === 0 ? (
               <Empty description="Cart is empty" className="py-8" />
             ) : (

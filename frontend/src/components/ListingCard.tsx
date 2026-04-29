@@ -90,7 +90,7 @@ const ListingCard = ({ item, onPresentClick, onAddToCart, onBuy, isInCart, isOwn
           disabled={isOwnListing}
           onClick={() => onBuy?.(item.listing_id)}
         >
-          <span className="block min-w-0 truncate">{price}</span>
+          <span className="block min-w-0 truncate text-[13px] sm:text-[var(--size-base)]">{price}</span>
         </Button>
 
         <Button

@@ -20,7 +20,7 @@ from services.blockchain.token_service import (
 
 TOPUP_COOLDOWN_MINUTES = 5
 TOPUP_MIN_AMOUNT = Decimal("0")
-TOPUP_MAX_AMOUNT = Decimal("1000000")
+TOPUP_MAX_AMOUNT = Decimal("10000")
 
 
 def _get_pending_status_id(db: Session) -> int:
@@ -47,8 +47,8 @@ def _get_failed_status_id(db: Session) -> int:
 def _validate_amount(amount: Decimal) -> None:
     if amount <= TOPUP_MIN_AMOUNT:
         raise ValueError("Amount must be greater than 0")
-    if amount >= TOPUP_MAX_AMOUNT:
-        raise ValueError("Amount must be less than 1000000")
+    if amount > TOPUP_MAX_AMOUNT:
+        raise ValueError("Amount must be less than or equal to 10000")
 
 
 def _check_cooldown(db: Session, wallet_adr: int) -> tuple[bool, int]:

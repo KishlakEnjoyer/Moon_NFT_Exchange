@@ -381,16 +381,18 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
       <Flex
         align="center"
         justify="space-between"
+        gap={12}
+        wrap="wrap"
         className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4"
       >
-        <Flex vertical gap={4}>
+        <Flex vertical gap={4} className="min-w-0 flex-1">
           <Text strong>{title}</Text>
-          <Text type="secondary">
+          <Text type="secondary" ellipsis={{ tooltip: usernameValue || statusText }}>
             {usernameValue || statusText}
           </Text>
         </Flex>
 
-        <Flex align="center" gap={12}>
+        <Flex align="center" gap={12} wrap="wrap">
           {connected ? (
             <Flex align="center" gap={6}>
               <CheckCircleOutlined style={{ color: "#52c41a" }} />
@@ -422,20 +424,22 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         cancelText="Cancel"
         confirmLoading={isSaving || isCheckingProfilePhoto}
         okButtonProps={{ disabled: isCheckingProfilePhoto }}
-        width={560}
+        width="min(560px, calc(100vw - 24px))"
         title={<Title level={4} className="!mb-0">Edit Profile</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
           <Flex
             align="center"
             justify="space-between"
+            gap={12}
+            wrap="wrap"
             className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4"
           >
-            <Flex align="center" gap={16}>
-              <Avatar size={72} src={previewSrc} className="border border-gray-500" />
-              <Flex vertical gap={4}>
+            <Flex align="center" gap={16} className="min-w-0 flex-1">
+              <Avatar size={{ xs: 56, sm: 72 }} src={previewSrc} className="border border-gray-500 shrink-0" />
+              <Flex vertical gap={4} className="min-w-0">
                 <Text strong>Profile Photo</Text>
-                <Text type="secondary">PNG, JPG, or WEBP up to 5 MB</Text>
+                <Text type="secondary" className="break-words">PNG, JPG, or WEBP up to 5 MB</Text>
               </Flex>
             </Flex>
 

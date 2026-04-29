@@ -224,11 +224,11 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
         open={open}
         onCancel={onClose}
         footer={null}
-        width={860}
+        width="min(860px, calc(100vw - 24px))"
         title={<Title level={4} className="!mb-0">Transaction History</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
-          <Flex gap={8}>
+          <Flex gap={8} wrap="wrap">
             <Tag.CheckableTag
               checked={filter === "all"}
               onChange={() => setFilter("all")}
@@ -280,7 +280,7 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
               })}
               pagination={{ pageSize: 10, size: "small" }}
               size="small"
-              scroll={{ y: 400 }}
+              scroll={{ x: 860, y: 400 }}
             />
           )}
         </Flex>

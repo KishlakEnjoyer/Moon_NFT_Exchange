@@ -81,6 +81,7 @@ const ALL_TAB = "All";
 const DEFAULT_VISIBLE_COUNT = 36;
 const MAX_ALBUMS_PER_USER = 10;
 const MAX_ALBUM_TITLE_LENGTH = 30;
+const PROFILE_AVATAR_SIZE = { xs: 92, sm: 116, md: 140, lg: 140, xl: 140, xxl: 140 };
 
 type SegmentedValue = typeof ALL_TAB | number;
 
@@ -490,7 +491,7 @@ const AccountView = () => {
       : (userIdValue ? `https://vk.com/id${userIdValue}` : null);
 
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {provider === "tg" ? (
           <Image
             src="/icons/tg-icon-png.png"
@@ -512,12 +513,12 @@ const AccountView = () => {
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1"
+            className="flex min-w-0 items-center gap-1 break-all"
           >
             {label}
           </a>
         ) : (
-          <SpoilerSpan pointerEvents={isOwn ? "auto" : "none"} className="text-[var(--liquid-glass-fg)]">
+          <SpoilerSpan pointerEvents={isOwn ? "auto" : "none"} className="text-[var(--liquid-glass-fg)] break-all">
             {label}
           </SpoilerSpan>
         )}
@@ -529,11 +530,11 @@ const AccountView = () => {
     <Layout className="min-h-screen">
       {contextHolder}
 
-      <Content className="gap-5 flex flex-col py-[var(--size-2xs)] px-[var(--size-4xl)]">
-        <Flex className="gap-5 flex justify-between items-start" vertical={false}>
-          <Flex className="gap-5" vertical={false}>
+      <Content className="gap-4 sm:gap-5 flex flex-col py-[var(--size-2xs)] px-3 sm:px-4 lg:px-[var(--size-4xl)]">
+        <Flex className="gap-4 sm:gap-5 flex justify-between items-start" wrap="wrap">
+          <Flex className="gap-3 sm:gap-5 min-w-0 flex-1" wrap="wrap" align="flex-start">
             <Avatar
-              size={140}
+              size={PROFILE_AVATAR_SIZE}
               src={
                 user.profile_pic_url
                   ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`
@@ -542,20 +543,20 @@ const AccountView = () => {
               className="border border-gray-500 shrink-0"
             />
 
-            <Flex vertical>
-              <Title level={2} className="!mb-0">
+            <Flex vertical className="min-w-0 flex-1">
+              <Title level={2} className="!mb-0 break-all !text-[28px] sm:!text-[30px]">
                 {user.username}
               </Title>
 
               {renderSocialAccount("tg", user.tg_username, user.user_tg_id, user.tg_visibility)}
               {renderSocialAccount("vk", user.vk_username, user.user_vk_id, user.vk_visibility)}
 
-              <Text className="mt-3 leading-relaxed">{user.about_me}</Text>
+              <Text className="mt-3 leading-relaxed break-words">{user.about_me}</Text>
             </Flex>
           </Flex>
 
           {isOwn ? (
-            <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
+            <Flex className="gap-2 sm:gap-3 flex flex-row h-full !items-center w-full sm:w-auto" wrap="wrap">
               <Tooltip title="Send Gift">
                 <Button
                   size="large"
@@ -584,7 +585,7 @@ const AccountView = () => {
               </Button>
             </Flex>
           ) : (
-            <Flex className="gap-3 flex flex-row h-full !items-center" vertical={false}>
+            <Flex className="gap-2 sm:gap-3 flex flex-row h-full !items-center w-full sm:w-auto" wrap="wrap">
               {getStoredCurrentUser().user_id && (
                 <Tooltip title="Send Gift">
                   <Button
@@ -612,7 +613,7 @@ const AccountView = () => {
           )}
         </Flex>
 
-        <div className="overflow-x-auto overflow-y-hidden whitespace-nowrap w-full">
+        <div className="moon-mobile-scroll overflow-x-auto overflow-y-hidden whitespace-nowrap w-full">
           <Flex align="center" gap={8}>
             <Segmented<SegmentedValue>
               options={segmentedOptions}

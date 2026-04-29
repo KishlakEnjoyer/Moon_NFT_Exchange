@@ -44,8 +44,8 @@ export interface FilterState {
   model_ids: number[];
   background_ids: number[];
   symbol_ids: number[];
-  price_min: number;
-  price_max: number;
+  price_min?: number;
+  price_max?: number;
   sort: string | null;
 }
 
@@ -120,8 +120,6 @@ const EMPTY_FILTERS: FilterState = {
   model_ids: [],
   background_ids: [],
   symbol_ids: [],
-  price_min: 0,
-  price_max: 3000,
   sort: null,
 };
 
@@ -311,8 +309,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   };
 
   return (
-    <Row className="w-full" gutter={[12, 12]} align="middle">
-      <Col flex="auto">
+    <Row className="w-full" gutter={[8, 8]} align="middle">
+      <Col xs={24} lg={7}>
         {/* <Input.Search
           className="w-full"
           placeholder="Search"
@@ -360,7 +358,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
 
       </Col>
 
-      <Col flex="1 1 200px">
+      <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
           placeholder="Collection"
@@ -371,7 +369,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         />
       </Col>
 
-      <Col flex="1 1 200px">
+      <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
           placeholder={
@@ -385,7 +383,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         />
       </Col>
 
-      <Col flex="1 1 200px">
+      <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
           placeholder="Background"
@@ -396,7 +394,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         />
       </Col>
 
-      <Col flex="1 1 200px">
+      <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
           placeholder="Symbol"
@@ -407,7 +405,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         />
       </Col>
 
-      <Col flex="40px">
+      <Col xs={12} sm={12} md={6} lg={1}>
         <Dropdown
           open={open}
           onOpenChange={setOpen}

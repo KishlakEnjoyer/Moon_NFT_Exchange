@@ -22,6 +22,7 @@ router = Router()
 
 SITE_URL = os.getenv("REACT_APP_FRONT_URL")
 API_URL = os.getenv("API_DOCKER_URL")
+TOPUP_MAX_AMOUNT = Decimal("10000")
 
 
 def get_site_link_keyboard() -> InlineKeyboardMarkup:
@@ -42,7 +43,7 @@ def format_seconds_to_human(seconds: int) -> str:
 @router.callback_query(F.data == "topup")
 async def top_up_start_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(TopupStates.waiting_for_topup_amount)
-    await callback.message.answer("Enter a top-up amount between 0 and 1000000:")
+    await callback.message.answer("Enter a top-up amount between 0 and 10000:")
     await callback.answer()
 
 
@@ -69,8 +70,8 @@ async def top_up_amount_handler(message: Message, state: FSMContext) -> None:
         await message.answer("The amount must be greater than 0.")
         return
 
-    if amount >= Decimal("1000000"):
-        await message.answer("The amount must be less than 1000000.")
+    if amount > TOPUP_MAX_AMOUNT:
+        await message.answer("The amount must be less than or equal to 10000.")
         return
 
     try:

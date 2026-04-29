@@ -21,20 +21,23 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onC
     <Flex
       align="center"
       justify="space-between"
-      className="bg-[var(--liquid-glass-bg)] rounded-[var(--size-smm)] p-3 border border-solid border-[var(--black-40)]"
+      gap={12}
+      wrap="wrap"
+      className="bg-[var(--liquid-glass-bg)] rounded-[var(--size-smm)] p-2 sm:p-3 border border-solid border-[var(--black-40)]"
     >
-      <Flex align="center" gap={12}>
+      <Flex align="center" gap={12} className="min-w-0 flex-1">
         <Avatar
-          size={76}
+          size={{ xs: 56, sm: 76 }}
           src={getPresentImageUrl(item.present_image_url)}
           shape="square"
           className="rounded-[var(--size-xs)] cursor-pointer hover:opacity-75 transition-opacity"
           onClick={() => onPresentClick?.(item)}
         />
-        <Flex vertical>
+        <Flex vertical className="min-w-0">
           <Text
             strong
-            className="cursor-pointer hover:opacity-75 transition-opacity text-[var(--size-base)]"
+            ellipsis={{ tooltip: `${item.collection_name} # ${item.present_num}` }}
+            className="cursor-pointer hover:opacity-75 transition-opacity text-[var(--size-base)] max-w-[180px] sm:max-w-[280px]"
             onClick={() => onPresentClick?.(item)}
           >
             {item.collection_name} # {item.present_num}
@@ -54,7 +57,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onC
         </Flex>
       </Flex>
 
-      <Flex align="center" gap={8}>
+      <Flex align="center" gap={8} className="ml-auto">
         <Flex align="center" gap={4}>
           <Text strong className="text-[var(--size-base)]">{price}</Text>
           <TONIcon />

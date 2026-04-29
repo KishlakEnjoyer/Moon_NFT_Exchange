@@ -14,10 +14,12 @@
 
 body {
   overflow-x: hidden;
+  min-width: 320px;
 }
 
 .App {
   min-height: 100vh;
+  min-height: 100svh;
 }
 
 .icon-antd {
@@ -123,4 +125,31 @@ body {
 
 *, *::before, *::after {
   transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+@media (max-width: 640px) {
+  .ant-modal {
+    max-width: calc(100vw - 24px);
+  }
+
+  .ant-modal .ant-modal-content {
+    padding: 18px 14px;
+  }
+
+  .ant-popover {
+    max-width: calc(100vw - 24px);
+  }
+
+  .ant-btn {
+    min-width: 0;
+  }
+
+  .moon-mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .moon-mobile-scroll::-webkit-scrollbar {
+    display: none;
+  }
 }
