@@ -3,6 +3,7 @@ import { DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TONIcon from "./icons/TONIcon";
 import { CartItem as CartItemType, getPresentImageUrl } from "../services/listingService";
+import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
 
@@ -14,6 +15,7 @@ interface CartItemProps {
 }
 
 const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onClose }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const price = parseFloat(item.price).toFixed(2);
 
@@ -52,7 +54,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onC
                 }
             }}
           >
-            {item.seller_username || 'Unknown'}
+            {item.seller_username || t("common.unknown")}
           </Text>
         </Flex>
       </Flex>

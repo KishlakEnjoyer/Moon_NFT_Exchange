@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, update
@@ -44,12 +46,17 @@ def get_notifications(
     if user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Cannot access another user's notifications")
 
+    cutoff = datetime.utcnow() - timedelta(days=30)
+
     notifications = db.scalars(
         select(Notification)
-        .where(Notification.user_id == user_id)
+        .where(
+            Notification.user_id == user_id,
+            Notification.created_at >= cutoff,
+        )
         .options(joinedload(Notification.notification_type))
         .order_by(Notification.created_at.desc())
-        .limit(50)
+        .limit(100)
     ).all()
 
     return [

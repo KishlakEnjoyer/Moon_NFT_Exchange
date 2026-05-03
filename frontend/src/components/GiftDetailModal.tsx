@@ -1,17 +1,20 @@
 import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfirm, InputNumber } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { RightOutlined, CheckOutlined, FireOutlined, TagOutlined, StopOutlined } from "@ant-design/icons";
+import { RightOutlined, CheckOutlined, FireOutlined, TagOutlined, StopOutlined, UserOutlined } from "@ant-design/icons";
 import {
   PresentDetail,
   cancelListing,
   createListing,
+  getPriceEstimate,
   getPresentDetail,
   getPresentDisplayImageUrl,
   togglePresentVisibility,
   upgradePresent,
 } from "../services/presentService";
 import { authFetch } from "../services/auth";
+import { buyListing } from "../services/listingService";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -27,12 +30,15 @@ interface GiftDetailModalProps {
 }
 
 const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, onRefresh }: GiftDetailModalProps) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [detail, setDetail] = useState<PresentDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isListingFormOpen, setIsListingFormOpen] = useState(false);
   const [listingPrice, setListingPrice] = useState<number | null>(null);
+  const [recommendedPrice, setRecommendedPrice] = useState<number | null>(null);
+  const [priceEstimateLoading, setPriceEstimateLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,6 +47,8 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     setDetail(null);
     setIsListingFormOpen(false);
     setListingPrice(null);
+    setRecommendedPrice(null);
+    setPriceEstimateLoading(false);
     getPresentDetail(presentId)
       .then((data) => setDetail(data))
       .catch(() => setDetail(null))
@@ -56,7 +64,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
       setDetail({ ...detail, is_visible: detail.is_visible === 1 ? 0 : 1 });
       onRefresh();
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to toggle visibility");
+      messageApi.error(e.message || t("giftDetail.failedToggleVisibility"));
     }
   };
 
@@ -69,14 +77,14 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || "Burn failed");
+        throw new Error(err.detail || t("giftDetail.burnFailed"));
       }
       const data = await res.json();
-      messageApi.success(`Burned! Received ${parseFloat(data.refund_amount).toFixed(2)} TON`);
+      messageApi.success(t("giftDetail.burnedReceived", { amount: parseFloat(data.refund_amount).toFixed(2) }));
       setDetail({ ...detail, is_burned: true });
       onRefresh();
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to burn");
+      messageApi.error(e.message || t("giftDetail.failedBurn"));
     } finally {
       setSubmitting(false);
     }
@@ -103,9 +111,9 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
       } catch {
       }
 
-      messageApi.success(`Upgraded! Paid ${parseFloat(data.price).toFixed(2)} TON`);
+      messageApi.success(t("giftDetail.upgradedPaid", { amount: parseFloat(data.price).toFixed(2) }));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to upgrade");
+      messageApi.error(e.message || t("giftDetail.failedUpgrade"));
     } finally {
       setSubmitting(false);
     }
@@ -114,22 +122,82 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   const handleCreateListing = async () => {
     if (!detail) return;
     if (!listingPrice || listingPrice <= 0) {
-      messageApi.error("Enter a valid price");
+      messageApi.error(t("giftDetail.enterValidPrice"));
       return;
     }
 
     setSubmitting(true);
     try {
-      await createListing(detail.present_id, userId, listingPrice.toFixed(2));
-      setDetail({ ...detail, is_on_sale: true });
+      const listing = await createListing(detail.present_id, userId, listingPrice.toFixed(2));
+      setDetail({
+        ...detail,
+        is_on_sale: true,
+        active_listing_id: listing.listing_id,
+        active_listing_price: listing.price,
+      });
       setIsListingFormOpen(false);
       setListingPrice(null);
       onRefresh();
-      messageApi.success("Gift listed for sale");
+      messageApi.success(t("giftDetail.giftListed"));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to create listing");
+      messageApi.error(e.message || t("giftDetail.failedCreateListing"));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBuyListing = async () => {
+    if (!detail?.active_listing_id) return;
+
+    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+    if (!currentUser.user_id) {
+      messageApi.error(t("giftDetail.loginToBuy"));
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await buyListing(detail.active_listing_id);
+
+      if (result.new_balance) {
+        localStorage.setItem(
+          "currentUser",
+          JSON.stringify({ ...currentUser, balance: parseFloat(result.new_balance) }),
+        );
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      window.dispatchEvent(new Event("listingsChanged"));
+      onRefresh();
+      onClose();
+      messageApi.success(t("giftDetail.purchasedFor", { price: parseFloat(result.price).toFixed(2) }));
+    } catch (e: any) {
+      messageApi.error(e.message || t("giftDetail.failedBuyGift"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenListingForm = async () => {
+    if (!detail) return;
+
+    setIsListingFormOpen(true);
+    setRecommendedPrice(null);
+    setPriceEstimateLoading(true);
+
+    try {
+      const estimate = await getPriceEstimate(detail.present_id);
+      const avgPrice = Number(estimate.avg_price);
+
+      if (Number.isFinite(avgPrice) && avgPrice > 0) {
+        const roundedAvgPrice = Number(avgPrice.toFixed(2));
+        setRecommendedPrice(roundedAvgPrice);
+        setListingPrice((currentPrice) => currentPrice ?? roundedAvgPrice);
+      }
+    } catch (e: any) {
+      messageApi.warning(e.message || t("giftDetail.failedRecommendedPrice"));
+    } finally {
+      setPriceEstimateLoading(false);
     }
   };
 
@@ -139,11 +207,16 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     setSubmitting(true);
     try {
       await cancelListing(detail.present_id);
-      setDetail({ ...detail, is_on_sale: false });
+      setDetail({
+        ...detail,
+        is_on_sale: false,
+        active_listing_id: null,
+        active_listing_price: null,
+      });
       onRefresh();
-      messageApi.success("Gift removed from sale");
+      messageApi.success(t("giftDetail.giftRemoved"));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to remove listing");
+      messageApi.error(e.message || t("giftDetail.failedRemoveListing"));
     } finally {
       setSubmitting(false);
     }
@@ -164,21 +237,29 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   };
 
   const basePrice = parseFloat(detail?.base_price || "0");
+  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+  const currentUserBlocked = currentUser.is_active === 0;
+  const activeListingPrice = detail?.active_listing_price
+    ? parseFloat(detail.active_listing_price)
+    : null;
+  const activeListingPriceLabel = activeListingPrice !== null && Number.isFinite(activeListingPrice)
+    ? activeListingPrice.toFixed(2)
+    : "0.00";
   const burnRefundPercent = parseFloat(process.env.REACT_APP_BURN_REFUND_PERCENT || "75");
   const upgradePercent = parseFloat(process.env.REACT_APP_UPGRADE_PERCENT || "25");
   const burnRefundAmount = (basePrice * burnRefundPercent / 100).toFixed(2);
   const upgradePriceAmount = (basePrice * upgradePercent / 100).toFixed(2);
   const ownerAvatarUrl = detail?.owner_profile_pic_url
     ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.owner_profile_pic_url}`
-    : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
+    : undefined;
   const senderAvatarUrl = detail?.original_sender_profile_pic_url
     ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.original_sender_profile_pic_url}`
-    : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
+    : undefined;
   const giftDescription = detail?.description?.trim();
 
   const attributes = [
     {
-      key: "Owner",
+      key: t("giftDetail.owner"),
       value: (
         <Flex
           align="center"
@@ -186,13 +267,13 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           className="cursor-pointer hover:opacity-75 transition-opacity"
           onClick={handleOwnerClick}
         >
-          <Avatar size={24} src={ownerAvatarUrl} />
-          <Text className="!text-[var(--accent-150)]">{detail?.owner_username || "Unknown"}</Text>
+          <Avatar size={24} src={ownerAvatarUrl} icon={!ownerAvatarUrl ? <UserOutlined /> : undefined} />
+          <Text className="!text-[var(--accent-150)]">{detail?.owner_username || t("common.unknown")}</Text>
         </Flex>
       ),
     },
     ...(detail?.original_sender_username ? [{
-      key: "From",
+      key: t("giftDetail.from"),
       value: (
         <Flex
           align="center"
@@ -200,25 +281,29 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           className="cursor-pointer hover:opacity-75 transition-opacity"
           onClick={handleSenderClick}
         >
-          <Avatar size={24} src={senderAvatarUrl} />
+          <Avatar size={24} src={senderAvatarUrl} icon={!senderAvatarUrl ? <UserOutlined /> : undefined} />
           <Text className="!text-[var(--accent-150)]">{detail.original_sender_username}</Text>
         </Flex>
       ),
     }] : []),
     {
-      key: "Collection",
+      key: t("giftDetail.collection"),
       value: detail?.collection_name || "-",
     },
     {
-      key: "Total Supply",
+      key: t("giftDetail.totalSupply"),
       value: detail?.total_supply || 0,
     },
     {
-      key: "Base Price",
+      key: t("giftDetail.basePrice"),
       value: `${parseFloat(detail?.base_price || "0").toFixed(2)} TON`,
     },
+    ...(activeListingPrice !== null && Number.isFinite(activeListingPrice) ? [{
+      key: t("giftDetail.salePrice"),
+      value: `${activeListingPriceLabel} TON`,
+    }] : []),
     ...(giftDescription ? [{
-      key: "Message",
+      key: t("giftDetail.message"),
       value: (
         <Text className="max-w-[220px] whitespace-pre-wrap break-words text-right">
           {giftDescription}
@@ -229,13 +314,13 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
 
   if (detail?.is_upgraded) {
     if (detail.model_name) {
-      attributes.push({ key: "Model", value: detail.model_name });
+      attributes.push({ key: t("giftDetail.model"), value: detail.model_name });
     }
     if (detail.background_name) {
-      attributes.push({ key: "Background", value: detail.background_name });
+      attributes.push({ key: t("giftDetail.background"), value: detail.background_name });
     }
     if (detail.symbol_name) {
-      attributes.push({ key: "Symbol", value: detail.symbol_name });
+      attributes.push({ key: t("giftDetail.symbol"), value: detail.symbol_name });
     }
   }
 
@@ -245,8 +330,9 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   );
 
   const hasModels = detail?.has_models;
-  const canListForSale = canManage && !!detail?.is_upgraded && !detail?.is_on_sale;
-  const canRemoveFromSale = canManage && !!detail?.is_on_sale;
+  const canListForSale = canManage && !currentUserBlocked && !!detail?.is_upgraded && !detail?.is_on_sale;
+  const canRemoveFromSale = canManage && !currentUserBlocked && !!detail?.is_on_sale;
+  const canBuyListedGift = !canManage && !currentUserBlocked && !!detail?.active_listing_id;
 
   return (
     <>
@@ -273,12 +359,12 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
             </Title>
             <Flex gap={4}>
               {detail?.is_upgraded ? (
-                <Tag color="purple">Upgraded</Tag>
+                <Tag color="purple">{t("giftDetail.upgraded")}</Tag>
               ) : (
-                <Tag>Basic</Tag>
+                <Tag>{t("giftDetail.basic")}</Tag>
               )}
               {detail?.is_on_sale && (
-                <Tag color="orange">On Sale</Tag>
+                <Tag color="blue">{t("giftDetail.onSale")}</Tag>
               )}
             </Flex>
           </Flex>
@@ -306,7 +392,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           </div>
 
           <Flex vertical gap={8} className="w-full">
-            {canManage && (
+            {canManage && !currentUserBlocked && (
               <Flex
                 align="center"
                 justify="space-between"
@@ -315,34 +401,34 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               >
                 <Text type="secondary" style={{ fontSize: 13 }}>
                   {detail?.is_visible === 1
-                    ? "This gift is visible"
-                    : "This gift is hidden"}
+                    ? t("giftDetail.visible")
+                    : t("giftDetail.hidden")}
                 </Text>
                 <Text
                   className="!text-[var(--accent-150)]"
                   style={{ fontSize: 13 }}
                 >
-                  {detail?.is_visible === 1 ? "Hide from Profile" : "Show"} <RightOutlined style={{ fontSize: 10 }} />
+                  {detail?.is_visible === 1 ? t("giftDetail.hideFromProfile") : t("giftDetail.show")} <RightOutlined style={{ fontSize: 10 }} />
                 </Text>
               </Flex>
             )}
 
-            {canManage && !detail?.is_on_sale && !detail?.is_upgraded && (
+            {canManage && !currentUserBlocked && !detail?.is_on_sale && !detail?.is_upgraded && (
               <Popconfirm
-                title="Burn to Redeem"
+                title={t("giftDetail.burnToRedeem")}
                 description={
                   <Flex vertical gap={4}>
                     <Text>
-                      You will receive <Text strong style={{ color: "var(--color-primary)" }}>{burnRefundAmount} TON</Text>
+                      <Text strong style={{ color: "var(--color-primary)" }}>{t("giftDetail.burnRefundDescription", { amount: burnRefundAmount })}</Text>
                     </Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      ({burnRefundPercent}% of base price). This action cannot be undone.
+                      {t("giftDetail.burnRefundPercent", { percent: burnRefundPercent })}
                     </Text>
                   </Flex>
                 }
                 onConfirm={handleBurn}
-                okText="Burn"
-                cancelText="Cancel"
+                okText={t("giftDetail.burn")}
+                cancelText={t("common.cancel")}
                 okButtonProps={{ danger: true, loading: submitting }}
               >
                 <Button
@@ -352,12 +438,12 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                   icon={<FireOutlined />}
                   loading={submitting}
                 >
-                  Burn to Redeem - {burnRefundAmount} TON
+                  {t("giftDetail.burnButton", { amount: burnRefundAmount })}
                 </Button>
               </Popconfirm>
             )}
 
-            {canManage && hasModels && !detail?.is_upgraded && (
+            {canManage && !currentUserBlocked && hasModels && !detail?.is_upgraded && (
               <Button
                 type="primary"
                 size="large"
@@ -366,7 +452,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                 loading={submitting}
                 onClick={handleUpgrade}
               >
-                Upgrade - {upgradePriceAmount} TON
+                {t("giftDetail.upgrade", { amount: upgradePriceAmount })}
               </Button>
             )}
 
@@ -376,9 +462,9 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                 size="large"
                 block
                 icon={<TagOutlined />}
-                onClick={() => setIsListingFormOpen(true)}
+                onClick={handleOpenListingForm}
               >
-                List for Sale
+                {t("giftDetail.listForSale")}
               </Button>
             )}
 
@@ -390,11 +476,24 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                   precision={2}
                   value={listingPrice}
                   onChange={(value) => setListingPrice(typeof value === "number" ? value : null)}
-                  placeholder="Price"
+                  placeholder={t("giftDetail.price")}
                   addonAfter="TON"
                   size="large"
                   className="w-full"
                 />
+                {priceEstimateLoading ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {t("giftDetail.loadingRecommended")}
+                  </Text>
+                ) : recommendedPrice !== null ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {t("giftDetail.recommendedPrice", { price: recommendedPrice.toFixed(2) })}
+                  </Text>
+                ) : (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {t("giftDetail.noRecommendation")}
+                  </Text>
+                )}
                 <Flex gap={8}>
                   <Button
                     type="primary"
@@ -402,9 +501,9 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                     block
                     icon={<TagOutlined />}
                     loading={submitting}
-                    onClick={handleCreateListing}
-                  >
-                    Confirm
+                  onClick={handleCreateListing}
+                >
+                    {t("common.confirm")}
                   </Button>
                   <Button
                     size="large"
@@ -412,9 +511,10 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                     onClick={() => {
                       setIsListingFormOpen(false);
                       setListingPrice(null);
+                      setRecommendedPrice(null);
                     }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </Flex>
               </Flex>
@@ -429,11 +529,24 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                 loading={submitting}
                 onClick={handleCancelListing}
               >
-                Remove from Sale
+                {t("giftDetail.removeFromSale")}
               </Button>
             )}
 
-            {(!canManage || !hasModels) && (
+            {canBuyListedGift && (
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<TagOutlined />}
+                loading={submitting}
+                onClick={handleBuyListing}
+              >
+                {t("giftDetail.buyFor", { price: activeListingPriceLabel })}
+              </Button>
+            )}
+
+            {(!canManage || !hasModels) && !canBuyListedGift && (
               <Button
                 type="default"
                 size="large"
@@ -441,7 +554,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                 icon={<CheckOutlined />}
                 onClick={onClose}
               >
-                OK
+                {t("common.ok")}
               </Button>
             )}
           </Flex>

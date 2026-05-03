@@ -134,14 +134,16 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
         .where(CurrentOwner.owner_id == user.user_id)
     ) or 0
 
-    active_listings_count = db.scalar(
-        select(func.count())
-        .select_from(Listing)
-        .where(
-            Listing.seller_id == user.user_id,
-            Listing.status.has(ListingStatuses.status_name == "active"),
-        )
-    ) or 0
+    active_listings_count = 0
+    if user.is_active:
+        active_listings_count = db.scalar(
+            select(func.count())
+            .select_from(Listing)
+            .where(
+                Listing.seller_id == user.user_id,
+                Listing.status.has(ListingStatuses.status_name == "active"),
+            )
+        ) or 0
 
     sales_count = db.scalar(
         select(func.count())
@@ -156,7 +158,7 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
     native_balance = "0"
     token_balance = "0"
 
-    if user.wallet_address:
+    if user.is_active and user.wallet_address:
         try:
             native_balance = get_native_balance_eth(user.wallet_address)
         except Exception:
@@ -176,7 +178,7 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
         "tg_visibility": user.tg_visibility,
         "vk_visibility": user.vk_visibility,
         "wallet_address": user.wallet_address,
-        "profile_pic_url": user.profile_pic_url,
+        "profile_pic_url": user.profile_pic_url if user.is_active else None,
         "about_me": user.about_me,
         "is_active": user.is_active,
         "role": user.role.role_name if user.role else None,
@@ -198,7 +200,7 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
         raise ValueError(f"User with username={username} not found")
 
     token_balance = "0"
-    if user.wallet_address:
+    if user.is_active and user.wallet_address:
         try:
             token_balance = get_token_balance(user.wallet_address)
         except Exception:
@@ -218,16 +220,17 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
 
     present_ids = [p.present_id for p in presents]
 
-    active_listing_present_ids = set()
-    if present_ids:
-        active_listing_present_ids = set(
-            db.scalars(
-                select(Listing.present_id).where(
+    active_listing_by_present_id = {}
+    if user.is_active and present_ids:
+        active_listing_by_present_id = {
+            listing.present_id: listing
+            for listing in db.scalars(
+                select(Listing).where(
                     Listing.present_id.in_(present_ids),
                     Listing.status.has(ListingStatuses.status_name == "active"),
                 )
             ).all()
-        )
+        }
 
     user_albums = db.scalars(
         select(Album)
@@ -244,7 +247,7 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
         "vk_username": user.vk_username,
         "tg_visibility": user.tg_visibility,
         "vk_visibility": user.vk_visibility,
-        "profile_pic_url": user.profile_pic_url,
+        "profile_pic_url": user.profile_pic_url if user.is_active else None,
         "about_me": user.about_me,
         "is_active": user.is_active,
         "role": user.role.role_name if user.role else None,
@@ -266,7 +269,12 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
                 "generated_at": p.generated_at,
                 "model_id": p.model_id,
                 "is_visible": p.is_visible,
-                "is_on_sale": p.present_id in active_listing_present_ids,
+                "is_on_sale": p.present_id in active_listing_by_present_id,
+                "active_listing_price": (
+                    str(active_listing_by_present_id[p.present_id].price)
+                    if p.present_id in active_listing_by_present_id
+                    else None
+                ),
                 "original_sender_username": p.original_sender.username if p.original_sender else None,
                 "collection": {
                     "collection_id": p.collection.collection_id,

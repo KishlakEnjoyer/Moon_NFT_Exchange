@@ -1,6 +1,7 @@
 import { Avatar, Descriptions, Flex, Modal, Tag, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { Transaction, getProfileAvatarUrl } from "../services/transactionService";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -54,33 +55,33 @@ const getTransactionViewKind = (tx: Transaction, currentUserId: number): Transac
   return tx.buyer_id === currentUserId ? "purchase" : "sale";
 };
 
-const getViewTag = (kind: TransactionViewKind) => {
+const getViewTag = (kind: TransactionViewKind, t: (key: string) => string) => {
   switch (kind) {
     case "purchase":
-      return <Tag color="blue">Purchase</Tag>;
+      return <Tag color="blue">{t("transactions.purchase")}</Tag>;
     case "sale":
-      return <Tag color="green">Sale</Tag>;
+      return <Tag color="green">{t("transactions.sale")}</Tag>;
     case "received":
-      return <Tag color="purple">Received</Tag>;
+      return <Tag color="purple">{t("transactions.received")}</Tag>;
     case "upgrade":
-      return <Tag color="gold">Upgrade</Tag>;
+      return <Tag color="blue">{t("transactions.upgrade")}</Tag>;
     case "burn":
-      return <Tag color="volcano">Burn</Tag>;
+      return <Tag color="volcano">{t("transactions.burn")}</Tag>;
     default:
-      return <Tag>Transaction</Tag>;
+      return <Tag>{t("transactions.transaction")}</Tag>;
   }
 };
 
-const formatTypeLabel = (type: string) => {
+const formatTypeLabel = (type: string, t: (key: string) => string) => {
   switch (type.toLowerCase()) {
     case "purchase":
-      return "Collection purchase";
+      return t("transactions.collectionPurchase");
     case "marketplace":
-      return "Marketplace trade";
+      return t("transactions.marketplaceTrade");
     case "upgrade":
-      return "Gift upgrade";
+      return t("transactions.giftUpgrade");
     case "burn":
-      return "Burn";
+      return t("transactions.burn");
     default:
       return type;
   }
@@ -94,8 +95,9 @@ const renderUserValue = (
   fallbackId: number,
   navigate: ReturnType<typeof useNavigate>,
   onClose: () => void,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ) => {
-  const label = username || `User #${fallbackId}`;
+  const label = username || t("common.userFallback", { id: fallbackId });
 
   if (!username) {
     return <Text>{label}</Text>;
@@ -123,6 +125,7 @@ const TransactionDetailModal = ({
   currentUserId,
   onClose,
 }: TransactionDetailModalProps) => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   if (!transaction) {
@@ -136,48 +139,52 @@ const TransactionDetailModal = ({
     ? [
         {
           key: "purchased_by",
-          label: "Purchased By",
+          label: t("transactions.purchasedBy"),
           children: renderUserValue(
             transaction.seller_username,
             transaction.seller_profile_pic_url,
             transaction.seller_id,
             navigate,
             onClose,
+            t,
           ),
         },
         {
           key: "received_by",
-          label: "Received By",
+          label: t("transactions.receivedBy"),
           children: renderUserValue(
             transaction.buyer_username,
             transaction.buyer_profile_pic_url,
             transaction.buyer_id,
             navigate,
             onClose,
+            t,
           ),
         },
       ]
     : [
         {
           key: "buyer",
-          label: "Buyer",
+          label: t("transactions.buyer"),
           children: renderUserValue(
             transaction.buyer_username,
             transaction.buyer_profile_pic_url,
             transaction.buyer_id,
             navigate,
             onClose,
+            t,
           ),
         },
         {
           key: "seller",
-          label: "Seller",
+          label: t("transactions.seller"),
           children: renderUserValue(
             transaction.seller_username,
             transaction.seller_profile_pic_url,
             transaction.seller_id,
             navigate,
             onClose,
+            t,
           ),
         },
       ];
@@ -189,13 +196,13 @@ const TransactionDetailModal = ({
       footer={null}
       width="min(640px, calc(100vw - 24px))"
       zIndex={1100}
-      title={<Title level={4} className="!mb-0">Transaction Details</Title>}
+      title={<Title level={4} className="!mb-0">{t("transactions.detailsTitle")}</Title>}
     >
       <Flex vertical gap={16} className="mt-4">
         <Flex justify="space-between" align="center" gap={12} wrap="wrap">
-          <Text type="secondary">Transaction #{transaction.transaction_id}</Text>
+          <Text type="secondary">{t("transactions.transactionNumber", { id: transaction.transaction_id })}</Text>
           <Flex gap={8} wrap="wrap">
-            {getViewTag(kind)}
+            {getViewTag(kind, t)}
             <Tag color={getStatusColor(transaction.transaction_status)}>
               {transaction.transaction_status}
             </Tag>
@@ -209,50 +216,50 @@ const TransactionDetailModal = ({
           items={[
             {
               key: "type",
-              label: "Source Type",
-              children: formatTypeLabel(transaction.transaction_type),
+              label: t("transactions.sourceType"),
+              children: formatTypeLabel(transaction.transaction_type, t),
             },
             {
               key: "collection",
-              label: "Collection",
+              label: t("transactions.collection"),
               children: transaction.collection_name,
             },
             {
               key: "present",
-              label: "Present",
+              label: t("transactions.present"),
               children: `#${transaction.present_id}`,
             },
             ...participantItems,
             {
               key: "price",
-              label: "Price",
+              label: t("transactions.price"),
               children: formatAmount(transaction.transaction_price),
             },
             {
               key: "platform_fee",
-              label: "Platform Fee",
+              label: t("transactions.platformFee"),
               children: formatAmount(transaction.platform_fee),
             },
             {
               key: "seller_received",
-              label: "Seller Received",
+              label: t("transactions.sellerReceived"),
               children: formatAmount(transaction.seller_received),
             },
             {
               key: "tx_hash",
-              label: "Blockchain Tx Hash",
+              label: t("transactions.txHash"),
               children: transaction.blockchain_tx_hash ? (
                 <Text code copyable className="break-all">
                   {transaction.blockchain_tx_hash}
                 </Text>
               ) : (
-                "Not available"
+                t("transactions.notAvailable")
               ),
             },
             {
               key: "date",
-              label: "Date",
-              children: new Date(transaction.transaction_date).toLocaleString(),
+              label: t("transactions.date"),
+              children: new Date(transaction.transaction_date).toLocaleString(i18n.language),
             },
           ]}
         />

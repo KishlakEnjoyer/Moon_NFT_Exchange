@@ -3,8 +3,12 @@ import { ApiListing, formatTonPrice, getPresentImageUrl, getSellerAvatarUrl } fr
 import TONIcon from "./icons/TONIcon";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCartOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { getPriceEstimate } from "../services/presentService";
+import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
+const MARKET_TOLERANCE = 0.05;
 
 interface ModalPresentDetailProps {
   open: boolean;
@@ -28,6 +32,53 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
   buying,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [marketStatusKey, setMarketStatusKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !item) {
+      setMarketStatusKey(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMarketStatusKey(null);
+
+    getPriceEstimate(item.present_id)
+      .then((estimate) => {
+        if (cancelled) return;
+
+        const avgPrice = Number(estimate.avg_price);
+        const listingPrice = Number(item.price);
+
+        if (!Number.isFinite(avgPrice) || avgPrice <= 0 || !Number.isFinite(listingPrice)) {
+          setMarketStatusKey("listing.marketPrice");
+          return;
+        }
+
+        if (listingPrice > avgPrice * (1 + MARKET_TOLERANCE)) {
+          setMarketStatusKey("listing.aboveMarket");
+          return;
+        }
+
+        if (listingPrice < avgPrice * (1 - MARKET_TOLERANCE)) {
+          setMarketStatusKey("listing.belowMarket");
+          return;
+        }
+
+        setMarketStatusKey("listing.marketPrice");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMarketStatusKey("listing.marketPrice");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item]);
+
   if (!item) return null;
 
   const price = formatTonPrice(item.price, true);
@@ -42,7 +93,7 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
 
   const attributes = [
     {
-      key: 'Owner',
+      key: t("listing.owner"),
       value: (
         <Flex
           align="center"
@@ -55,19 +106,23 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
             src={getSellerAvatarUrl(item.seller_profile_pic_url)}
             className="shrink-0 border border-solid border-[var(--black-transparent)]"
           />
-          <Text className="!text-[var(--accent-150)] max-w-[150px]" ellipsis={{ tooltip: item.seller_username || 'Unknown' }}>
-            {item.seller_username || 'Unknown'}
+          <Text className="!text-[var(--accent-150)] max-w-[150px]" ellipsis={{ tooltip: item.seller_username || t("common.unknown") }}>
+            {item.seller_username || t("common.unknown")}
           </Text>
         </Flex>
       ),
     },
     {
-      key: 'Model',
+      key: t("listing.model"),
       value: item.model_name || '-',
     },
     {
-      key: 'Symbol',
+      key: t("listing.symbol"),
       value: item.symbol_name || '-',
+    },
+    {
+      key: t("listing.market"),
+      value: marketStatusKey ? t(marketStatusKey) : t("listing.checkingMarket"),
     },
   ];
 
@@ -132,7 +187,7 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
             disabled={isOwnListing}
             onClick={() => onBuy?.(item.listing_id)}
           >
-            <span className="block min-w-0 truncate">{price} TON - Buy</span>
+            <span className="block min-w-0 truncate">{t("listing.buyFor", { price })}</span>
           </Button>
           <Button 
             type="default" 

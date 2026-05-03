@@ -1,6 +1,8 @@
-import { Avatar, Button, Flex, Image, Input, Modal, message, Typography } from "antd";
+import { UserOutlined } from "@ant-design/icons";
+import { Avatar, Button, Flex, Image, Input, Modal, Tag, message, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { authFetch } from "../services/auth";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -19,6 +21,7 @@ interface UserOption {
   user_id: number;
   username: string;
   profile_pic_url: string | null;
+  is_active: number;
 }
 
 interface SendGiftModalProps {
@@ -30,6 +33,7 @@ interface SendGiftModalProps {
 }
 
 const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: SendGiftModalProps) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
 
   const [step, setStep] = useState<"user" | "collection">("user");
@@ -79,7 +83,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
       .then((res) => res.json())
       .then((data) => setCollections(Array.isArray(data) ? data : []))
       .catch(() => {
-        messageApi.error("Failed to load collections");
+        messageApi.error(t("sendGift.failedLoadCollections"));
         setCollections([]);
       });
   };
@@ -92,6 +96,11 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
   }, [searchQuery, step, senderId]);
 
   const handleUserSelect = (userId: number) => {
+    const user = users.find((item) => item.user_id === userId);
+    if (user?.is_active === 0) {
+      return;
+    }
+
     setSelectedUserId(userId);
     setStep("collection");
     loadCollections();
@@ -116,18 +125,18 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.detail || "Failed to send gift");
+        throw new Error(error.detail || t("sendGift.failedSendGift"));
       }
 
       const data = await res.json();
       const newBalance = data.new_balance ? parseFloat(data.new_balance) : undefined;
 
-      messageApi.success("Gift sent successfully!");
+      messageApi.success(t("sendGift.sent"));
       onSent(newBalance);
       onClose();
     } catch (error) {
       console.error("Failed to send gift:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to send gift");
+      messageApi.error(error instanceof Error ? error.message : t("sendGift.failedSendGift"));
     } finally {
       setIsSending(false);
     }
@@ -135,6 +144,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
 
   const selectedUser = users.find((u) => u.user_id === selectedUserId);
   const selectedCollection = collections.find((c) => c.id === selectedCollectionId);
+  const selectedUserBlocked = selectedUser?.is_active === 0;
 
   const collectionImage = (url: string | null | undefined) => {
     if (!url) return `${process.env.REACT_APP_IMAGES_URL}/collections/placeholder.png`;
@@ -151,34 +161,34 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
           <Flex justify="space-between" gap={8} wrap="wrap">
             {step === "collection" && (
               <Button onClick={() => setStep("user")} className="!bg-[var(--liquid-glass-bg)]">
-                Back
+                {t("common.back")}
               </Button>
             )}
             <Flex justify="flex-end" gap={8} className="flex-1" wrap="wrap">
               <Button onClick={onClose} className="!bg-[var(--liquid-glass-bg)]">
-                Cancel
+                {t("common.cancel")}
               </Button>
-              {step === "collection" && selectedCollectionId && (
+              {step === "collection" && selectedCollectionId && !selectedUserBlocked && (
                 <Button
                   type="primary"
                   onClick={handleSend}
                   loading={isSending}
                 >
-                  Send Gift {selectedCollection && `(${selectedCollection.base_price} TON)`}
+                  {selectedCollection ? t("sendGift.sendGiftPrice", { price: selectedCollection.base_price }) : t("sendGift.sendGift")}
                 </Button>
               )}
             </Flex>
           </Flex>
         }
         width="min(560px, calc(100vw - 24px))"
-        title={<Title level={4} className="!mb-0">Send Gift</Title>}
+        title={<Title level={4} className="!mb-0">{t("sendGift.title")}</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
           {step === "user" && (
             <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-              <Text strong className="block mb-3">Select a user to send a gift to</Text>
+              <Text strong className="block mb-3">{t("sendGift.selectUser")}</Text>
               <Input.Search
-                placeholder="Search users..."
+                placeholder={t("sendGift.searchUsers")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="mb-4"
@@ -187,36 +197,35 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
               <Flex vertical gap={8} className="max-h-64 overflow-y-auto moon-mobile-scroll">
                 {users.map((user) => {
                   const isSelf = user.user_id === senderId;
+                  const isBlocked = user.is_active === 0;
                   return (
                     <Flex
                       key={user.user_id}
                       align="center"
                       gap={12}
-                      className={`min-w-0 cursor-pointer rounded-[var(--size-smm)] p-3 transition-colors ${isSelf ? 'bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]' : 'hover:bg-[var(--black-transparent-05)]'}`}
+                      className={`min-w-0 rounded-[var(--size-smm)] p-3 transition-colors ${isBlocked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${isSelf ? 'bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]' : isBlocked ? '' : 'hover:bg-[var(--black-transparent-05)]'}`}
                       onClick={() => handleUserSelect(user.user_id)}
                     >
                       <Avatar
                         size={40}
-                        src={
-                          user.profile_pic_url
-                            ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`
-                            : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
-                        }
+                        src={isBlocked || !user.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`}
+                        icon={isBlocked || !user.profile_pic_url ? <UserOutlined /> : undefined}
                       />
                       <Flex vertical className="min-w-0">
                         <Text strong ellipsis={{ tooltip: user.username }}>{user.username}</Text>
                         {isSelf && (
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            Gift yourself
+                            {t("sendGift.giftYourself")}
                           </Text>
                         )}
+                        {isBlocked && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
                       </Flex>
                     </Flex>
                   );
                 })}
                 {users.length === 0 && (
                   <Text type="secondary" className="text-center py-4">
-                    No users found
+                    {t("sendGift.noUsers")}
                   </Text>
                 )}
               </Flex>
@@ -227,24 +236,22 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
             <>
               {selectedUserId && (
                 <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-                  <Text strong className="block mb-2">Recipient</Text>
+                  <Text strong className="block mb-2">{t("sendGift.recipient")}</Text>
                   <Flex align="center" gap={12}>
                     <Avatar
                       size={32}
-                      src={
-                        selectedUser?.profile_pic_url
-                          ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${selectedUser.profile_pic_url}`
-                          : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
-                      }
+                      src={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${selectedUser.profile_pic_url}`}
+                      icon={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? <UserOutlined /> : undefined}
                     />
-                    <Text>{selectedUser?.username || `User #${selectedUserId}`}</Text>
+                    <Text>{selectedUser?.username || t("common.userFallback", { id: selectedUserId })}</Text>
+                    {selectedUserBlocked && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
                   </Flex>
                 </div>
               )}
 
               {!selectedCollectionId ? (
                 <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-                  <Text strong className="block mb-3">Select a collection</Text>
+                  <Text strong className="block mb-3">{t("sendGift.selectCollection")}</Text>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1 moon-mobile-scroll">
                     {collections.map((col) => (
                       <div
@@ -273,7 +280,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                   </div>
                   {collections.length === 0 && (
                     <Text type="secondary" className="text-center py-4 block">
-                      No collections available
+                      {t("sendGift.noCollections")}
                     </Text>
                   )}
                 </div>
@@ -302,14 +309,14 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                         onClick={() => setSelectedCollectionId(null)}
                       >
                       <Text type="secondary" className="text-xs hover:text-[var(--liquid-glass-fg)] transition-colors">
-                        Change collection
+                        {t("sendGift.changeCollection")}
                       </Text>
                     </div>
                     </Flex>
                   </div>
 
                   <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-6">
-                    <Text strong className="block mb-2">Message (optional)</Text>
+                    <Text strong className="block mb-2">{t("sendGift.messageOptional")}</Text>
                     <TextArea
                       value={description}
                       maxLength={100}
@@ -317,7 +324,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                         formatter: ({ count }) => `${count} / ${MAX_DESCRIPTION_LENGTH}`,
                       }}
                       rows={3}
-                      placeholder="Write a message..."
+                      placeholder={t("sendGift.writeMessage")}
                       onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
                     />
                   </div>

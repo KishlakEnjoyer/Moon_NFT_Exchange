@@ -11,6 +11,14 @@ export interface AppNotification {
   created_at: string;
 }
 
+const NOTIFICATION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+const isRecentNotification = (notification: AppNotification) => {
+  const createdAt = new Date(notification.created_at).getTime();
+  if (!Number.isFinite(createdAt)) return false;
+  return Date.now() - createdAt <= NOTIFICATION_PERIOD_MS;
+};
+
 export function useNotifications(userId: number | null, onGiftReceived?: () => void) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
@@ -18,7 +26,7 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
     if (!userId) return;
     authFetch(`${process.env.REACT_APP_API_URL}/notifications/${userId}`)
       .then(r => r.json())
-      .then(data => setNotifications(data))
+      .then(data => setNotifications(Array.isArray(data) ? data.filter(isRecentNotification) : []))
       .catch(() => {});
   }, [userId]);
 
@@ -33,7 +41,11 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
 
     ws.onmessage = (event) => {
       const notification: AppNotification = JSON.parse(event.data);
-      setNotifications(prev => [notification, ...prev]);
+      setNotifications(prev => (
+        isRecentNotification(notification)
+          ? [notification, ...prev].filter(isRecentNotification)
+          : prev.filter(isRecentNotification)
+      ));
       if (notification.type === "gift_received" && onGiftReceived) {
         onGiftReceived();
       }

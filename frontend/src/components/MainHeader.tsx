@@ -1,13 +1,15 @@
 import { Header } from "antd/es/layout/layout";
 import {
   Avatar, Badge, Button, Dropdown, Flex, List,
-  MenuProps, Popover, Typography, theme,
+  MenuProps, Popover, Typography, message, theme,
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import {
   BellOutlined,
+  ControlOutlined,
+  GlobalOutlined,
   LogoutOutlined,
   MoonOutlined,
   PlusOutlined,
@@ -24,7 +26,8 @@ import { useBalanceSocket } from "../hooks/useBalanceSocket";
 import { useNotifications } from "../hooks/useNotifications";
 import PeopleSearchModal from "./PeopleSearchModal";
 import QrModal from "./QrModal";
-import { clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
+import { BLOCKED_ACCOUNT_MESSAGE, authFetch, clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
+import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
 type AuthProvider = "tg" | "vk";
@@ -52,6 +55,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   onAuthFail,
   onLogout,
 }) => {
+  const { t, i18n } = useTranslation();
+  const [messageApi, contextHolder] = message.useMessage();
   const pollingRef = useRef<number | null>(null);
   const initAbortRef = useRef<AbortController | null>(null);
   const authAttemptRef = useRef(0);
@@ -73,9 +78,10 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const currentUserBlocked = currentUser.is_active === 0;
 
   const { notifications, unreadCount, markAllRead } = useNotifications(
-    isAuthenticated ? (currentUser.user_id ?? null) : null
+    isAuthenticated && currentUser.is_active !== 0 ? (currentUser.user_id ?? null) : null
   );
 
   const clearPolling = () => {
@@ -126,7 +132,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
         if (data.status === "confirmed") {
           if (!data.access_token) {
-            throw new Error("Missing access token");
+            throw new Error(t("editProfile.missingToken"));
           }
 
           clearPolling();
@@ -137,7 +143,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           setIsAuthenticated(true);
           setQrModalOpen(false);
           window.dispatchEvent(new Event("storage"));
-          onAuthSuccess?.();
+          if (data.user?.is_active === 0) {
+            messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+            window.dispatchEvent(new Event("accountBlocked"));
+            onAuthFail?.();
+          } else {
+            onAuthSuccess?.();
+          }
           return;
         }
 
@@ -253,6 +265,22 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     if (getAccessToken()) {
       setIsAuthenticated(true);
       setCurrentUser(getStoredCurrentUser());
+      void authFetch(`${process.env.REACT_APP_API_URL}/auth/me`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((user) => {
+          if (!user) return;
+          const current = getStoredCurrentUser();
+          const updated = { ...current, ...user, balance: user.balance ?? current.balance ?? 0 };
+          localStorage.setItem("currentUser", JSON.stringify(updated));
+          setCurrentUser(updated);
+          setBalance(updated.balance ?? 0);
+          window.dispatchEvent(new Event("storage"));
+          if (updated.is_active === 0) {
+            messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+            window.dispatchEvent(new Event("accountBlocked"));
+          }
+        })
+        .catch(() => undefined);
     } else if (localStorage.getItem("isAuth") === "true" || getStoredCurrentUser().user_id) {
       clearAuthSession();
       setCurrentUser({});
@@ -273,7 +301,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         initAbortRef.current = null;
       }
     };
-  }, []);
+  }, [messageApi]);
 
   useEffect(() => {
     const syncCurrentUser = () => {
@@ -282,14 +310,22 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       setBalance(updatedUser.balance ?? 0);
       setIsAuthenticated(Boolean(getAccessToken()));
     };
+    const handleAccountBlocked = () => {
+      syncCurrentUser();
+      messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+    };
 
     window.addEventListener("storage", syncCurrentUser);
+    window.addEventListener("accountBlocked", handleAccountBlocked);
 
-    return () => window.removeEventListener("storage", syncCurrentUser);
-  }, []);
+    return () => {
+      window.removeEventListener("storage", syncCurrentUser);
+      window.removeEventListener("accountBlocked", handleAccountBlocked);
+    };
+  }, [messageApi]);
 
   useBalanceSocket(
-    isAuthenticated ? currentUser.user_id : null,
+    isAuthenticated && !currentUserBlocked ? currentUser.user_id : null,
     (newBalance) => {
       setBalance(newBalance);
       const updated = { ...getStoredCurrentUser(), balance: newBalance };
@@ -339,16 +375,37 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     onLogout?.();
   };
 
+  const handleToggleLanguage = () => {
+    void i18n.changeLanguage(i18n.language.startsWith("ru") ? "en" : "ru");
+  };
+
+  const currentRoleName = String(currentUser.role_name || currentUser.role || "").toLowerCase();
+  const canOpenAdmin =
+    [2, 3].includes(Number(currentUser.role_id)) ||
+    ["manager", "moderator", "admin", "administrator", "менеджер", "модератор", "администратор"].includes(currentRoleName);
+
   const dropdownItems: MenuProps["items"] = [
     {
       key: "profile",
-      label: "Profile",
+      label: t("header.profile"),
       icon: <UserOutlined />,
       onClick: () => navigate(`/account/${currentUser.username}`),
     },
+    ...(canOpenAdmin ? [{
+      key: "admin",
+      label: "Админ-панель",
+      icon: <ControlOutlined />,
+      onClick: () => navigate("/admin"),
+    }] : []),
+    {
+      key: "language",
+      label: i18n.language.startsWith("ru") ? t("common.english") : t("common.russian"),
+      icon: <GlobalOutlined />,
+      onClick: handleToggleLanguage,
+    },
     {
       key: "logout",
-      label: "Log out",
+      label: t("header.logout"),
       icon: <LogoutOutlined />,
       danger: true,
       onClick: handleLogout,
@@ -361,12 +418,12 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   }).format(Number.isFinite(balance) ? balance : 0);
 
   const notificationsContent = (
-    <div style={{ width: "min(320px, calc(100vw - 32px))" }}>
+    <div style={{ width: "min(360px, calc(100vw - 32px))" }}>
       <Flex justify="space-between" align="center" className="mb-2">
-        <Text strong>Notifications</Text>
+        <Text strong>{t("header.notifications")}</Text>
         {unreadCount > 0 && (
           <Button type="link" size="small" onClick={markAllRead}>
-            Mark all as read
+            {t("header.markAllAsRead")}
           </Button>
         )}
       </Flex>
@@ -374,32 +431,42 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       {notifications.length === 0 ? (
         <Flex vertical align="center" className="py-8 gap-2">
           <SmileOutlined className="text-3xl text-gray-400" rotate={180} />
-          <Text className="text-gray-400">No notifications yet</Text>
+          <Text className="text-gray-400">{t("header.noNotifications")}</Text>
         </Flex>
       ) : (
-        <List
-          dataSource={notifications.slice(0, 20)}
-          renderItem={(item) => (
-            <List.Item
-              className={`!px-2 !py-2 rounded ${item.is_read === 0 ? "bg-blue-500/10" : ""}`}
-            >
-              <Flex vertical gap={2}>
-                <Text className={item.is_read === 0 ? "font-semibold" : ""}>
-                  {item.description ?? item.type}
-                </Text>
-                <Text className="text-xs text-gray-400">
-                  {new Date(item.created_at).toLocaleString()}
-                </Text>
-              </Flex>
-            </List.Item>
-          )}
-        />
+        <div
+          className="moon-mobile-scroll"
+          style={{
+            maxHeight: "min(420px, calc(100vh - 180px))",
+            overflowY: "auto",
+            paddingRight: 4,
+          }}
+        >
+          <List
+            dataSource={notifications}
+            renderItem={(item) => (
+              <List.Item
+                className={`!px-2 !py-2 rounded ${item.is_read === 0 ? "bg-blue-500/10" : ""}`}
+              >
+                <Flex vertical gap={2} className="min-w-0">
+                  <Text className={`${item.is_read === 0 ? "font-semibold" : ""} whitespace-normal break-words`}>
+                    {item.description ?? item.type}
+                  </Text>
+                  <Text className="text-xs text-gray-400">
+                    {new Date(item.created_at).toLocaleString(i18n.language)}
+                  </Text>
+                </Flex>
+              </List.Item>
+            )}
+          />
+        </div>
       )}
     </div>
   );
 
   return (
     <Header className="w-full h-auto py-2 sm:py-[var(--size-base)] px-3 sm:px-4 lg:px-[var(--size-4xl)] flex flex-wrap justify-between items-center gap-2 bg-transparent">
+      {contextHolder}
       <div
         className="flex min-w-0 items-center gap-2 sm:gap-[var(--size-base)] cursor-pointer"
         onClick={handleHomeClick}
@@ -442,7 +509,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               disabled={isConnecting}
             >
               <span className="truncate">
-                {isConnecting ? "Connecting..." : hasPendingAuth ? "Continue Login" : "Connect"}
+                {isConnecting ? t("header.connecting") : hasPendingAuth ? t("header.continueLogin") : t("header.connect")}
               </span>
               {authProvider === "vk" ? (
                 <Avatar src="/icons/vk-icon-png.png" alt="VK" />
@@ -459,9 +526,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
             <Dropdown menu={{ items: dropdownItems }} trigger={["hover"]}>
               <Avatar
                 size="large"
-                src={`${process.env.REACT_APP_IMAGES_URL}/pfps/${
-                  currentUser.profile_pic_url ? currentUser.profile_pic_url : "example_user.png"
-                }`}
+                src={currentUserBlocked || !currentUser.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${currentUser.profile_pic_url}`}
+                icon={currentUserBlocked || !currentUser.profile_pic_url ? <UserOutlined /> : undefined}
                 className="border-solid border-gray-500"
               />
             </Dropdown>
@@ -503,19 +569,19 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               icon={<PlusOutlined />}
               iconPlacement={"end"}
               size="large"
-              title={`${balance} TON`}
+              title={currentUserBlocked ? "Баланс заморожен" : `${balance} TON`}
+              disabled={currentUserBlocked}
               onClick={() => {
                 window.open(`https://t.me/moon_exchange_bot`, "_blank", "noopener,noreferrer");
               }}
             >
-              <span className="hidden sm:inline">{balanceLabel}</span>
+              <span className="hidden sm:inline">{currentUserBlocked ? "Заморожен" : balanceLabel}</span>
               <TONIcon />
             </Button>
           </div>
         )}
       </div>
 
-      {/* QR Auth Modal */}
       <QrModal
         open={qrModalOpen}
         onClose={() => setQrModalOpen(false)}

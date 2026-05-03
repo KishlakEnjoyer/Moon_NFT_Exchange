@@ -48,9 +48,15 @@ def get_cart(
         return CartResponse(user_id=current_user.user_id, items=[], total="0")
 
     listing_ids = [ci.listing_id for ci in cart_items]
-    listings = db.query(ActiveListingsView).filter(
-        ActiveListingsView.listing_id.in_(listing_ids)
-    ).all()
+    listings = (
+        db.query(ActiveListingsView)
+        .join(User, ActiveListingsView.seller_id == User.user_id)
+        .filter(
+            ActiveListingsView.listing_id.in_(listing_ids),
+            User.is_active == 1,
+        )
+        .all()
+    )
     listing_by_id = {listing.listing_id: listing for listing in listings}
     present_ids = [listing.present_id for listing in listings]
     present_num_by_id = {}
@@ -95,9 +101,15 @@ def add_to_cart(
     if req.user_id is not None and req.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Cannot modify another user's cart")
 
-    listing = db.query(ActiveListingsView).filter(
-        ActiveListingsView.listing_id == req.listing_id
-    ).first()
+    listing = (
+        db.query(ActiveListingsView)
+        .join(User, ActiveListingsView.seller_id == User.user_id)
+        .filter(
+            ActiveListingsView.listing_id == req.listing_id,
+            User.is_active == 1,
+        )
+        .first()
+    )
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 

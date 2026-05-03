@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ApiListing, getActiveListings, addToCart, CartItem, getCart, buyListing } from "../services/listingService";
 import ModalPresentDetail from "../components/ModalPresentDetail";
 import { message } from "antd";
+import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
 
@@ -43,6 +44,7 @@ const updateStoredBalance = (newBalance: string | null) => {
 };
 
 const MainView = () => {
+  const { t } = useTranslation();
   useDocumentTitle("Moon Exchange - Home");
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -53,7 +55,9 @@ const MainView = () => {
   const [buyingListingId, setBuyingListingId] = useState<number | null>(null);
   const [listingFilters, setListingFilters] = useState<FilterState>(DEFAULT_LISTING_FILTERS);
 
-  const currentUserId = getStoredCurrentUser().user_id;
+  const currentUser = getStoredCurrentUser();
+  const currentUserId = currentUser.user_id;
+  const currentUserBlocked = currentUser.is_active === 0;
 
   const loadCart = useCallback(async () => {
     if (!currentUserId) return;
@@ -72,11 +76,11 @@ const MainView = () => {
       setListings(data);
     } catch (e: any) {
       setListings([]);
-      messageApi.error(e.message || "Failed to load listings");
+      messageApi.error(e.message || t("marketplace.failedLoadListings"));
     } finally {
       setLoading(false);
     }
-  }, [listingFilters, messageApi]);
+  }, [listingFilters, messageApi, t]);
 
   useEffect(() => {
     loadListings();
@@ -95,21 +99,29 @@ const MainView = () => {
 
   const handleAddToCart = async (listingId: number) => {
     if (!currentUserId) {
-      messageApi.warning("Please log in to add items to cart");
+      messageApi.warning(t("marketplace.loginAddCart"));
+      return;
+    }
+    if (currentUserBlocked) {
+      messageApi.error("Аккаунт заблокирован");
       return;
     }
     try {
       await addToCart(currentUserId, listingId);
       await loadCart();
-      messageApi.success("Added to cart");
+      messageApi.success(t("marketplace.addedToCart"));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to add to cart");
+      messageApi.error(e.message || t("marketplace.failedAddCart"));
     }
   };
 
   const handleBuyListing = async (listingId: number) => {
     if (!currentUserId) {
-      messageApi.warning("Please log in to buy lots");
+      messageApi.warning(t("marketplace.loginBuyLots"));
+      return;
+    }
+    if (currentUserBlocked) {
+      messageApi.error("Аккаунт заблокирован");
       return;
     }
 
@@ -122,9 +134,9 @@ const MainView = () => {
       if (selectedPresent?.listing_id === listingId) {
         setSelectedPresent(null);
       }
-      messageApi.success(`Purchased for ${parseFloat(result.price).toFixed(2)} TON`);
+      messageApi.success(t("marketplace.purchasedFor", { price: parseFloat(result.price).toFixed(2) }));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to buy lot");
+      messageApi.error(e.message || t("marketplace.failedBuyLot"));
     } finally {
       setBuyingListingId(null);
     }
@@ -153,7 +165,7 @@ const MainView = () => {
               styles={{ image: { height: 100 } }}
               description={
                 <Text type="secondary" style={{ fontSize: "var(--size-lg)" }}>
-                  No lots available
+                  {t("marketplace.noLots")}
                 </Text>
               }
             />

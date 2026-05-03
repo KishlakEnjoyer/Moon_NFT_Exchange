@@ -82,6 +82,9 @@ def transfer_tokens_to_user_by_wallet_address(db: Session, wallet_address, amoun
     if not user:
         raise ValueError("User not found")
 
+    if not user.is_active:
+        raise ValueError("User account is blocked")
+
     if not user.wallet_address:
         raise ValueError("User wallet not found")
 

@@ -2,6 +2,7 @@ import { Button, Flex, Modal, Radio, message, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { FlagOutlined } from "@ant-design/icons";
 import { authFetch } from "../services/auth";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -18,6 +19,7 @@ interface ReportModalProps {
 }
 
 const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [reportTypes, setReportTypes] = useState<ReportTypeOption[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
@@ -29,14 +31,14 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
     fetch(`${process.env.REACT_APP_API_URL}/reports/types`)
       .then((res) => res.json())
       .then((data) => setReportTypes(data))
-      .catch(() => messageApi.error("Failed to load report types"));
+      .catch(() => messageApi.error(t("report.failedLoadTypes")));
 
     setSelectedTypeId(null);
-  }, [open, messageApi]);
+  }, [open, messageApi, t]);
 
   const handleSubmit = async () => {
     if (!selectedTypeId) {
-      messageApi.warning("Please select a report reason");
+      messageApi.warning(t("report.selectReason"));
       return;
     }
 
@@ -55,14 +57,14 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.detail || "Failed to submit report");
+        throw new Error(error.detail || t("report.failedSubmit"));
       }
 
-      messageApi.success("Report submitted");
+      messageApi.success(t("report.submitted"));
       onClose();
     } catch (error) {
       console.error("Failed to submit report:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to submit report");
+      messageApi.error(error instanceof Error ? error.message : t("report.failedSubmit"));
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +79,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
         footer={
           <Flex justify="flex-end" gap={8} wrap="wrap">
             <Button onClick={onClose} className="!bg-[var(--liquid-glass-bg)]">
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="primary"
@@ -86,7 +88,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
               loading={isSubmitting}
               disabled={!selectedTypeId}
             >
-              Submit Report
+              {t("report.submit")}
             </Button>
           </Flex>
         }
@@ -94,13 +96,13 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
         title={
           <Flex align="center" gap={8}>
             <FlagOutlined />
-            <Title level={4} className="!mb-0">Report User</Title>
+            <Title level={4} className="!mb-0">{t("report.title")}</Title>
           </Flex>
         }
       >
         <Flex vertical gap={16} className="mt-4">
           <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-            <Text strong className="block mb-3">Reason for report</Text>
+            <Text strong className="block mb-3">{t("report.reason")}</Text>
             <Radio.Group
               value={selectedTypeId}
               onChange={(e) => setSelectedTypeId(e.target.value)}

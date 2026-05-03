@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routers.price_estimate_router import price_estimate_router
 from routers.nsfw_detector_router import nsfw_detector_router
 from routers.auth_router import auth_router
 from routers.blockchain_debug_router import blockchain_debug_router
@@ -16,6 +17,7 @@ from routers.cart_router import cart_router
 from routers.transactions_router import transactions_router  
 from routers.presents_router import presents_router
 from routers.generation_image_router import image_generator_router  
+from routers.admin_router import admin_router
 from dotenv import load_dotenv
 import os
 
@@ -51,3 +53,5 @@ app.include_router(transactions_router)
 app.include_router(presents_router)
 app.include_router(image_generator_router)
 app.include_router(nsfw_detector_router)
+app.include_router(price_estimate_router)
+app.include_router(admin_router)

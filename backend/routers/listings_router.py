@@ -181,7 +181,11 @@ def get_active_listings(
     if price_min is not None and price_max is not None and price_min > price_max:
         raise HTTPException(status_code=400, detail="price_min cannot be greater than price_max")
 
-    query = db.query(ActiveListingsView)
+    query = (
+        db.query(ActiveListingsView)
+        .join(User, ActiveListingsView.seller_id == User.user_id)
+        .filter(User.is_active == 1)
+    )
     needs_present_join = bool(model_id_values or background_id_values or symbol_id_values)
 
     if needs_present_join:

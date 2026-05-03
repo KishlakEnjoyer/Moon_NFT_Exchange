@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, Modal, Spin, Typography } from "antd";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type AuthProvider = "tg" | "vk";
 
@@ -31,6 +32,7 @@ export const QrModal: React.FC<QrModalProps> = ({
   onTimeout,
   onSelectProvider,
 }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState<number>(AUTH_TIMEOUT_MS);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export const QrModal: React.FC<QrModalProps> = ({
       return (
         <Flex vertical align="center" gap={12} className="py-8">
           <Spin size="large" />
-          <Text type="secondary">Preparing authorization...</Text>
+          <Text type="secondary">{t("auth.preparing")}</Text>
         </Flex>
       );
     }
@@ -77,8 +79,8 @@ export const QrModal: React.FC<QrModalProps> = ({
     if (!authLink && provider === "tg") {
       return (
         <Alert
-          message="Authorization error"
-          description="Unable to generate Telegram login link."
+          message={t("auth.error")}
+          description={t("auth.tgLinkError")}
           type="error"
           showIcon
         />
@@ -88,8 +90,8 @@ export const QrModal: React.FC<QrModalProps> = ({
     if (!stateValue) {
       return (
         <Alert
-          message="Authorization error"
-          description="Unable to generate login state."
+          message={t("auth.error")}
+          description={t("auth.stateError")}
           type="error"
           showIcon
         />
@@ -108,7 +110,7 @@ export const QrModal: React.FC<QrModalProps> = ({
           />
 
           <Text className="text-center text-gray-500">
-            Scan the QR code in Telegram or open the bot directly.
+            {t("auth.tgQrHint")}
           </Text>
 
           <Button
@@ -117,7 +119,7 @@ export const QrModal: React.FC<QrModalProps> = ({
             onClick={handleOpenLink}
             size="large"
           >
-            Open Telegram
+            {t("auth.openTelegram")}
           </Button>
         </Flex>
       );
@@ -126,16 +128,16 @@ export const QrModal: React.FC<QrModalProps> = ({
     return (
       <Flex vertical align="center" gap={16} className="w-full">
         <Title level={5} className="!mb-0">
-          VK login
+          {t("auth.vkLogin")}
         </Title>
 
         <Text className="text-center text-gray-500">
-          Open the VK bot and send the state below.
+          {t("auth.vkHint")}
         </Text>
 
         <div className="w-full rounded-xl border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-4 py-4 text-center">
           <Text type="secondary" className="block mb-2">
-            State
+            {t("auth.state")}
           </Text>
           <Paragraph copyable={{ text: stateValue }} className="!mb-0 !font-mono !text-base break-all">
             {stateValue}
@@ -153,7 +155,7 @@ export const QrModal: React.FC<QrModalProps> = ({
           onClick={handleOpenLink}
           size="large"
         >
-          Open VK Bot
+          {t("auth.openVkBot")}
         </Button>
       </Flex>
     );
@@ -167,7 +169,7 @@ export const QrModal: React.FC<QrModalProps> = ({
       centered
       closable
       width="min(480px, calc(100vw - 24px))"
-      title="Authorization"
+      title={t("auth.title")}
       destroyOnClose
     >
       <Flex vertical gap={16} className="py-2">
@@ -177,14 +179,14 @@ export const QrModal: React.FC<QrModalProps> = ({
             onClick={() => onSelectProvider("tg")}
             className="flex-1"
           >
-            Connect TG
+            {t("auth.connectTg")}
           </Button>
           <Button
             type={provider === "vk" ? "primary" : "default"}
             onClick={() => onSelectProvider("vk")}
             className="flex-1"
           >
-            Connect VK
+            {t("auth.connectVk")}
           </Button>
         </Flex>
 
@@ -194,7 +196,7 @@ export const QrModal: React.FC<QrModalProps> = ({
           {stateValue ? (
             <div className="w-full max-w-[240px]">
               <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <Text>Time left</Text>
+                <Text>{t("auth.timeLeft")}</Text>
                 <Text>{formatTime(timeLeft)}</Text>
               </div>
               <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -208,8 +210,8 @@ export const QrModal: React.FC<QrModalProps> = ({
 
           {timeLeft <= 0 ? (
             <Alert
-              message="Code expired"
-              description="Switch provider or reopen authorization to get a new state."
+              message={t("auth.codeExpired")}
+              description={t("auth.codeExpiredDescription")}
               type="warning"
               showIcon
               className="w-full"

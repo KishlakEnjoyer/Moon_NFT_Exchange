@@ -8,6 +8,7 @@ import {
   Layout,
   Segmented,
   Spin,
+  Tag,
   Tooltip,
   Typography,
   message,
@@ -20,6 +21,7 @@ import {
   PlusOutlined,
   SmileOutlined,
   UpOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
@@ -42,6 +44,7 @@ import { getPresentDisplayImageUrl } from "../services/presentService";
 import { UpdateProfileResponse } from "../services/profileService";
 import { useNotifications } from "../hooks/useNotifications";
 import NotFound from "./NotFound";
+import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
 
@@ -52,6 +55,7 @@ interface Present {
   collection: { collection_name: string } | null;
   model_id: number | null;
   is_on_sale?: boolean;
+  active_listing_price?: string | null;
   is_visible?: number;
 }
 
@@ -73,6 +77,7 @@ interface UserProfile {
   vk_visibility: number;
   profile_pic_url: string | null;
   about_me: string | null;
+  is_active: number;
   presents: Present[];
   albums: Album[];
 }
@@ -94,6 +99,7 @@ const getStoredCurrentUser = () => {
 };
 
 const AccountView = () => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -242,7 +248,7 @@ const AccountView = () => {
 
   const handleStartAddingAlbum = () => {
     if (!user || user.albums.length >= MAX_ALBUMS_PER_USER) {
-      messageApi.warning(`You can create up to ${MAX_ALBUMS_PER_USER} albums`);
+      messageApi.warning(t("profile.maxAlbums", { count: MAX_ALBUMS_PER_USER }));
       return;
     }
 
@@ -280,7 +286,7 @@ const AccountView = () => {
       handleCancelAddingAlbum();
     } catch (error) {
       console.error("Failed to create album:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to create album");
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedCreateAlbum"));
     } finally {
       setIsCreatingAlbum(false);
     }
@@ -331,7 +337,7 @@ const AccountView = () => {
       handleCancelRenaming();
     } catch (error) {
       console.error("Failed to rename album:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to rename album");
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedRenameAlbum"));
       setIsRenamingAlbum(false);
     }
   };
@@ -363,7 +369,7 @@ const AccountView = () => {
       updateUserAlbums(() => previousAlbums);
       setActiveAlbumId(previousActiveAlbumId);
       setVisibleCount(previousVisibleCount);
-      messageApi.error(error instanceof Error ? error.message : "Failed to delete album");
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedDeleteAlbum"));
     }
   };
 
@@ -455,7 +461,7 @@ const AccountView = () => {
 
   const segmentedOptions = [
     {
-      label: <span>All</span>,
+      label: <span>{t("transactions.all")}</span>,
       value: ALL_TAB as SegmentedValue,
     },
     ...(user?.albums.map((album) => ({
@@ -473,8 +479,13 @@ const AccountView = () => {
   }
 
   const activeSegmentedValue: SegmentedValue = activeAlbumId ?? ALL_TAB;
-  const activeAlbumTitle = activeAlbum?.album_title ?? ALL_TAB;
+  const activeAlbumTitle = activeAlbum?.album_title ?? t("transactions.all");
   const hasReachedAlbumLimit = user.albums.length >= MAX_ALBUMS_PER_USER;
+  const currentUser = getStoredCurrentUser();
+  const currentUserBlocked = currentUser.is_active === 0;
+  const isBlockedProfile = user.is_active === 0;
+  const canSendGiftFromProfile = !currentUserBlocked && !isBlockedProfile;
+  const canReportProfile = !currentUserBlocked && !isBlockedProfile;
   const renderSocialAccount = (
     provider: "tg" | "vk",
     usernameValue: string | null,
@@ -483,8 +494,8 @@ const AccountView = () => {
   ) => {
     const isVisible = Number(visibility) === 1;
     const label = provider === "tg"
-      ? usernameValue || (userIdValue ? "Telegram connected" : "Telegram not connected")
-      : usernameValue || (userIdValue ? `id${userIdValue}` : "VK not connected");
+      ? usernameValue || (userIdValue ? t("profile.telegramConnected") : t("profile.telegramNotConnected"))
+      : usernameValue || (userIdValue ? `id${userIdValue}` : t("profile.vkNotConnected"));
 
     const href = provider === "tg"
       ? (usernameValue ? `https://t.me/${usernameValue}` : null)
@@ -535,18 +546,18 @@ const AccountView = () => {
           <Flex className="gap-3 sm:gap-5 min-w-0 flex-1" wrap="wrap" align="flex-start">
             <Avatar
               size={PROFILE_AVATAR_SIZE}
-              src={
-                user.profile_pic_url
-                  ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`
-                  : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
-              }
+              src={isBlockedProfile || !user.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`}
+              icon={isBlockedProfile || !user.profile_pic_url ? <UserOutlined /> : undefined}
               className="border border-gray-500 shrink-0"
             />
 
             <Flex vertical className="min-w-0 flex-1">
-              <Title level={2} className="!mb-0 break-all !text-[28px] sm:!text-[30px]">
-                {user.username}
-              </Title>
+              <Flex align="center" gap={8} wrap="wrap">
+                <Title level={2} className="!mb-0 break-all !text-[28px] sm:!text-[30px]">
+                  {user.username}
+                </Title>
+                {isBlockedProfile && <Tag color="red">Аккаунт заблокирован</Tag>}
+              </Flex>
 
               {renderSocialAccount("tg", user.tg_username, user.user_tg_id, user.tg_visibility)}
               {renderSocialAccount("vk", user.vk_username, user.user_vk_id, user.vk_visibility)}
@@ -557,17 +568,19 @@ const AccountView = () => {
 
           {isOwn ? (
             <Flex className="gap-2 sm:gap-3 flex flex-row h-full !items-center w-full sm:w-auto" wrap="wrap">
-              <Tooltip title="Send Gift">
-                <Button
-                  size="large"
-                  icon={<GiftOutlined />}
-                  className="!bg-[var(--liquid-glass-bg)]"
-                  onClick={() => setIsGiftOpen(true)}
-                >
-                  Send Gift
-                </Button>
-              </Tooltip>
-              <Tooltip title="History">
+              {canSendGiftFromProfile && (
+                <Tooltip title={t("profile.sendGift")}>
+                  <Button
+                    size="large"
+                    icon={<GiftOutlined />}
+                    className="!bg-[var(--liquid-glass-bg)]"
+                    onClick={() => setIsGiftOpen(true)}
+                  >
+                    {t("profile.sendGift")}
+                  </Button>
+                </Tooltip>
+              )}
+              <Tooltip title={t("profile.history")}>
                 <Button
                   size="large"
                   icon={<HistoryOutlined />}
@@ -580,26 +593,27 @@ const AccountView = () => {
                 icon={<EditOutlined />}
                 className="!bg-[var(--liquid-glass-bg)]"
                 onClick={() => setIsEditProfileOpen(true)}
+                disabled={currentUserBlocked}
               >
-                Edit
+                {t("profile.edit")}
               </Button>
             </Flex>
           ) : (
             <Flex className="gap-2 sm:gap-3 flex flex-row h-full !items-center w-full sm:w-auto" wrap="wrap">
-              {getStoredCurrentUser().user_id && (
-                <Tooltip title="Send Gift">
+              {currentUser.user_id && canSendGiftFromProfile && (
+                <Tooltip title={t("profile.sendGift")}>
                   <Button
                     size="large"
                     icon={<GiftOutlined />}
                     className="!bg-[var(--liquid-glass-bg)]"
                     onClick={() => setIsGiftOpen(true)}
                   >
-                    Send Gift
+                    {t("profile.sendGift")}
                   </Button>
                 </Tooltip>
               )}
-              {getStoredCurrentUser().user_id && (
-                <Tooltip title="Report">
+              {currentUser.user_id && canReportProfile && (
+                <Tooltip title={t("profile.report")}>
                   <Button
                     size="large"
                     icon={<FlagOutlined />}
@@ -625,14 +639,14 @@ const AccountView = () => {
               }}
             />
 
-            {isOwn && (
+            {isOwn && !currentUserBlocked && (
               <>
                 {isAddingAlbum ? (
                   <Input
                     autoFocus
                     disabled={isCreatingAlbum}
                     maxLength={MAX_ALBUM_TITLE_LENGTH}
-                    placeholder="Album name"
+                    placeholder={t("profile.albumName")}
                     size="large"
                     style={{ width: 160 }}
                     value={newAlbumTitle}
@@ -650,7 +664,7 @@ const AccountView = () => {
                     }}
                   />
                 ) : (
-                  <Tooltip title={hasReachedAlbumLimit ? `Maximum ${MAX_ALBUMS_PER_USER} albums` : "Create album"}>
+                  <Tooltip title={hasReachedAlbumLimit ? t("profile.maximumAlbums", { count: MAX_ALBUMS_PER_USER }) : t("profile.createAlbum")}>
                     <Button
                       size="large"
                       icon={<PlusOutlined />}
@@ -673,7 +687,7 @@ const AccountView = () => {
                 rotate={180}
               />
               <Text className="text-gray-400">
-                {activeAlbumId === null ? "No gifts yet" : `No gifts in ${activeAlbumTitle}`}
+                {activeAlbumId === null ? t("profile.noGifts") : t("profile.noGiftsInAlbum", { album: activeAlbumTitle })}
               </Text>
             </Flex>
           )}
@@ -685,7 +699,7 @@ const AccountView = () => {
                 <PresentCardContextMenu
                   presentId={item.present_id}
                   userId={user.user_id}
-                  isOwner={isOwn}
+                  isOwner={isOwn && !currentUserBlocked}
                   isVisible={item.is_visible !== 0}
                   albums={user.albums}
                   activeAlbumId={activeAlbumId}
@@ -696,6 +710,7 @@ const AccountView = () => {
                     name={item.collection?.collection_name}
                     number={item.present_num}
                     isOnSale={item.is_on_sale}
+                    activeListingPrice={item.active_listing_price}
                     isVisible={item.is_visible !== 0}
                     isUpgraded={item.model_id !== null}
                     onClick={() => setSelectedGiftId(item.present_id)}
@@ -709,7 +724,7 @@ const AccountView = () => {
         </div>
 
         <EditProfileModal
-          open={isEditProfileOpen}
+          open={isEditProfileOpen && !currentUserBlocked}
           profile={{
             user_id: user.user_id,
             user_tg_id: user.user_tg_id ?? null,
@@ -728,15 +743,15 @@ const AccountView = () => {
         />
 
         <ReportModal
-          open={isReportOpen}
-          senderId={getStoredCurrentUser().user_id}
+          open={isReportOpen && canReportProfile}
+          senderId={currentUser.user_id}
           receiverId={user.user_id}
           onClose={() => setIsReportOpen(false)}
         />
 
         <SendGiftModal
-          open={isGiftOpen}
-          senderId={getStoredCurrentUser().user_id}
+          open={isGiftOpen && canSendGiftFromProfile}
+          senderId={currentUser.user_id}
           onClose={() => setIsGiftOpen(false)}
           onSent={handleGiftSent}
           initialReceiverId={isOwn ? null : user.user_id}
@@ -753,7 +768,7 @@ const AccountView = () => {
           open={!!selectedGiftId}
           presentId={selectedGiftId}
           userId={user.user_id}
-          canManage={isOwn}
+          canManage={isOwn && !currentUserBlocked}
           onClose={() => setSelectedGiftId(null)}
           onRefresh={loadUser}
         />

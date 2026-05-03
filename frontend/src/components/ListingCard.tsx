@@ -2,6 +2,7 @@ import { Button, Card, Space, Typography, Image } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 import { ApiListing, formatTonPrice, getPresentImageUrl } from "../services/listingService";
+import { useTranslation } from "react-i18next";
 
 interface ListingCardProps {
   item: ApiListing;
@@ -16,9 +17,10 @@ interface ListingCardProps {
 const { Text } = Typography;
 
 const ListingCard = ({ item, onPresentClick, onAddToCart, onBuy, isInCart, isOwnListing, buying }: ListingCardProps) => {
+  const { t } = useTranslation();
   const price = formatTonPrice(item.price, true);
   const fullPrice = formatTonPrice(item.price);
-  const title = `${item.collection_name || 'Unknown Collection'} # ${item.present_num}`;
+  const title = `${item.collection_name || t("marketplace.unknownCollection")} # ${item.present_num}`;
 
   return (
     <Card
@@ -39,7 +41,7 @@ const ListingCard = ({ item, onPresentClick, onAddToCart, onBuy, isInCart, isOwn
           <Image
             rootClassName="!block !w-full !h-full"
             className="!w-full !h-full object-cover object-center"
-            alt={item.collection_name || 'Unknown Collection'}
+            alt={item.collection_name || t("marketplace.unknownCollection")}
             draggable={false}
             src={getPresentImageUrl(item.present_image_url)}
             preview={false}

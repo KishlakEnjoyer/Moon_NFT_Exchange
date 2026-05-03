@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, text
 from typing import List
 from pydantic import BaseModel
 
 from core.database import get_db
 from core.models import Collections, Models, Backgrounds, Symbols
 from core.request_models import CollectionOption, ModelOption, BackgroundOption, SymbolOption
+from routers.admin_router import ensure_archive_columns
 
 filters_router = APIRouter(prefix="/api/filters", tags=["filters"])
 
@@ -44,6 +45,7 @@ def get_models(
     collection_ids: str = Query(..., description="Comma-separated collection IDs, e.g. '1,2,3'"),
     db: Session = Depends(get_db),
 ):
+    ensure_archive_columns(db)
     try:
         ids = [int(i.strip()) for i in collection_ids.split(",") if i.strip()]
     except ValueError:
@@ -56,6 +58,7 @@ def get_models(
         db.execute(
             select(Models.model_id, Models.model_name, Models.model_image_url)
             .where(Models.collection_id.in_(ids))
+            .where(text("models.is_active = 1"))
             .order_by(Models.model_name)
         )
         .all()
@@ -68,6 +71,7 @@ def get_models(
 
 @filters_router.get("/backgrounds", response_model=List[BackgroundOption])
 def get_backgrounds(db: Session = Depends(get_db)):
+    ensure_archive_columns(db)
     rows = (
         db.execute(
             select(
@@ -75,6 +79,7 @@ def get_backgrounds(db: Session = Depends(get_db)):
                 Backgrounds.background_name,
                 Backgrounds.background_image_url,
             )
+            .where(text("backgrounds.is_active = 1"))
             .order_by(Backgrounds.background_name)
         )
         .all()
@@ -87,9 +92,11 @@ def get_backgrounds(db: Session = Depends(get_db)):
 
 @filters_router.get("/symbols", response_model=List[SymbolOption])
 def get_symbols(db: Session = Depends(get_db)):
+    ensure_archive_columns(db)
     rows = (
         db.execute(
             select(Symbols.symbol_id, Symbols.symbol_name, Symbols.symbol_image_url)
+            .where(text("symbols.is_active = 1"))
             .order_by(Symbols.symbol_name)
         )
         .all()

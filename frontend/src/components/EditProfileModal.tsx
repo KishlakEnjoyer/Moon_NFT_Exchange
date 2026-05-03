@@ -11,6 +11,7 @@ import QrModal from "./QrModal";
 import { authFetch, setAuthSession } from "../services/auth";
 import { detectNsfwImage } from "../services/nsfwDetectorService";
 import { updateProfile, UpdateProfileResponse } from "../services/profileService";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -61,6 +62,7 @@ const readFileAsDataUrl = (file: File) =>
   });
 
 const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditProfileModalProps) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pollingRef = useRef<number | null>(null);
@@ -167,7 +169,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
 
         if (data.status === "confirmed") {
           if (!data.access_token) {
-            throw new Error("Missing access token");
+            throw new Error(t("editProfile.missingToken"));
           }
 
           clearAuthPolling();
@@ -175,7 +177,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
           window.dispatchEvent(new Event("storage"));
           setAuthModalOpen(false);
           setIsAuthLoading(false);
-          messageApi.success(provider === "tg" ? "Telegram connected" : "VK connected");
+          messageApi.success(provider === "tg" ? t("profile.telegramConnected") : t("editProfile.vkConnectedShort"));
           onLinked();
           return;
         }
@@ -183,7 +185,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         if (data.status === "expired" || data.status === "failed" || data.status === "declined") {
           clearAuthPolling();
           setIsAuthLoading(false);
-          messageApi.error("Connection request expired");
+          messageApi.error(t("editProfile.connectionExpired"));
         }
       } catch (error) {
         clearAuthPolling();
@@ -231,7 +233,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || "Failed to start linking");
+        throw new Error(text || t("editProfile.failedStartLinking"));
       }
 
       const data = await response.json();
@@ -252,7 +254,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         return;
       }
       console.error("Failed to start linking:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to start linking");
+      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedStartLinking"));
     }
   };
 
@@ -279,12 +281,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     setIsCheckingProfilePhoto(false);
 
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      messageApi.error("Use PNG, JPG, or WEBP for the profile photo");
+      messageApi.error(t("editProfile.badImageType"));
       return;
     }
 
     if (file.size > MAX_PROFILE_IMAGE_SIZE) {
-      messageApi.error("Profile photo must be 5 MB or smaller");
+      messageApi.error(t("editProfile.imageTooLarge"));
       return;
     }
 
@@ -302,7 +304,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
 
       if (!isSafe) {
         setProfilePicDataUrl(null);
-        messageApi.error("Profile photo did not pass moderation");
+        messageApi.error(t("editProfile.moderationFailed"));
         return;
       }
 
@@ -312,7 +314,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         return;
       }
       console.error("Failed to check profile photo:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to check profile photo");
+      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedCheckPhoto"));
     } finally {
       if (checkId === profilePhotoCheckIdRef.current) {
         profilePhotoCheckAbortRef.current = null;
@@ -327,7 +329,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     }
 
     if (isCheckingProfilePhoto) {
-      messageApi.warning("Wait until the profile photo check finishes");
+      messageApi.warning(t("editProfile.waitPhotoCheck"));
       return;
     }
 
@@ -335,7 +337,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     const trimmedAboutMe = aboutMe.trim();
 
     if (!trimmedUsername) {
-      messageApi.error("Username cannot be empty");
+      messageApi.error(t("editProfile.usernameEmpty"));
       return;
     }
 
@@ -350,12 +352,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         profile_pic_data_url: profilePicDataUrl,
       });
 
-      messageApi.success("Profile updated");
+      messageApi.success(t("editProfile.profileUpdated"));
       onSaved(updatedProfile);
       onClose();
     } catch (error) {
       console.error("Failed to update profile:", error);
-      messageApi.error(error instanceof Error ? error.message : "Failed to update profile");
+      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedUpdate"));
     } finally {
       setIsSaving(false);
     }
@@ -371,11 +373,11 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     const title = provider === "tg" ? "Telegram" : "VK";
     const statusText = connected
       ? provider === "tg"
-        ? "TG connected"
-        : "VK connected"
+        ? t("editProfile.telegramConnectedShort")
+        : t("editProfile.vkConnectedShort")
       : provider === "tg"
-        ? "Telegram is not connected"
-        : "VK is not connected";
+        ? t("editProfile.telegramNotConnected")
+        : t("editProfile.vkNotConnected");
 
     return (
       <Flex
@@ -396,11 +398,11 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
           {connected ? (
             <Flex align="center" gap={6}>
               <CheckCircleOutlined style={{ color: "#52c41a" }} />
-              <Text style={{ color: "#52c41a" }}>{provider === "tg" ? "TG connected" : "VK connected"}</Text>
+              <Text style={{ color: "#52c41a" }}>{provider === "tg" ? t("editProfile.telegramConnectedShort") : t("editProfile.vkConnectedShort")}</Text>
             </Flex>
           ) : (
             <Button onClick={() => void startLinkAuth(provider)} className="!bg-[var(--liquid-glass-bg)]">
-              {provider === "tg" ? "Connect TG" : "Connect VK"}
+              {provider === "tg" ? t("editProfile.connectTg") : t("editProfile.connectVk")}
             </Button>
           )}
 
@@ -420,12 +422,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         open={open}
         onCancel={onClose}
         onOk={handleSave}
-        okText="Save"
-        cancelText="Cancel"
+        okText={t("common.save")}
+        cancelText={t("common.cancel")}
         confirmLoading={isSaving || isCheckingProfilePhoto}
         okButtonProps={{ disabled: isCheckingProfilePhoto }}
         width="min(560px, calc(100vw - 24px))"
-        title={<Title level={4} className="!mb-0">Edit Profile</Title>}
+        title={<Title level={4} className="!mb-0">{t("editProfile.title")}</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
           <Flex
@@ -438,8 +440,8 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
             <Flex align="center" gap={16} className="min-w-0 flex-1">
               <Avatar size={{ xs: 56, sm: 72 }} src={previewSrc} className="border border-gray-500 shrink-0" />
               <Flex vertical gap={4} className="min-w-0">
-                <Text strong>Profile Photo</Text>
-                <Text type="secondary" className="break-words">PNG, JPG, or WEBP up to 5 MB</Text>
+                <Text strong>{t("editProfile.profilePhoto")}</Text>
+                <Text type="secondary" className="break-words">{t("editProfile.photoHint")}</Text>
               </Flex>
             </Flex>
 
@@ -449,29 +451,29 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
               loading={isCheckingProfilePhoto}
               className="!bg-[var(--liquid-glass-bg)]"
             >
-              Change
+              {t("common.change")}
             </Button>
           </Flex>
 
           <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-            <Text strong className="block mb-2">Nickname</Text>
+            <Text strong className="block mb-2">{t("editProfile.nickname")}</Text>
             <Input
               value={username}
               maxLength={MAX_USERNAME_LENGTH}
               showCount
-              placeholder="Enter your nickname"
+              placeholder={t("editProfile.nicknamePlaceholder")}
               onChange={(event) => setUsername(event.target.value)}
             />
           </div>
 
           <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-            <Text strong className="block mb-2">About Me</Text>
+            <Text strong className="block mb-2">{t("editProfile.aboutMe")}</Text>
             <TextArea
               value={aboutMe}
               maxLength={MAX_ABOUT_ME_LENGTH}
               showCount
               rows={4}
-              placeholder="Tell something about yourself"
+              placeholder={t("editProfile.aboutPlaceholder")}
               onChange={(event) => setAboutMe(event.target.value)}
             />
           </div>

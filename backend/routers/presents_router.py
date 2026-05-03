@@ -45,6 +45,8 @@ class PresentDetailResponse(BaseModel):
     owner_id: int | None
     owner_profile_pic_url: str | None
     is_on_sale: bool
+    active_listing_id: int | None
+    active_listing_price: str | None
     is_visible: int
     is_upgraded: bool
     has_models: bool
@@ -88,9 +90,12 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         original_sender = db.scalar(select(User).where(User.user_id == present.original_sender_id))
 
     active_listing = db.scalar(
-        select(Listing).where(
+        select(Listing)
+        .join(User, Listing.seller_id == User.user_id)
+        .where(
             Listing.present_id == present_id,
             Listing.status.has(ListingStatuses.status_name == "active"),
+            User.is_active == 1,
         )
     )
 
@@ -135,13 +140,15 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         symbol_image_url=symbol_image_url,
         owner_username=owner_user.username if owner_user else None,
         owner_id=owner_record.owner_id if owner_record else None,
-        owner_profile_pic_url=owner_user.profile_pic_url if owner_user else None,
+        owner_profile_pic_url=owner_user.profile_pic_url if owner_user and owner_user.is_active else None,
         is_on_sale=active_listing is not None,
+        active_listing_id=active_listing.listing_id if active_listing else None,
+        active_listing_price=str(active_listing.price) if active_listing else None,
         is_visible=present.is_visible,
         is_upgraded=present.model_id is not None,
         has_models=has_models > 0,
         original_sender_username=original_sender.username if original_sender else None,
-        original_sender_profile_pic_url=original_sender.profile_pic_url if original_sender else None,
+        original_sender_profile_pic_url=original_sender.profile_pic_url if original_sender and original_sender.is_active else None,
     )
 
 

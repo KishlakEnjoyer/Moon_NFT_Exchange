@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from core.auth import get_current_user, get_user_id_from_token
+from core.auth import get_current_user, get_current_user_any, get_user_id_from_token
 from core.database import get_db
 from core.models import User
 from core.request_models import ConfirmAuthRequest, DeclineAuthRequest, ConfirmVkAuthRequest
@@ -18,6 +18,25 @@ from utils.websocket_manager import ws_manager
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def serialize_auth_user(user: User, balance=0) -> dict:
+    return {
+        "user_id": user.user_id,
+        "role_id": user.role_id,
+        "user_tg_id": user.user_tg_id,
+        "user_vk_id": user.user_vk_id,
+        "tg_username": user.tg_username,
+        "vk_username": user.vk_username,
+        "tg_visibility": user.tg_visibility,
+        "vk_visibility": user.vk_visibility,
+        "username": user.username,
+        "profile_pic_url": user.profile_pic_url if user.is_active else None,
+        "wallet_address": user.wallet_address,
+        "is_active": user.is_active,
+        "about_me": user.about_me,
+        "balance": balance,
+    }
 
 
 def _create_auth_state(user_id: int | None, platform_key: str) -> dict[str, str]:
@@ -80,6 +99,18 @@ def auth_init_vk():
         "bot_link": f"https://vk.me/moon_nft_exchange",
         "instruction": "Open VK bot and send the following message:\n\n" + auth_data["state"]
     }
+
+
+@auth_router.get("/me")
+def auth_me(current_user: User = Depends(get_current_user_any), db: Session = Depends(get_db)):
+    balance = 0
+    if current_user.is_active and current_user.user_tg_id:
+        try:
+            balance = get_user_wallet_balances(db, current_user.user_tg_id)["token_balance"]
+        except Exception:
+            balance = 0
+
+    return serialize_auth_user(current_user, balance=balance)
 
 
 @auth_router.post("/link/tg/init")
@@ -176,7 +207,8 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
 
-    user = ensure_user_wallet(db, user)
+    if user.is_active:
+        user = ensure_user_wallet(db, user)
     access_token = generate_jwt(user.user_id, user.role_id)
 
     redis_payload = {
@@ -185,20 +217,7 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
         "tg_id": user.user_tg_id,
         "access_token": access_token,
         "token_type": "Bearer",
-        "user": {
-            "user_id": user.user_id,
-            "role_id": user.role_id,
-            "user_tg_id": user.user_tg_id,
-            "user_vk_id": user.user_vk_id,
-            "tg_username": user.tg_username,
-            "vk_username": user.vk_username,
-            "tg_visibility": user.tg_visibility,
-            "vk_visibility": user.vk_visibility,
-            "username": user.username,
-            "wallet_address": user.wallet_address,
-            "is_active": user.is_active,
-            "about_me": user.about_me,
-        }
+        "user": serialize_auth_user(user)
     }
 
     redis_client.setex(key, 600, json.dumps(redis_payload))
@@ -276,7 +295,8 @@ def auth_confirm_vk(payload: ConfirmVkAuthRequest, db: Session = Depends(get_db)
             db.commit()
             db.refresh(user)
 
-    user = ensure_user_wallet(db, user)
+    if user.is_active:
+        user = ensure_user_wallet(db, user)
     access_token = generate_jwt(user.user_id, user.role_id)
 
     redis_payload = {
@@ -285,20 +305,7 @@ def auth_confirm_vk(payload: ConfirmVkAuthRequest, db: Session = Depends(get_db)
         "vk_id": user.user_vk_id,
         "access_token": access_token,
         "token_type": "Bearer",
-        "user": {
-            "user_id": user.user_id,
-            "role_id": user.role_id,
-            "user_tg_id": user.user_tg_id,
-            "user_vk_id": user.user_vk_id,
-            "tg_username": user.tg_username,
-            "vk_username": user.vk_username,
-            "tg_visibility": user.tg_visibility,
-            "vk_visibility": user.vk_visibility,
-            "username": user.username,
-            "wallet_address": user.wallet_address,
-            "is_active": user.is_active,
-            "about_me": user.about_me,
-        }
+        "user": serialize_auth_user(user)
     }
 
     redis_client.setex(key, 600, json.dumps(redis_payload))
@@ -392,27 +399,12 @@ def auth_status(state: str, db: Session = Depends(get_db)):
         redis_client.setex(key, 600, json.dumps(auth_data))
     
     balance = 0
-    if user.user_tg_id:
+    if user.is_active and user.user_tg_id:
         balance = get_user_wallet_balances(db, user.user_tg_id)['token_balance']
 
     return {
         "status": "confirmed",
         "access_token": access_token,
         "token_type": token_type,
-        "user": {
-            "user_id": user.user_id,
-            "role_id": user.role_id,
-            "user_tg_id": user.user_tg_id,
-            "user_vk_id": user.user_vk_id,
-            "tg_username": user.tg_username,
-            "vk_username": user.vk_username,
-            "tg_visibility": user.tg_visibility,
-            "vk_visibility": user.vk_visibility,
-            "username": user.username,
-            "profile_pic_url": user.profile_pic_url,
-            "wallet_address": user.wallet_address,
-            "is_active": user.is_active,
-            "about_me": user.about_me,
-            "balance": balance
-        }
+        "user": serialize_auth_user(user, balance=balance)
     }

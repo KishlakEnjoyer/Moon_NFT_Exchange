@@ -125,6 +125,8 @@ def get_listing_for_purchase(db: Session, listing_id: int, buyer_id: int) -> tup
     seller = db.scalar(select(User).where(User.user_id == listing.seller_id))
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if not seller.is_active:
+        raise HTTPException(status_code=409, detail="Seller account is blocked")
 
     return listing, present, owner, seller
 

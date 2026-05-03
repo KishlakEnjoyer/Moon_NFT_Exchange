@@ -15,6 +15,7 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import TONIcon from "./icons/TONIcon";
+import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
 
@@ -124,6 +125,7 @@ const EMPTY_FILTERS: FilterState = {
 };
 
 const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
+  const { t } = useTranslation();
   const popupContainer = () => document.body;
 
   const [collections, setCollections] = useState<Option[]>([]);
@@ -218,7 +220,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
     >
       <div>
         <Text strong>
-          Price, <TONIcon /> TON
+          {t("filter.price")}, <TONIcon /> TON
         </Text>
         <Row align="middle" gutter={8} className="mt-[8px]">
           <Col>
@@ -240,22 +242,22 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
       </div>
 
       <div>
-        <Text strong>Sort</Text>
+        <Text strong>{t("filter.sort")}</Text>
         <Select
           className="w-full mt-[8px]"
-          placeholder="Select sorting"
+          placeholder={t("filter.selectSorting")}
           value={sortOrder}
           onChange={setSortOrder}
           options={[
-            { value: "price_desc", label: "By price (Desc)" },
-            { value: "price_asc", label: "By price (Asc)" },
-            { value: "newest", label: "New ones first" },
+            { value: "price_desc", label: t("filter.priceDesc") },
+            { value: "price_asc", label: t("filter.priceAsc") },
+            { value: "newest", label: t("filter.newest") },
           ]}
         />
       </div>
 
       <Button block danger icon={<CloseOutlined />} onClick={handleClear}>
-        Clear all
+        {t("common.clearAll")}
       </Button>
       <Button
         block
@@ -263,7 +265,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         onClick={handleApply}
         className="bg-[var(--green-accept)]"
       >
-        Apply
+        {t("common.apply")}
       </Button>
     </div>
   );
@@ -311,18 +313,9 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   return (
     <Row className="w-full" gutter={[8, 8]} align="middle">
       <Col xs={24} lg={7}>
-        {/* <Input.Search
-          className="w-full"
-          placeholder="Search"
-          allowClear
-          size="large"
-          maxLength={MAX_INPUT_LENGTH}
-          onSearch={(val) => updateFilters({ search: val })}
-          onChange={(e) => !e.target.value && updateFilters({ search: "" })}
-        /> */}
         <Space.Compact className="w-full">
           <Input
-            placeholder={smart ? "Smart search" : "Search"}
+            placeholder={smart ? t("filter.smartSearch") : t("common.search")}
             allowClear
             size="large"
             maxLength={MAX_INPUT_LENGTH}
@@ -336,7 +329,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
             onPressEnter={runSearch}
           />
 
-          <Tooltip title={smart ? "Smart search enabled" : "Enable smart search"}>
+          <Tooltip title={smart ? t("filter.smartSearchEnabled") : t("filter.enableSmartSearch")}>
             <Button
               size="large"
               type={smart ? "primary" : "default"}
@@ -346,7 +339,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
             />
           </Tooltip>
 
-          <Tooltip title="Search">
+          <Tooltip title={t("common.search")}>
             <Button
               size="large"
               icon={<SearchOutlined />}
@@ -361,7 +354,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
       <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
-          placeholder="Collection"
+          placeholder={t("filter.collection")}
           loading={loadingCollections}
           options={toSelectOptions(collections, "collections")}
           value={filters.collection_ids}
@@ -373,7 +366,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         <Select
           {...sharedSelectProps}
           placeholder={
-            filters.collection_ids.length === 0 ? "Select collection first" : "Model"
+            filters.collection_ids.length === 0 ? t("filter.selectCollectionFirst") : t("filter.model")
           }
           disabled={filters.collection_ids.length === 0}
           loading={loadingModels}
@@ -386,7 +379,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
       <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
-          placeholder="Background"
+          placeholder={t("filter.background")}
           loading={loadingBackgrounds}
           options={toSelectOptions(backgrounds, "bgs")}
           value={filters.background_ids}
@@ -397,7 +390,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
       <Col xs={12} sm={12} md={6} lg={4}>
         <Select
           {...sharedSelectProps}
-          placeholder="Symbol"
+          placeholder={t("filter.symbol")}
           loading={loadingSymbols}
           options={toSelectOptions(symbols, "symbols")}
           value={filters.symbol_ids}

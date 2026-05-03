@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import TONIcon from "./icons/TONIcon";
 import { CartItem, getCart, removeFromCart, clearCart, buyListing } from "../services/listingService";
 import CartItemRow from "./CartItem";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -32,11 +33,14 @@ interface ModalCartProps {
 }
 
 const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
+  const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [purchasing, setPurchasing] = useState(false);
 
-  const currentUserId = getStoredCurrentUser().user_id;
+  const currentUser = getStoredCurrentUser();
+  const currentUserId = currentUser.user_id;
+  const currentUserBlocked = currentUser.is_active === 0;
 
   const loadCart = useCallback(async () => {
     if (!currentUserId) return;
@@ -59,7 +63,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       await removeFromCart(cartItemId);
       setCartItems((prev) => prev.filter((item) => item.cart_item_id !== cartItemId));
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to remove item");
+      messageApi.error(e.message || t("cart.failedRemoveItem"));
     }
   };
 
@@ -69,12 +73,16 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       await clearCart(currentUserId);
       setCartItems([]);
     } catch (e: any) {
-      messageApi.error(e.message || "Failed to clear cart");
+      messageApi.error(e.message || t("cart.failedClearCart"));
     }
   };
 
   const handleBuyCart = async () => {
     if (!currentUserId || cartItems.length === 0) return;
+    if (currentUserBlocked) {
+      messageApi.error("Аккаунт заблокирован");
+      return;
+    }
 
     setPurchasing(true);
     const purchasedListingIds: number[] = [];
@@ -88,11 +96,11 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
 
       setCartItems([]);
       window.dispatchEvent(new Event("listingsChanged"));
-      messageApi.success("Purchase completed");
+      messageApi.success(t("cart.purchaseCompleted"));
     } catch (e: any) {
       setCartItems((prev) => prev.filter((item) => !purchasedListingIds.includes(item.listing_id)));
       window.dispatchEvent(new Event("listingsChanged"));
-      messageApi.error(e.message || "Failed to buy cart");
+      messageApi.error(e.message || t("cart.failedBuyCart"));
     } finally {
       setPurchasing(false);
     }
@@ -111,18 +119,18 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
         open={open}
         onCancel={onClose}
         footer={null}
-        title={<Title level={4} className="!mb-0">Cart</Title>}
+        title={<Title level={4} className="!mb-0">{t("cart.title")}</Title>}
         width="min(780px, calc(100vw - 24px))"
       >
         <Flex vertical gap={12} className="mt-4 max-h-[70vh]">
           <Flex vertical gap={12} className="mt-2 sm:mt-4 max-h-[52vh] overflow-y-auto moon-mobile-scroll">
             {cartItems.length === 0 ? (
-              <Empty description="Cart is empty" className="py-8" />
+              <Empty description={t("cart.empty")} className="py-8" />
             ) : (
               <>
                 <Flex justify="flex-end">
                   <Button type="link" size="small" onClick={handleClearCart}>
-                    Clear cart
+                    {t("cart.clear")}
                   </Button>
                 </Flex>
                 {cartItems.map((item) => (
@@ -142,14 +150,14 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
             <>
               <Divider className="!my-2" />
               <Flex justify="space-between" align="center">
-                <Text type="secondary">Total:</Text>
+                <Text type="secondary">{t("cart.total")}</Text>
                 <Flex align="center" gap={6}>
                   <Title level={4} className="!mb-0">{total.toFixed(2)}</Title>
                   <TONIcon />
                 </Flex>
               </Flex>
-              <Button type="primary" size="large" block loading={purchasing} onClick={handleBuyCart}>
-                Buy
+              <Button type="primary" size="large" block loading={purchasing} disabled={currentUserBlocked} onClick={handleBuyCart}>
+                {t("cart.buy")}
               </Button>
             </>
           )}

@@ -30,6 +30,12 @@ def create_report(
         if payload.sender_id is not None and payload.sender_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Cannot submit reports as another user")
 
+        receiver = db.get(User, payload.receiver_id)
+        if not receiver:
+            raise HTTPException(status_code=404, detail="Receiver not found")
+        if not receiver.is_active:
+            raise HTTPException(status_code=409, detail="Receiver account is blocked")
+
         return submit_report(
             db=db,
             sender_id=current_user.user_id,

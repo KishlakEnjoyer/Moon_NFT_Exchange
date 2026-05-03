@@ -1,6 +1,8 @@
-import { Avatar, Flex, Input, Modal, Typography } from "antd";
+import { UserOutlined } from "@ant-design/icons";
+import { Avatar, Flex, Input, Modal, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -8,6 +10,7 @@ interface UserOption {
   user_id: number;
   username: string;
   profile_pic_url: string | null;
+  is_active: number;
 }
 
 interface PeopleSearchModalProps {
@@ -17,6 +20,7 @@ interface PeopleSearchModalProps {
 }
 
 const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalProps) => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<UserOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
@@ -58,11 +62,11 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
       onCancel={onClose}
       footer={null}
       width="min(480px, calc(100vw - 24px))"
-      title={<Title level={4} className="!mb-0">People</Title>}
+      title={<Title level={4} className="!mb-0">{t("people.title")}</Title>}
     >
       <Flex vertical gap={16} className="mt-4">
         <Input.Search
-          placeholder="Search by username..."
+          placeholder={t("people.search")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           allowClear
@@ -78,23 +82,23 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
             >
               <Avatar
                 size={40}
-                src={
-                  user.profile_pic_url
-                    ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`
-                    : `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`
-                }
+                src={user.is_active === 0 || !user.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`}
+                icon={user.is_active === 0 || !user.profile_pic_url ? <UserOutlined /> : undefined}
               />
-              <Text strong ellipsis={{ tooltip: user.username }} className="min-w-0">{user.username}</Text>
+              <Flex vertical className="min-w-0">
+                <Text strong ellipsis={{ tooltip: user.username }} className="min-w-0">{user.username}</Text>
+                {user.is_active === 0 && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
+              </Flex>
             </Flex>
           ))}
           {users.length === 0 && searchQuery === "" && (
             <Text type="secondary" className="text-center py-4">
-              Start typing to search...
+              {t("people.startTyping")}
             </Text>
           )}
           {users.length === 0 && searchQuery !== "" && (
             <Text type="secondary" className="text-center py-4">
-              No users found
+              {t("people.noUsers")}
             </Text>
           )}
         </Flex>

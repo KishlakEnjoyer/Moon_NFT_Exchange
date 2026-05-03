@@ -37,7 +37,7 @@ def get_user_id_from_token(token: str) -> int:
         raise _get_unauthorized_exception("Invalid token") from exc
 
 
-def get_current_user(
+def get_current_user_any(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
@@ -53,10 +53,16 @@ def get_current_user(
     if not user:
         raise _get_unauthorized_exception("User not found")
 
-    if not user.is_active:
+    return user
+
+
+def get_current_user(
+    current_user: User = Depends(get_current_user_any),
+) -> User:
+    if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is inactive",
         )
 
-    return user
+    return current_user

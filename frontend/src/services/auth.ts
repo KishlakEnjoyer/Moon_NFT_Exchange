@@ -1,5 +1,8 @@
 const ACCESS_TOKEN_KEY = "access_token";
 const TOKEN_TYPE_KEY = "token_type";
+const BLOCKED_DETAIL = "User is inactive";
+
+export const BLOCKED_ACCOUNT_MESSAGE = "Аккаунт заблокирован";
 
 export const getAccessToken = (): string | null => {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -26,7 +29,22 @@ export const clearAuthSession = () => {
   localStorage.removeItem("currentUser");
 };
 
-export const authFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+const markStoredUserBlocked = () => {
+  try {
+    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+    if (!currentUser.user_id || currentUser.is_active === 0) {
+      return;
+    }
+
+    localStorage.setItem("currentUser", JSON.stringify({ ...currentUser, is_active: 0, profile_pic_url: null }));
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("accountBlocked"));
+  } catch {
+    window.dispatchEvent(new Event("accountBlocked"));
+  }
+};
+
+export const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const headers = new Headers(init.headers);
   const accessToken = getAccessToken();
 
@@ -34,10 +52,22 @@ export const authFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
     headers.set("Authorization", `${getTokenType()} ${accessToken}`);
   }
 
-  return fetch(input, {
+  const response = await fetch(input, {
     ...init,
     headers,
   });
+
+  if (response.status === 403) {
+    try {
+      const data = await response.clone().json();
+      if (data?.detail === BLOCKED_DETAIL) {
+        markStoredUserBlocked();
+      }
+    } catch {
+    }
+  }
+
+  return response;
 };
 
 export const appendAccessToken = (url: string): string => {

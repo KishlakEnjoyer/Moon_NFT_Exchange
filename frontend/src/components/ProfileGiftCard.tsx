@@ -1,11 +1,13 @@
 import EyeInvisibleOutlined from "@ant-design/icons/lib/icons/EyeInvisibleOutlined";
 import { Card, Image } from "antd";
+import { useTranslation } from "react-i18next";
 
 interface ProfileGiftCardProps {
   cardImage?: string;
   name?: string;
   number?: string | number;
   isOnSale?: boolean | number;
+  activeListingPrice?: string | number | null;
   isVisible?: boolean;
   isUpgraded?: boolean;
   onClick?: () => void;
@@ -16,11 +18,18 @@ const ProfileGiftCard = ({
   name,
   number,
   isOnSale = false,
+  activeListingPrice = null,
   isVisible = true,
   isUpgraded = false,
   onClick
 }: ProfileGiftCardProps) => {
+  const { t } = useTranslation();
   const showOnSale = isOnSale === true || isOnSale === 1;
+  const parsedListingPrice = Number(activeListingPrice);
+  const hasListingPrice = activeListingPrice !== null && activeListingPrice !== undefined && activeListingPrice !== "";
+  const listingPriceLabel = hasListingPrice && Number.isFinite(parsedListingPrice)
+    ? `${parsedListingPrice.toFixed(2)} TON`
+    : null;
 
   return (
     <div className={`relative w-full h-full z-4 cursor-pointer`} onClick={onClick}>
@@ -31,9 +40,14 @@ const ProfileGiftCard = ({
       )}
 
       <div className="flex max-w-[calc(100%-16px)] flex-row flex-wrap justify-end gap-1 sm:gap-[var(--size-s)] z-50 absolute top-[var(--size-xs)] right-[var(--size-xs)]">
-        {showOnSale &&
+        {showOnSale && listingPriceLabel &&
+          <div className="max-w-full truncate text-[11px] sm:text-[var(--size-base)] text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
+            {listingPriceLabel}
+          </div>
+        }
+        {showOnSale && !listingPriceLabel &&
           <div className="text-[11px] sm:text-[var(--size-base)] text-white backdrop-blur-[var(--size-2xs)] py-[var(--size-3xs)] px-[var(--size-xs)] font-[var(--font-semibold)] rounded-[var(--size-xs)] bg-[var(--green-accept)]">
-            On Sale
+            {t("profileCard.onSale")}
           </div>
         }
         {number &&

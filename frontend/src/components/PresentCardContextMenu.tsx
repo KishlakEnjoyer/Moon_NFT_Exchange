@@ -4,6 +4,7 @@ import { CheckOutlined, EyeOutlined, EyeInvisibleOutlined, FolderOpenOutlined } 
 import { togglePresentVisibility } from "../services/presentService";
 import { addPresentToAlbum, removePresentFromAlbum, Album } from "../services/albumService";
 import { authFetch } from "../services/auth";
+import { useTranslation } from "react-i18next";
 
 interface PresentCardContextMenuProps {
   presentId: number;
@@ -17,6 +18,7 @@ interface PresentCardContextMenuProps {
 }
 
 const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums, activeAlbumId, onRefresh, children }: PresentCardContextMenuProps) => {
+  const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [presentAlbumIds, setPresentAlbumIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,7 +46,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       onRefresh();
       setRefreshKey(k => k + 1);
     } catch (e: any) {
-      messageApi.error(e.message || "Failed");
+      messageApi.error(e.message || t("presentMenu.failed"));
     }
   };
 
@@ -60,7 +62,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       onRefresh();
       setRefreshKey(k => k + 1);
     } catch (e: any) {
-      messageApi.error(e.message || "Failed");
+      messageApi.error(e.message || t("presentMenu.failed"));
     }
   };
 
@@ -88,7 +90,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
           styles={{ root: { minWidth: 180 } }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
-            <FolderOpenOutlined /> Add to Album
+            <FolderOpenOutlined /> {t("presentMenu.addToAlbum")}
           </span>
         </Dropdown>
       ),
@@ -97,18 +99,18 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       key: "remove_from_album",
       label: (
         <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff4d4f" }}>
-          Remove from Album
+          {t("presentMenu.removeFromAlbum")}
         </span>
       ),
       onClick: () => {
         removePresentFromAlbum(activeAlbumId, presentId)
           .then(() => {
             setPresentAlbumIds(prev => prev.filter(id => id !== activeAlbumId));
-            messageApi.success("Removed from album");
+            messageApi.success(t("presentMenu.removedFromAlbum"));
             onRefresh();
             setRefreshKey(k => k + 1);
           })
-          .catch((e: any) => messageApi.error(e.message || "Failed"));
+          .catch((e: any) => messageApi.error(e.message || t("presentMenu.failed")));
       },
     }] : []),
     { type: "divider" },
@@ -117,7 +119,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       label: (
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-          {isVisible ? "Hide from Profile" : "Show on Profile"}
+          {isVisible ? t("presentMenu.hideFromProfile") : t("presentMenu.showOnProfile")}
         </span>
       ),
       onClick: handleToggleVisibility,

@@ -8,6 +8,7 @@ import {
   getUserTransactions,
 } from "../services/transactionService";
 import TransactionDetailModal, { TransactionViewKind } from "./TransactionDetailModal";
+import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
 
@@ -19,6 +20,7 @@ interface TransactionHistoryModalProps {
 }
 
 const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: TransactionHistoryModalProps) => {
+  const { t, i18n } = useTranslation();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<TransactionFilter>("all");
@@ -93,17 +95,17 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
 
     switch (kind) {
       case "purchase":
-        return <Tag color="blue">Purchase</Tag>;
+        return <Tag color="blue">{t("transactions.purchase")}</Tag>;
       case "sale":
-        return <Tag color="green">Sale</Tag>;
+        return <Tag color="green">{t("transactions.sale")}</Tag>;
       case "received":
-        return <Tag color="purple">Received</Tag>;
+        return <Tag color="purple">{t("transactions.received")}</Tag>;
       case "upgrade":
-        return <Tag color="gold">Upgrade</Tag>;
+        return <Tag color="blue">{t("transactions.upgrade")}</Tag>;
       case "burn":
-        return <Tag color="volcano">Burn</Tag>;
+        return <Tag color="volcano">{t("transactions.burn")}</Tag>;
       default:
-        return <Tag>Transaction</Tag>;
+        return <Tag>{t("transactions.transaction")}</Tag>;
     }
   };
 
@@ -127,26 +129,26 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
 
   const columns = [
     {
-      title: "Type",
+      title: t("transactions.type"),
       dataIndex: "transaction_type",
       key: "type",
       width: 100,
       render: (_: string, tx: Transaction) => getTypeTag(tx),
     },
     {
-      title: "Collection",
+      title: t("transactions.collection"),
       dataIndex: "collection_name",
       key: "collection",
       width: 190,
       render: (name: string, tx: Transaction) => (
         <Flex vertical gap={0}>
           <Text strong>{name}</Text>
-          <Text type="secondary">Gift #{tx.present_id}</Text>
+          <Text type="secondary">{t("transactions.gift", { id: tx.present_id })}</Text>
         </Flex>
       ),
     },
     {
-      title: "Counterparty",
+      title: t("transactions.counterparty"),
       key: "counterparty",
       width: 140,
       render: (_: unknown, tx: Transaction) => {
@@ -166,14 +168,14 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
                 handleUserClick(otherUsername);
               }}
             >
-              {otherUsername || "Unknown"}
+              {otherUsername || t("common.unknown")}
             </Text>
           </Flex>
         );
       },
     },
     {
-      title: "Price",
+      title: t("transactions.price"),
       dataIndex: "transaction_price",
       key: "price",
       width: 100,
@@ -182,7 +184,7 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
       ),
     },
     {
-      title: "Status",
+      title: t("transactions.status"),
       dataIndex: "transaction_status",
       key: "status",
       width: 100,
@@ -191,12 +193,12 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
       ),
     },
     {
-      title: "Date",
+      title: t("transactions.date"),
       dataIndex: "transaction_date",
       key: "date",
       width: 160,
       render: (date: string) => (
-        <Text type="secondary">{new Date(date).toLocaleString()}</Text>
+        <Text type="secondary">{new Date(date).toLocaleString(i18n.language)}</Text>
       ),
     },
     {
@@ -212,7 +214,7 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
             setSelectedTransaction(tx);
           }}
         >
-          Details
+          {t("transactions.details")}
         </Button>
       ),
     },
@@ -225,7 +227,7 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
         onCancel={onClose}
         footer={null}
         width="min(860px, calc(100vw - 24px))"
-        title={<Title level={4} className="!mb-0">Transaction History</Title>}
+        title={<Title level={4} className="!mb-0">{t("transactions.historyTitle")}</Title>}
       >
         <Flex vertical gap={16} className="mt-4">
           <Flex gap={8} wrap="wrap">
@@ -234,21 +236,21 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
               onChange={() => setFilter("all")}
               className="text-[16px] p-1"
             >
-              All
+              {t("transactions.all")}
             </Tag.CheckableTag>
             <Tag.CheckableTag
               checked={filter === "purchases"}
               onChange={() => setFilter("purchases")}
               className="text-[16px] p-1"
             >
-              Purchases
+              {t("transactions.purchases")}
             </Tag.CheckableTag>
             <Tag.CheckableTag
               checked={filter === "sales"}
               onChange={() => setFilter("sales")}
               className="text-[16px] p-1"
             >
-              Sales
+              {t("transactions.sales")}
             </Tag.CheckableTag>
           </Flex>
 
@@ -261,10 +263,10 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
               description={
                 <Text type="secondary">
                   {filter === "all"
-                    ? "No transactions yet"
+                    ? t("transactions.noTransactions")
                     : filter === "purchases"
-                    ? "No purchases yet"
-                    : "No sales yet"}
+                    ? t("transactions.noPurchases")
+                    : t("transactions.noSales")}
                 </Text>
               }
               className="py-8"

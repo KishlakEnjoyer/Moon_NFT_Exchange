@@ -2,6 +2,7 @@ import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 interface AlbumContextMenuProps {
   children: ReactNode;
@@ -16,16 +17,17 @@ const AlbumContextMenu = ({
   onDelete,
   onRename,
 }: AlbumContextMenuProps) => {
+  const { t } = useTranslation();
   const items: MenuProps["items"] = [
     {
       key: "rename",
       icon: <EditOutlined />,
-      label: "Rename",
+      label: t("common.rename"),
     },
     {
       key: "delete",
       icon: <DeleteOutlined />,
-      label: "Delete",
+      label: t("common.delete"),
       danger: true,
     },
   ];

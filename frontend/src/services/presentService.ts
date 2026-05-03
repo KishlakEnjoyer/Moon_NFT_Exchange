@@ -22,6 +22,8 @@ export interface PresentDetail {
   owner_id: number | null;
   owner_profile_pic_url: string | null;
   is_on_sale: boolean;
+  active_listing_id: number | null;
+  active_listing_price: string | null;
   is_visible: number;
   is_upgraded: boolean;
   is_burned?: boolean;
@@ -42,6 +44,13 @@ export interface UpgradePresentResponse {
   tx_hash: string;
   price: string;
   new_balance: string;
+}
+
+export interface PriceEstimate {
+  avg_price: string | null;
+  low_price: string | null;
+  high_price: string | null;
+  listings_count: number;
 }
 
 const hasFileExtension = (value: string) => /\.[a-z0-9]+$/i.test(value);
@@ -68,6 +77,15 @@ export const getPresentDetail = async (presentId: number): Promise<PresentDetail
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.detail || "Failed to fetch present details");
+  }
+  return res.json();
+};
+
+export const getPriceEstimate = async (presentId: number): Promise<PriceEstimate> => {
+  const res = await fetch(`${API_URL}/price-estimate/pricing/present/${presentId}`);
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to fetch recommended price");
   }
   return res.json();
 };

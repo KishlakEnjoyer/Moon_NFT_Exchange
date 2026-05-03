@@ -24,16 +24,21 @@ def search_users(
     limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    query = db.query(User).filter(User.is_active == 1)
+    query = db.query(User)
     if q.strip():
         pattern = f"%{q.strip().lower()}%"
-        query = query.filter(User.username.ilike(pattern))
+        query = query.filter(
+            (User.username.ilike(pattern)) |
+            (User.tg_username.ilike(pattern)) |
+            (User.vk_username.ilike(pattern))
+        )
     users = query.limit(limit).all()
     return [
         {
             "user_id": u.user_id,
             "username": u.username,
-            "profile_pic_url": u.profile_pic_url,
+            "profile_pic_url": u.profile_pic_url if u.is_active else None,
+            "is_active": u.is_active,
         }
         for u in users
     ]
