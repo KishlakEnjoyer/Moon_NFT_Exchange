@@ -67,7 +67,7 @@ const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
 
 export const formatTonPrice = (price: string | number, compact = false): string => {
   const amount = Number(price);
-  if (!Number.isFinite(amount)) return "0.00";
+  if (!Number.isFinite(amount)) return "0";
 
   if (compact && Math.abs(amount) >= 1_000_000) {
     return new Intl.NumberFormat("en-US", {
@@ -77,7 +77,7 @@ export const formatTonPrice = (price: string | number, compact = false): string 
   }
 
   return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(amount);
 };

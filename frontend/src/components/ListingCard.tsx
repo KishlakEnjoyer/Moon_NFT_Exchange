@@ -86,13 +86,18 @@ const ListingCard = ({ item, onPresentClick, onAddToCart, onBuy, isInCart, isOwn
           type="primary"
           icon={<TONIcon/>}
           size="large"
-          className="rounded-[var(--size-smm)] min-w-0"
+          className="rounded-[var(--size-smm)] min-w-0 !px-2 sm:!px-[15px]"
           title={`${fullPrice} TON`}
           loading={buying}
           disabled={isOwnListing}
           onClick={() => onBuy?.(item.listing_id)}
         >
-          <span className="block min-w-0 truncate text-[13px] sm:text-[var(--size-base)]">{price}</span>
+          <span
+            className="block min-w-0 truncate font-normal leading-none"
+            style={{ fontSize: "clamp(14px, 3.9vw, 18px)" }}
+          >
+            {price}
+          </span>
         </Button>
 
         <Button

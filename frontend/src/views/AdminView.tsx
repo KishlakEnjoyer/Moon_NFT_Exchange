@@ -13,7 +13,6 @@ import {
   Segmented,
   Select,
   Spin,
-  Statistic,
   Switch,
   Table,
   Tabs,
@@ -74,6 +73,9 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 type SalesRangePreset = "7" | "14" | "30" | "custom";
+type DashboardSection = "overview" | "charts" | "tables";
+type AccessSection = "users" | "roles";
+type AnalyticsSection = "reports" | "roles" | "sales" | "collections";
 
 const getDefaultSalesRange = (): [Dayjs, Dayjs] => [
   dayjs().subtract(6, "day"),
@@ -158,15 +160,15 @@ const PanelShell = ({ children, className = "" }: { children: ReactNode; classNa
 const VerticalBarChart = ({ data }: { data: AdminSummary["sales_by_day"] }) => {
   const values = data.map((item) => Number(item.volume));
   const max = Math.max(1, ...values);
-  const chartHeight = 176;
+  const chartHeight = 132;
 
   return (
-    <PanelShell className="h-full">
-      <Title level={4} className="!mb-4">Оборот по дням</Title>
+    <PanelShell className="h-full !p-3">
+      <Title level={5} className="!mb-3">Оборот по дням</Title>
       <div className="overflow-x-auto">
         <div
-          className="grid h-56 min-w-[560px] gap-3"
-          style={{ gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(88px, 1fr))` }}
+          className="grid h-44 min-w-[480px] gap-2"
+          style={{ gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(64px, 1fr))` }}
         >
           {data.map((item) => {
             const value = Number(item.volume);
@@ -205,9 +207,9 @@ const HorizontalBarChart = ({ data }: { data: AdminSummary["top_collections"] })
   const max = Math.max(1, ...values);
 
   return (
-    <PanelShell className="h-full">
-      <Title level={4} className="!mb-4">Коллекции по обороту</Title>
-      <Flex vertical gap={14}>
+    <PanelShell className="h-full !p-3">
+      <Title level={5} className="!mb-3">Коллекции по обороту</Title>
+      <Flex vertical gap={10}>
         {data.length === 0 && <Empty description="Пока нет продаж" />}
         {data.map((item) => {
           const value = Number(item.volume);
@@ -240,9 +242,9 @@ const StatusChart = ({ data }: { data: AdminSummary["reports_by_status"] }) => {
   const total = data.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <PanelShell>
-      <Title level={4}>Жалобы по статусам</Title>
-      <Flex vertical gap={10}>
+    <PanelShell className="!p-3">
+      <Title level={5} className="!mb-3">Жалобы по статусам</Title>
+      <Flex vertical gap={8}>
         {data.length === 0 && <Empty description="Жалоб пока нет" />}
         {data.map((item) => {
           const percent = total ? Math.round((item.count / total) * 100) : 0;
@@ -367,6 +369,7 @@ const DashboardPanel = ({ messageApi }: { messageApi: ReturnType<typeof message.
   const [loading, setLoading] = useState(true);
   const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>("14");
   const [customSalesRange, setCustomSalesRange] = useState<[Dayjs, Dayjs]>(getDefaultSalesRange);
+  const [dashboardSection, setDashboardSection] = useState<DashboardSection>("overview");
 
   const summaryParams = useMemo<AdminSummaryParams>(() => {
     if (salesRangePreset === "custom") {
@@ -417,91 +420,115 @@ const DashboardPanel = ({ messageApi }: { messageApi: ReturnType<typeof message.
 
   return (
     <Flex vertical gap={16}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
         {stats.map(([label, value]) => (
-          <PanelShell key={label}>
-            <Statistic title={label} value={value} />
-          </PanelShell>
+          <div
+            key={label}
+            className="rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] px-3 py-2"
+          >
+            <Text type="secondary" className="block truncate text-xs">{label}</Text>
+            <Text strong className="block truncate text-lg leading-6">{value}</Text>
+          </div>
         ))}
       </div>
 
-      <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
-        <Flex vertical gap={2}>
-          <Text strong>Период оборота</Text>
-          <Text type="secondary" className="text-xs">{salesRangeLabel}</Text>
-        </Flex>
-        <Flex gap={8} wrap="wrap" justify="flex-end">
-          <Segmented
-            value={salesRangePreset}
-            options={[
-              { label: "7 дней", value: "7" },
-              { label: "14 дней", value: "14" },
-              { label: "30 дней", value: "30" },
-              { label: "Диапазон", value: "custom" },
-            ]}
-            onChange={(value) => setSalesRangePreset(value as SalesRangePreset)}
-          />
-          {salesRangePreset === "custom" && (
-            <RangePicker
-              allowClear={false}
-              value={customSalesRange}
-              disabledDate={(current) => Boolean(current?.isAfter(dayjs(), "day"))}
-              onChange={(dates) => {
-                if (!dates?.[0] || !dates?.[1]) return;
-
-                if (dates[1].diff(dates[0], "day") > 89) {
-                  messageApi.warning("Диапазон не должен быть больше 90 дней");
-                  return;
-                }
-
-                setCustomSalesRange([dates[0], dates[1]]);
-              }}
+      <PanelShell className="!p-3">
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <Flex vertical gap={2}>
+            <Text strong>Период оборота</Text>
+            <Text type="secondary" className="text-xs">{salesRangeLabel}</Text>
+          </Flex>
+          <Flex gap={8} wrap="wrap" justify="flex-end">
+            <Segmented
+              value={dashboardSection}
+              options={[
+                { label: "Обзор", value: "overview" },
+                { label: "Графики", value: "charts" },
+                { label: "Таблицы", value: "tables" },
+              ]}
+              onChange={(value) => setDashboardSection(value as DashboardSection)}
             />
-          )}
-          <Button icon={<ReloadOutlined />} onClick={loadSummary}>Обновить</Button>
+            <Segmented
+              value={salesRangePreset}
+              options={[
+                { label: "7 дней", value: "7" },
+                { label: "14 дней", value: "14" },
+                { label: "30 дней", value: "30" },
+                { label: "Диапазон", value: "custom" },
+              ]}
+              onChange={(value) => setSalesRangePreset(value as SalesRangePreset)}
+            />
+            {salesRangePreset === "custom" && (
+              <RangePicker
+                allowClear={false}
+                value={customSalesRange}
+                disabledDate={(current) => Boolean(current?.isAfter(dayjs(), "day"))}
+                onChange={(dates) => {
+                  if (!dates?.[0] || !dates?.[1]) return;
+
+                  if (dates[1].diff(dates[0], "day") > 89) {
+                    messageApi.warning("Диапазон не должен быть больше 90 дней");
+                    return;
+                  }
+
+                  setCustomSalesRange([dates[0], dates[1]]);
+                }}
+              />
+            )}
+            <Button icon={<ReloadOutlined />} onClick={loadSummary}>Обновить</Button>
+          </Flex>
         </Flex>
-      </Flex>
+      </PanelShell>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <VerticalBarChart data={summary.sales_by_day} />
+      {dashboardSection === "overview" && (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <StatusChart data={summary.reports_by_status} />
+          <HorizontalBarChart data={summary.top_collections} />
         </div>
-        <HorizontalBarChart data={summary.top_collections} />
-      </div>
+      )}
 
-      <StatusChart data={summary.reports_by_status} />
+      {dashboardSection === "charts" && (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <VerticalBarChart data={summary.sales_by_day} />
+          </div>
+          <HorizontalBarChart data={summary.top_collections} />
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <PanelShell>
-          <Title level={4}>Топ коллекций по обороту</Title>
-          <Table
-            rowKey="collection_name"
-            size="small"
-            pagination={false}
-            dataSource={summary.top_collections}
-            columns={[
-              { title: "Коллекция", dataIndex: "collection_name" },
-              { title: "Сделки", dataIndex: "transactions", width: 100 },
-              { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
-            ]}
-          />
-        </PanelShell>
+      {dashboardSection === "tables" && (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <PanelShell className="!p-3">
+            <Title level={5} className="!mb-3">Топ коллекций по обороту</Title>
+            <Table
+              rowKey="collection_name"
+              size="small"
+              pagination={false}
+              dataSource={summary.top_collections}
+              columns={[
+                { title: "Коллекция", dataIndex: "collection_name" },
+                { title: "Сделки", dataIndex: "transactions", width: 100 },
+                { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
+              ]}
+            />
+          </PanelShell>
 
-        <PanelShell>
-          <Title level={4}>Продажи за период</Title>
-          <Table
-            rowKey="day"
-            size="small"
-            pagination={false}
-            dataSource={summary.sales_by_day}
-            columns={[
-              { title: "Дата", dataIndex: "day" },
-              { title: "Сделки", dataIndex: "transactions", width: 100 },
-              { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
-            ]}
-          />
-        </PanelShell>
-      </div>
+          <PanelShell className="!p-3">
+            <Title level={5} className="!mb-3">Продажи за период</Title>
+            <Table
+              rowKey="day"
+              size="small"
+              pagination={false}
+              dataSource={summary.sales_by_day}
+              columns={[
+                { title: "Дата", dataIndex: "day" },
+                { title: "Сделки", dataIndex: "transactions", width: 100 },
+                { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
+              ]}
+            />
+          </PanelShell>
+        </div>
+      )}
     </Flex>
   );
 };
@@ -956,6 +983,7 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [accessSection, setAccessSection] = useState<AccessSection>("users");
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<AdminRole | null>(null);
   const [roleForm] = Form.useForm<{ role_name: string; description: string | null }>();
@@ -1038,8 +1066,30 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
 
   return (
     <Flex vertical gap={16}>
-      <PanelShell>
-        <Flex vertical gap={16}>
+      <PanelShell className="!p-3">
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <Segmented
+            value={accessSection}
+            options={[
+              { label: "Пользователи", value: "users" },
+              { label: "Роли", value: "roles" },
+            ]}
+            onChange={(value) => setAccessSection(value as AccessSection)}
+          />
+          <Flex gap={8} wrap="wrap" justify="flex-end">
+            {accessSection === "roles" && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => openRoleModal(null)}>
+                Создать роль
+              </Button>
+            )}
+            <Button icon={<ReloadOutlined />} onClick={loadAll}>Обновить</Button>
+          </Flex>
+        </Flex>
+      </PanelShell>
+
+      {accessSection === "users" && (
+      <PanelShell className="!p-3">
+        <Flex vertical gap={12}>
           <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
             <Input.Search
               allowClear
@@ -1049,14 +1099,15 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
               onChange={(event) => setSearch(event.target.value)}
               onSearch={loadAll}
             />
-            <Button icon={<ReloadOutlined />} onClick={loadAll}>Обновить</Button>
           </Flex>
 
           <Table
             rowKey="user_id"
+            size="small"
             loading={loading}
             dataSource={users}
             scroll={{ x: 1370 }}
+            pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
             columns={[
               { title: "ID", dataIndex: "user_id", width: 90 },
               {
@@ -1131,14 +1182,14 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
           />
         </Flex>
       </PanelShell>
+      )}
 
-      <PanelShell>
-        <Flex vertical gap={16}>
+      {accessSection === "roles" && (
+      <PanelShell className="!p-3">
+        <Flex vertical gap={12}>
           <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
-            <Title level={4} className="!mb-0">Роли</Title>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openRoleModal(null)}>
-              Создать роль
-            </Button>
+            <Title level={5} className="!mb-0">Роли</Title>
+            <Text type="secondary" className="text-xs">{roles.length} записей</Text>
           </Flex>
 
           <Table
@@ -1176,6 +1227,7 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
           />
         </Flex>
       </PanelShell>
+      )}
 
       <Modal
         open={roleModalOpen}
@@ -1202,6 +1254,7 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: ReturnType<typeof mess
 const AnalyticsPanel = ({ messageApi }: { messageApi: ReturnType<typeof message.useMessage>[0] }) => {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsSection, setAnalyticsSection] = useState<AnalyticsSection>("reports");
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -1222,65 +1275,93 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: ReturnType<typeof message.
   if (!summary) return <Empty description="Нет данных для аналитики" />;
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <PanelShell>
-        <Title level={4}>Статусы жалоб</Title>
-        <Table
-          rowKey="status"
-          pagination={false}
-          dataSource={summary.reports_by_status}
-          columns={[
-            {
-              title: "Статус",
-              dataIndex: "status",
-              render: (value: string) => statusLabels[value] || value,
-            },
-            { title: "Количество", dataIndex: "count", width: 140 },
-          ]}
-        />
+    <Flex vertical gap={16}>
+      <PanelShell className="!p-3">
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <Segmented
+            value={analyticsSection}
+            options={[
+              { label: "Жалобы", value: "reports" },
+              { label: "Роли", value: "roles" },
+              { label: "Сделки", value: "sales" },
+              { label: "Коллекции", value: "collections" },
+            ]}
+            onChange={(value) => setAnalyticsSection(value as AnalyticsSection)}
+          />
+          <Button icon={<ReloadOutlined />} onClick={loadSummary}>Обновить</Button>
+        </Flex>
       </PanelShell>
 
-      <PanelShell>
-        <Title level={4}>Пользователи по ролям</Title>
-        <Table
-          rowKey="role"
-          pagination={false}
-          dataSource={summary.users_by_role}
-          columns={[
-            { title: "Роль", dataIndex: "role" },
-            { title: "Количество", dataIndex: "count", width: 140 },
-          ]}
-        />
-      </PanelShell>
+      {analyticsSection === "reports" && (
+        <PanelShell className="!p-3">
+          <Title level={5} className="!mb-3">Статусы жалоб</Title>
+          <Table
+            rowKey="status"
+            size="small"
+            pagination={false}
+            dataSource={summary.reports_by_status}
+            columns={[
+              {
+                title: "Статус",
+                dataIndex: "status",
+                render: (value: string) => statusLabels[value] || value,
+              },
+              { title: "Количество", dataIndex: "count", width: 140 },
+            ]}
+          />
+        </PanelShell>
+      )}
 
-      <PanelShell>
-        <Title level={4}>Дневная активность сделок</Title>
-        <Table
-          rowKey="day"
-          pagination={false}
-          dataSource={summary.sales_by_day}
-          columns={[
-            { title: "Дата", dataIndex: "day" },
-            { title: "Сделки", dataIndex: "transactions", width: 100 },
-            { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
-          ]}
-        />
-      </PanelShell>
+      {analyticsSection === "roles" && (
+        <PanelShell className="!p-3">
+          <Title level={5} className="!mb-3">Пользователи по ролям</Title>
+          <Table
+            rowKey="role"
+            size="small"
+            pagination={false}
+            dataSource={summary.users_by_role}
+            columns={[
+              { title: "Роль", dataIndex: "role" },
+              { title: "Количество", dataIndex: "count", width: 140 },
+            ]}
+          />
+        </PanelShell>
+      )}
 
-      <PanelShell>
-        <Title level={4}>Коллекции по продажам</Title>
-        <Table
-          rowKey="collection_name"
-          pagination={false}
-          dataSource={summary.top_collections}
-          columns={[
-            { title: "Коллекция", dataIndex: "collection_name" },
-            { title: "Сделки", dataIndex: "transactions", width: 100 },
-            { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
-          ]}
-        />
-      </PanelShell>
-    </div>
+      {analyticsSection === "sales" && (
+        <PanelShell className="!p-3">
+          <Title level={5} className="!mb-3">Дневная активность сделок</Title>
+          <Table
+            rowKey="day"
+            size="small"
+            pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
+            dataSource={summary.sales_by_day}
+            columns={[
+              { title: "Дата", dataIndex: "day" },
+              { title: "Сделки", dataIndex: "transactions", width: 100 },
+              { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
+            ]}
+          />
+        </PanelShell>
+      )}
+
+      {analyticsSection === "collections" && (
+        <PanelShell className="!p-3">
+          <Title level={5} className="!mb-3">Коллекции по продажам</Title>
+          <Table
+            rowKey="collection_name"
+            size="small"
+            pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
+            dataSource={summary.top_collections}
+            columns={[
+              { title: "Коллекция", dataIndex: "collection_name" },
+              { title: "Сделки", dataIndex: "transactions", width: 100 },
+              { title: "Оборот", dataIndex: "volume", render: formatTonNumber, width: 120 },
+            ]}
+          />
+        </PanelShell>
+      )}
+    </Flex>
   );
 };
 

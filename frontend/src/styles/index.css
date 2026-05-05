@@ -65,6 +65,29 @@ body {
   border-radius: 4px;
 }
 
+.moon-notifications-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--liquid-glass-bg-secondary) transparent;
+}
+
+.moon-notifications-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.moon-notifications-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.moon-notifications-scroll::-webkit-scrollbar-thumb {
+  background: var(--liquid-glass-bg-secondary);
+  border: 1px solid var(--black-transparent);
+  border-radius: 999px;
+}
+
+.moon-notifications-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-50);
+}
+
 
 
 

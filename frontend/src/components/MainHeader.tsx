@@ -1,29 +1,34 @@
 import { Header } from "antd/es/layout/layout";
 import {
-  Avatar, Badge, Button, Dropdown, Flex, List,
+  Avatar, Badge, Button, Drawer, Dropdown, Flex, Grid,
   MenuProps, Popover, Typography, message, theme,
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   BellOutlined,
+  CheckCircleOutlined,
   ControlOutlined,
+  GiftOutlined,
   GlobalOutlined,
+  InboxOutlined,
   LogoutOutlined,
   MoonOutlined,
   PlusOutlined,
+  ShoppingOutlined,
   ShoppingCartOutlined,
-  SmileOutlined,
   SunOutlined,
   TeamOutlined,
+  ThunderboltOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 
 import TONIcon from "./icons/TONIcon";
 import ModalCart from "./ModalCart";
 import { useBalanceSocket } from "../hooks/useBalanceSocket";
-import { useNotifications } from "../hooks/useNotifications";
+import { type AppNotification, useNotifications } from "../hooks/useNotifications";
 import PeopleSearchModal from "./PeopleSearchModal";
 import QrModal from "./QrModal";
 import { BLOCKED_ACCOUNT_MESSAGE, authFetch, clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
@@ -48,6 +53,67 @@ const getStoredCurrentUser = () => {
   }
 };
 
+const normalizeNotificationType = (value?: string | null) => (
+  value || ""
+).trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+const isSameCalendarDay = (first: Date, second: Date) => (
+  first.getFullYear() === second.getFullYear() &&
+  first.getMonth() === second.getMonth() &&
+  first.getDate() === second.getDate()
+);
+
+const getRuPlural = (count: number, one: string, few: string, many: string) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+};
+
+const getUnreadLabel = (count: number, isRu: boolean) => {
+  if (count <= 0) return isRu ? "Все прочитано" : "All caught up";
+  if (!isRu) return `${count} new`;
+  return `${count} ${getRuPlural(count, "новое", "новых", "новых")}`;
+};
+
+const formatNotificationTime = (value: string, language: string) => {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+
+  const isRu = language.startsWith("ru");
+  const locale = isRu ? "ru-RU" : "en-US";
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const time = date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+
+  if (isSameCalendarDay(date, now)) {
+    return `${isRu ? "Сегодня" : "Today"}, ${time}`;
+  }
+
+  if (isSameCalendarDay(date, yesterday)) {
+    return `${isRu ? "Вчера" : "Yesterday"}, ${time}`;
+  }
+
+  return date.toLocaleString(locale, {
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const humanizeNotificationType = (value: string | null | undefined, isRu: boolean) => {
+  if (!value) return isRu ? "Уведомление" : "Notification";
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
 const MainHeader: React.FC<MainHeaderProps> = ({
   darkMode,
   onThemeChange,
@@ -65,6 +131,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const [currentUser, setCurrentUser] = useState(getStoredCurrentUser);
   const [cartOpen, setCartOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasPendingAuth, setHasPendingAuth] = useState(false);
@@ -78,9 +145,11 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const screens = Grid.useBreakpoint();
   const currentUserBlocked = currentUser.is_active === 0;
+  const useNotificationsDrawer = screens.sm === false;
 
-  const { notifications, unreadCount, markAllRead } = useNotifications(
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications(
     isAuthenticated && currentUser.is_active !== 0 ? (currentUser.user_id ?? null) : null
   );
 
@@ -417,50 +486,213 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     maximumFractionDigits: 2,
   }).format(Number.isFinite(balance) ? balance : 0);
 
+  const liquidGlassPanelStyle = {
+    background: darkMode ? "var(--liquid-glass-bg-accent)" : "var(--liquid-glass-bg-light-theme)",
+    backdropFilter: "blur(var(--liquid-glass-blur))",
+    WebkitBackdropFilter: "blur(var(--liquid-glass-blur))",
+    border: "1px solid var(--black-transparent)",
+    boxShadow: "0 18px 55px rgba(0, 0, 0, 0.35)",
+  } satisfies CSSProperties;
+
+  const isRuLanguage = i18n.language.startsWith("ru");
+
+  const getNotificationMeta = (item: AppNotification) => {
+    const key = normalizeNotificationType(item.type) || normalizeNotificationType(item.description);
+    const fallbackTitle = humanizeNotificationType(item.description || item.type, isRuLanguage);
+
+    switch (key) {
+      case "purchase_confirmed":
+        return {
+          title: isRuLanguage ? "Покупка подтверждена" : "Purchase confirmed",
+          description: isRuLanguage ? "Лот оплачен и уже добавлен в вашу коллекцию." : "The lot is paid and added to your collection.",
+          icon: <CheckCircleOutlined />,
+          color: "var(--green-accept)",
+          background: "rgba(82, 196, 26, 0.14)",
+        };
+      case "listing_sold":
+      case "sale_completed":
+        return {
+          title: isRuLanguage ? "Подарок продан" : "Gift sold",
+          description: isRuLanguage ? "Покупатель оплатил лот, средства начислены на баланс." : "The buyer paid for the lot, funds were added to your balance.",
+          icon: <ShoppingOutlined />,
+          color: "#4f7cff",
+          background: "rgba(79, 124, 255, 0.14)",
+        };
+      case "upgrade_completed":
+      case "present_upgrade_completed":
+        return {
+          title: isRuLanguage ? "Апгрейд завершен" : "Upgrade completed",
+          description: isRuLanguage ? "Подарок улучшен и готов к продаже или коллекции." : "The gift was upgraded and is ready for sale or collection.",
+          icon: <ThunderboltOutlined />,
+          color: "#faad14",
+          background: "rgba(250, 173, 20, 0.16)",
+        };
+      case "gift_received":
+        return {
+          title: isRuLanguage ? "Получен подарок" : "Gift received",
+          description: isRuLanguage ? "Новый подарок появился в вашей коллекции." : "A new gift appeared in your collection.",
+          icon: <GiftOutlined />,
+          color: "var(--accent-150)",
+          background: "rgba(168, 185, 255, 0.16)",
+        };
+      case "listing_cancelled":
+        return {
+          title: isRuLanguage ? "Лот снят с продажи" : "Listing cancelled",
+          description: isRuLanguage ? "Подарок больше не продается на маркетплейсе." : "The gift is no longer listed on the marketplace.",
+          icon: <ShoppingCartOutlined />,
+          color: "var(--white-60)",
+          background: "rgba(158, 158, 158, 0.14)",
+        };
+      case "wallet_topup":
+        return {
+          title: isRuLanguage ? "Баланс пополнен" : "Balance topped up",
+          description: isRuLanguage ? "Токены зачислены на ваш кошелек." : "Tokens were credited to your wallet.",
+          icon: <CheckCircleOutlined />,
+          color: "#13c2c2",
+          background: "rgba(19, 194, 194, 0.14)",
+        };
+      case "burn_completed":
+        return {
+          title: isRuLanguage ? "Подарок сожжен" : "Gift burned",
+          description: isRuLanguage ? "Возврат начислен на ваш баланс." : "The refund was added to your balance.",
+          icon: <ThunderboltOutlined />,
+          color: "var(--red-fail)",
+          background: "rgba(181, 51, 51, 0.16)",
+        };
+      default:
+        return {
+          title: fallbackTitle,
+          description: isRuLanguage ? "Новое событие в аккаунте." : "New account event.",
+          icon: <BellOutlined />,
+          color: "var(--white-60)",
+          background: "rgba(158, 158, 158, 0.12)",
+        };
+    }
+  };
+
+  const getNotificationEntityLabel = (item: AppNotification) => {
+    if (!item.entity_id) return null;
+    const entityType = normalizeNotificationType(item.entity_type);
+    if (entityType === "present") return isRuLanguage ? `Подарок #${item.entity_id}` : `Gift #${item.entity_id}`;
+    if (entityType === "listing") return isRuLanguage ? `Лот #${item.entity_id}` : `Listing #${item.entity_id}`;
+    return `#${item.entity_id}`;
+  };
+
+  const handleNotificationClick = (item: AppNotification) => {
+    if (item.is_read === 0) {
+      void markRead(item.notification_id);
+    }
+  };
+
+  const notificationSummary = notifications.length === 0
+    ? (isRuLanguage ? "Тут пока тихо" : "Nothing here yet")
+    : getUnreadLabel(unreadCount, isRuLanguage);
+
+  const markAllReadButton = unreadCount > 0 ? (
+    <Button
+      type="text"
+      size="small"
+      onClick={(event) => {
+        event.stopPropagation();
+        void markAllRead();
+      }}
+    >
+      {t("header.markAllAsRead")}
+    </Button>
+  ) : null;
+
+  const notificationsList = notifications.length === 0 ? (
+    <Flex vertical align="center" className="py-10 gap-3 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-[var(--liquid-glass-bg-secondary)]">
+        <InboxOutlined className="text-2xl text-gray-400" />
+      </div>
+      <Flex vertical gap={2}>
+        <Text strong>{t("header.noNotifications")}</Text>
+        <Text className="text-xs text-gray-400">
+          {isRuLanguage ? "Когда что-то произойдет, покажем это здесь." : "When something happens, it will show up here."}
+        </Text>
+      </Flex>
+    </Flex>
+  ) : (
+    <div
+      className="moon-mobile-scroll moon-notifications-scroll flex flex-col gap-2 overflow-y-auto pr-1"
+      style={{
+        maxHeight: useNotificationsDrawer ? "calc(82vh - 132px)" : "min(480px, calc(100vh - 180px))",
+      }}
+    >
+      {notifications.map((item) => {
+        const meta = getNotificationMeta(item);
+        const isUnread = item.is_read === 0;
+        const entityLabel = getNotificationEntityLabel(item);
+        const notificationCardBg = darkMode ? "rgba(26, 26, 26, 0.78)" : "rgba(255, 255, 255, 0.78)";
+        const notificationCardAccentBg = darkMode ? "rgba(26, 26, 26, 0.92)" : "rgba(255, 255, 255, 0.92)";
+
+        return (
+          <button
+            key={item.notification_id}
+            type="button"
+            className="grid w-full grid-cols-[40px_minmax(0,1fr)_8px] items-start gap-3 rounded-[var(--size-smm)] border border-solid px-3 py-3 text-left transition hover:-translate-y-px hover:bg-[var(--liquid-glass-bg-secondary)]"
+            style={{
+              borderColor: isUnread ? meta.color : "var(--black-transparent)",
+              background: isUnread
+                ? `linear-gradient(135deg, ${meta.background}, ${notificationCardAccentBg})`
+                : notificationCardBg,
+              backdropFilter: "blur(var(--liquid-glass-blur))",
+              WebkitBackdropFilter: "blur(var(--liquid-glass-blur))",
+              boxShadow: isUnread ? "0 10px 28px rgba(0, 0, 0, 0.22)" : "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+            }}
+            onClick={() => handleNotificationClick(item)}
+          >
+            <span
+              className="grid h-10 w-10 place-items-center rounded-[var(--size-xs)] text-lg"
+              style={{
+                color: meta.color,
+                background: meta.background,
+              }}
+            >
+              {meta.icon}
+            </span>
+
+            <span className="min-w-0">
+              <Text strong={isUnread} className="block leading-5">
+                {meta.title}
+              </Text>
+              <Text className="block text-xs leading-5 text-gray-400">
+                {meta.description}
+              </Text>
+              <span className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                <Text className="text-[11px] text-gray-500">
+                  {formatNotificationTime(item.created_at, i18n.language)}
+                </Text>
+                {entityLabel && (
+                  <span className="max-w-full truncate rounded-full border border-solid border-[var(--black-transparent)] px-2 py-[1px] text-[11px] text-gray-400">
+                    {entityLabel}
+                  </span>
+                )}
+              </span>
+            </span>
+
+            <span
+              className={`mt-2 h-2 w-2 rounded-full ${isUnread ? "opacity-100" : "opacity-0"}`}
+              style={{ background: meta.color }}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+
   const notificationsContent = (
-    <div style={{ width: "min(360px, calc(100vw - 32px))" }}>
-      <Flex justify="space-between" align="center" className="mb-2">
-        <Text strong>{t("header.notifications")}</Text>
-        {unreadCount > 0 && (
-          <Button type="link" size="small" onClick={markAllRead}>
-            {t("header.markAllAsRead")}
-          </Button>
-        )}
+    <div style={{ width: "min(420px, calc(100vw - 32px))", padding: 14 }}>
+      <Flex justify="space-between" align="center" className="mb-3 gap-3">
+        <Flex vertical gap={0} className="min-w-0">
+          <Text strong>{t("header.notifications")}</Text>
+          <Text className="text-xs text-gray-400">{notificationSummary}</Text>
+        </Flex>
+        {markAllReadButton}
       </Flex>
 
-      {notifications.length === 0 ? (
-        <Flex vertical align="center" className="py-8 gap-2">
-          <SmileOutlined className="text-3xl text-gray-400" rotate={180} />
-          <Text className="text-gray-400">{t("header.noNotifications")}</Text>
-        </Flex>
-      ) : (
-        <div
-          className="moon-mobile-scroll"
-          style={{
-            maxHeight: "min(420px, calc(100vh - 180px))",
-            overflowY: "auto",
-            paddingRight: 4,
-          }}
-        >
-          <List
-            dataSource={notifications}
-            renderItem={(item) => (
-              <List.Item
-                className={`!px-2 !py-2 rounded ${item.is_read === 0 ? "bg-blue-500/10" : ""}`}
-              >
-                <Flex vertical gap={2} className="min-w-0">
-                  <Text className={`${item.is_read === 0 ? "font-semibold" : ""} whitespace-normal break-words`}>
-                    {item.description ?? item.type}
-                  </Text>
-                  <Text className="text-xs text-gray-400">
-                    {new Date(item.created_at).toLocaleString(i18n.language)}
-                  </Text>
-                </Flex>
-              </List.Item>
-            )}
-          />
-        </div>
-      )}
+      {notificationsList}
     </div>
   );
 
@@ -532,21 +764,80 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               />
             </Dropdown>
 
-            <Popover
-              content={notificationsContent}
-              trigger="click"
-              placement="bottomRight"
-              arrow={false}
-            >
-              <Badge count={unreadCount} size="small">
-                <Button
-                  type="text"
-                  icon={<BellOutlined />}
-                  className="icon-antd"
-                  size="large"
-                />
-              </Badge>
-            </Popover>
+            {useNotificationsDrawer ? (
+              <>
+                <Badge count={unreadCount} size="small">
+                  <Button
+                    type="text"
+                    icon={<BellOutlined />}
+                    className="icon-antd"
+                    size="large"
+                    aria-label={t("header.notifications")}
+                    onClick={() => setNotificationsOpen(true)}
+                  />
+                </Badge>
+                <Drawer
+                  open={notificationsOpen}
+                  onClose={() => setNotificationsOpen(false)}
+                  placement="bottom"
+                  height="min(82vh, 640px)"
+                  title={
+                    <Flex vertical gap={0} className="min-w-0">
+                      <Text strong>{t("header.notifications")}</Text>
+                      <Text className="text-xs text-gray-400">{notificationSummary}</Text>
+                    </Flex>
+                  }
+                  extra={markAllReadButton}
+                  styles={{
+                    mask: {
+                      background: "rgba(0, 0, 0, 0.35)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                    },
+                    section: {
+                      ...liquidGlassPanelStyle,
+                      borderBottom: 0,
+                      borderRadius: "18px 18px 0 0",
+                      overflow: "hidden",
+                    },
+                    body: { padding: 12, background: "transparent" },
+                    header: {
+                      borderBottom: "1px solid var(--black-transparent)",
+                      background: "transparent",
+                    },
+                  }}
+                >
+                  {notificationsList}
+                </Drawer>
+              </>
+            ) : (
+              <Popover
+                content={notificationsContent}
+                trigger="click"
+                placement="bottomRight"
+                arrow={false}
+                open={notificationsOpen}
+                onOpenChange={setNotificationsOpen}
+                styles={{
+                  container: {
+                    ...liquidGlassPanelStyle,
+                    borderRadius: "var(--size-smm)",
+                    padding: 0,
+                    overflow: "hidden",
+                  },
+                }}
+              >
+                <Badge count={unreadCount} size="small">
+                  <Button
+                    type="text"
+                    icon={<BellOutlined />}
+                    className="icon-antd"
+                    size="large"
+                    aria-label={t("header.notifications")}
+                  />
+                </Badge>
+              </Popover>
+            )}
 
             <Button
               type="text"

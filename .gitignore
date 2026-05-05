@@ -40,6 +40,7 @@ ganache-data/
 
 # Node
 node_modules/
+catboost_info/  
 
 backend/contract_info.json
 

@@ -59,7 +59,7 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
       clearInterval(ping);
       ws.close();
     };
-  }, [userId]);
+  }, [userId, onGiftReceived]);
 
   const markAllRead = useCallback(async () => {
     if (!userId) return;
@@ -69,7 +69,17 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
     setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
   }, [userId]);
 
+  const markRead = useCallback(async (notificationId: number) => {
+    if (!userId) return;
+    await authFetch(`${process.env.REACT_APP_API_URL}/notifications/${notificationId}/read`, {
+      method: "POST",
+    });
+    setNotifications(prev => prev.map(n => (
+      n.notification_id === notificationId ? { ...n, is_read: 1 } : n
+    )));
+  }, [userId]);
+
   const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
-  return { notifications, unreadCount, markAllRead };
+  return { notifications, unreadCount, markAllRead, markRead };
 }

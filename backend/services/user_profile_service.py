@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session, joinedload
 from core.models import Album, AlbumPresent, CurrentOwner, Listing, ListingStatuses, Present, Transaction, User
 from services.blockchain.token_service import get_token_balance
 from services.blockchain.wallet_service import get_native_balance_eth
+from services.profile_content_moderation_service import validate_profile_content
 
 
-USERNAME_REGEX = re.compile(r"^[A-Za-z0-9_]{3,32}$")
+USERNAME_REGEX = re.compile("^[A-Za-z\u0400-\u04FF0-9_]{3,32}$")
 PROFILE_IMAGE_DATA_URL_REGEX = re.compile(r"^data:(image/(png|jpeg|webp));base64,(.+)$", re.DOTALL)
 PROFILE_IMAGE_EXTENSIONS = {
     "image/png": ".png",
@@ -59,7 +60,7 @@ def _validate_username(username: str) -> str:
         raise ValueError("Username cannot be empty")
 
     if not USERNAME_REGEX.fullmatch(username):
-        raise ValueError("Username must be 3-32 characters long and use only letters, numbers, and underscores")
+        raise ValueError("Username must be 3-32 characters long and use only Russian/English letters, numbers, and underscores")
 
     return username
 
@@ -304,6 +305,7 @@ def update_user_profile(
     about_me = _validate_about_me(about_me)
     tg_visibility = _validate_platform_visibility("Telegram", tg_visibility)
     vk_visibility = _validate_platform_visibility("VK", vk_visibility)
+    validate_profile_content(username, about_me)
 
     existing_user = db.scalar(
         select(User).where(User.username == username, User.user_id != user_id)
