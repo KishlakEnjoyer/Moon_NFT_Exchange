@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 const { Text, Title } = Typography;
 
 const API_URL = process.env.REACT_APP_API_URL;
+const MAX_LISTING_PRICE = 100000;
 
 interface GiftDetailModalProps {
   open: boolean;
@@ -123,6 +124,10 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     if (!detail) return;
     if (!listingPrice || listingPrice <= 0) {
       messageApi.error(t("giftDetail.enterValidPrice"));
+      return;
+    }
+    if (listingPrice > MAX_LISTING_PRICE) {
+      messageApi.error(t("giftDetail.maxListingPrice", { price: MAX_LISTING_PRICE }));
       return;
     }
 
@@ -472,6 +477,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               <Flex vertical gap={8}>
                 <InputNumber
                   min={0.01}
+                  max={MAX_LISTING_PRICE}
                   step={0.01}
                   precision={2}
                   value={listingPrice}

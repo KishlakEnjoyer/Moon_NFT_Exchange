@@ -12,6 +12,7 @@ from services.listing_purchase_service import buy_listing as buy_listing_service
 from services.smart_search_service import SmartSearchItem, smart_search_service
 
 listings_router = APIRouter(prefix="/listings", tags=["listings"])
+MAX_LISTING_PRICE = Decimal("100000")
 
 
 class ListingResponse(BaseModel):
@@ -169,7 +170,7 @@ def get_active_listings(
     symbol_ids: str | None = Query(default=None),
     price_min: Decimal | None = Query(default=None, ge=0),
     price_max: Decimal | None = Query(default=None, ge=0),
-    sort: str | None = Query(default=None, pattern="^(price_desc|price_asc|newest)$"),
+    sort: str | None = Query(default="newest", pattern="^(price_desc|price_asc|newest)$"),
     db: Session = Depends(get_db),
 ):
     search_text = search.strip() if search else ""
@@ -284,9 +285,15 @@ def create_listing(
     if existing:
         raise HTTPException(status_code=409, detail="Present is already listed for sale")
 
-    price = Decimal(req.price)
+    try:
+        price = Decimal(req.price)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid listing price") from exc
+
     if price <= 0:
         raise HTTPException(status_code=400, detail="Price must be greater than 0")
+    if price > MAX_LISTING_PRICE:
+        raise HTTPException(status_code=400, detail="Price must be less than or equal to 100000")
 
     listing = Listing(
         present_id=req.present_id,

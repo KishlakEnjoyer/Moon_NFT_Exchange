@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { appendAccessToken } from "../services/auth";
+import { API_BASE_URL, getWebSocketBaseUrl } from "../services/apiConfig";
 
 export const useBalanceSocket = (
   userId: number | null,
@@ -20,7 +21,7 @@ export const useBalanceSocket = (
       const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
       if (!currentUser.wallet_address) return;
       
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/blockchain-debug/wallet-info/${currentUser.wallet_address}`);
+      const res = await fetch(`${API_BASE_URL}/blockchain-debug/wallet-info/${currentUser.wallet_address}`);
       if (!res.ok) return;
       const data = await res.json();
       if (typeof data.token_balance === "string") {
@@ -51,7 +52,7 @@ export const useBalanceSocket = (
       if (cancelled) return;
 
       const ws = new WebSocket(
-        appendAccessToken(`${process.env.REACT_APP_WS_URL}/auth/ws/${userId}`)
+        appendAccessToken(`${getWebSocketBaseUrl()}/auth/ws/${userId}`)
       );
       wsRef.current = ws;
 

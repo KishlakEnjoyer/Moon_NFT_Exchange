@@ -1,20 +1,4 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL}
-        REACT_APP_WS_URL: ${REACT_APP_WS_URL}
-        REACT_APP_IMAGES_URL: ${REACT_APP_IMAGES_URL}
-        REACT_APP_FRONT_URL: ${REACT_APP_FRONT_URL}
-    container_name: moon_frontend
-    ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
-    restart: unless-stopped
-    networks:
-      - moon_net
-
   backend:
     build:
       context: ./backend

@@ -191,7 +191,17 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
     }
 
 
-def get_user_profile_info_by_username(db: Session, username: str) -> dict:
+def _can_view_private_socials(user: User, viewer_user_id: int | None) -> bool:
+    return viewer_user_id is not None and viewer_user_id == user.user_id
+
+
+def _visible_social_value(value, visibility: int, can_view_private: bool):
+    if can_view_private or int(visibility) == 1:
+        return value
+    return None
+
+
+def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id: int | None = None) -> dict:
     user = db.scalar(
         select(User)
         .where(User.username == username)
@@ -199,6 +209,8 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
 
     if not user:
         raise ValueError(f"User with username={username} not found")
+
+    can_view_private_socials = _can_view_private_socials(user, viewer_user_id)
 
     token_balance = "0"
     if user.is_active and user.wallet_address:
@@ -241,11 +253,11 @@ def get_user_profile_info_by_username(db: Session, username: str) -> dict:
 
     return {
         "user_id": user.user_id,
-        "user_tg_id": user.user_tg_id,
-        "user_vk_id": user.user_vk_id,
+        "user_tg_id": _visible_social_value(user.user_tg_id, user.tg_visibility, can_view_private_socials),
+        "user_vk_id": _visible_social_value(user.user_vk_id, user.vk_visibility, can_view_private_socials),
         "username": user.username,
-        "tg_username": user.tg_username,
-        "vk_username": user.vk_username,
+        "tg_username": _visible_social_value(user.tg_username, user.tg_visibility, can_view_private_socials),
+        "vk_username": _visible_social_value(user.vk_username, user.vk_visibility, can_view_private_socials),
         "tg_visibility": user.tg_visibility,
         "vk_visibility": user.vk_visibility,
         "profile_pic_url": user.profile_pic_url if user.is_active else None,

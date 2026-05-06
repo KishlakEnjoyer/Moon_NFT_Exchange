@@ -5,7 +5,10 @@ from services.frontend_url import get_frontend_url
 
 load_dotenv()
 
-contacts = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Moon NFT', url=get_frontend_url())],
-    [InlineKeyboardButton(text='GitHub', url='https://github.com/KishlakEnjoyer')],
-])
+contact_buttons = []
+frontend_url = get_frontend_url()
+if frontend_url:
+    contact_buttons.append([InlineKeyboardButton(text='Moon NFT', url=frontend_url)])
+contact_buttons.append([InlineKeyboardButton(text='GitHub', url='https://github.com/KishlakEnjoyer')])
+
+contacts = InlineKeyboardMarkup(inline_keyboard=contact_buttons)

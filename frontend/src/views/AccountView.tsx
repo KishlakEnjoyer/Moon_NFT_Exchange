@@ -40,6 +40,7 @@ import SendGiftModal from "../components/SendGiftModal";
 import TransactionHistoryModal from "../components/TransactionHistoryModal";
 import SpoilerSpan from "../components/SpoilerSpan";
 import { createAlbum, deleteAlbum, renameAlbum } from "../services/albumService";
+import { authFetch } from "../services/auth";
 import { getPresentDisplayImageUrl } from "../services/presentService";
 import { UpdateProfileResponse } from "../services/profileService";
 import { useNotifications } from "../hooks/useNotifications";
@@ -152,7 +153,7 @@ const AccountView = () => {
 
   const loadUser = () => {
     if (!username) return;
-    fetch(`${process.env.REACT_APP_API_URL}/user-info/web/${username}`)
+    authFetch(`${process.env.REACT_APP_API_URL}/user-info/web/${username}`)
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
         return res.json();
@@ -493,6 +494,33 @@ const AccountView = () => {
     visibility: number,
   ) => {
     const isVisible = Number(visibility) === 1;
+
+    if (!isVisible && (!isOwn || provider === "vk")) {
+      return (
+        <div className="flex min-w-0 items-center gap-2">
+          {provider === "tg" ? (
+            <Image
+              src="/icons/tg-icon-png.png"
+              alt="TgIcon"
+              style={{ width: "var(--size-lg)", marginBottom: "10px" }}
+              preview={false}
+            />
+          ) : (
+            <Image
+              src="/icons/vk-icon-png.png"
+              alt="VKIcon"
+              style={{ width: "var(--size-lg)" }}
+              preview={false}
+            />
+          )}
+
+          <SpoilerSpan pointerEvents="none" className="text-[var(--liquid-glass-fg)] opacity-70 break-all">
+            {t("profile.socialHidden")}
+          </SpoilerSpan>
+        </div>
+      );
+    }
+
     const label = provider === "tg"
       ? usernameValue || (userIdValue ? t("profile.telegramConnected") : t("profile.telegramNotConnected"))
       : usernameValue || (userIdValue ? `id${userIdValue}` : t("profile.vkNotConnected"));

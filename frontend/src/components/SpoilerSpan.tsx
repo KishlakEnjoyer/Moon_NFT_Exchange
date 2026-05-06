@@ -11,7 +11,8 @@ const SpoilerSpan = ({ children, className = "", pointerEvents = "auto" }: Spoil
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const node = containerRef.current;
+    if (!node) return;
 
     const el = document.createElement("spoiler-span") as HTMLElement;
     if (className) el.className = className;
@@ -20,10 +21,9 @@ const SpoilerSpan = ({ children, className = "", pointerEvents = "auto" }: Spoil
     const text = typeof children === "string" ? children : "";
     el.textContent = text;
 
-    containerRef.current.appendChild(el);
+    node.appendChild(el);
 
     return () => {
-      const node = containerRef.current;
       if (node && el.parentNode === node) {
         node.removeChild(el);
       }

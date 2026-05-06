@@ -241,7 +241,10 @@ export async function setAdminUserRole(userId: number, roleId: number): Promise<
   return parseResponse<{ ok: boolean }>(response, "Не удалось изменить роль пользователя");
 }
 
-export async function setAdminUserActive(userId: number, isActive: number): Promise<{ ok: boolean }> {
+export async function setAdminUserActive(
+  userId: number,
+  isActive: number,
+): Promise<{ ok: boolean; deactivated_listings?: number; approved_reports?: number }> {
   const response = await authFetch(`${API_URL}/admin/users/${userId}/active`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

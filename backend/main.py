@@ -25,7 +25,23 @@ load_dotenv()
 
 app = FastAPI(title="Moon NFT Exchange API")
 
-origins = [o for o in [os.getenv("REACT_APP_FRONT_URL"), os.getenv("REACT_APP_FRONT_URL2"), os.getenv("FRONT_URL_DOCKER")] if o]
+def _split_env_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip().rstrip("/") for item in value.split(",") if item.strip()]
+
+
+origins = []
+for origin in [
+    os.getenv("REACT_APP_FRONT_URL"),
+    os.getenv("REACT_APP_FRONT_URL2"),
+    os.getenv("FRONT_URL_DOCKER"),
+    *_split_env_list(os.getenv("CORS_ALLOWED_ORIGINS")),
+]:
+    if origin:
+        normalized_origin = origin.rstrip("/")
+        if normalized_origin not in origins:
+            origins.append(normalized_origin)
 
 print(f"🔐 CORS origins: {origins}")
 

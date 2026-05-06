@@ -12,7 +12,7 @@ import {
   Space,
   Tooltip
 } from "antd";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import TONIcon from "./icons/TONIcon";
 import { useTranslation } from "react-i18next";
@@ -56,6 +56,7 @@ interface FilterBarProps {
 }
 
 const MAX_INPUT_LENGTH = 50;
+const PRICE_FILTER_MAX = 10000;
 const DEFAULT_IMAGE_EXT: AssetExt = "webp";
 const BG_EXT: AssetExt = "png";
 
@@ -132,6 +133,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const [models, setModels] = useState<Option[]>([]);
   const [backgrounds, setBackgrounds] = useState<Option[]>([]);
   const [symbols, setSymbols] = useState<Option[]>([]);
+  const [collectionSelectOpen, setCollectionSelectOpen] = useState(false);
+  const collectionOpenGuardUntil = useRef(0);
 
   const [loadingCollections, setLoadingCollections] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -141,7 +144,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
 
   const [open, setOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, PRICE_FILTER_MAX]);
   const [sortOrder, setSortOrder] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [smart, setSmart] = useState(false);
@@ -196,7 +199,7 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const handleClear = () => {
     setSearch("");
     setSmart(false);
-    setPriceRange([0, 3000]);
+    setPriceRange([0, PRICE_FILTER_MAX]);
     setSortOrder(null);
     setModels([]);
     setFilters(EMPTY_FILTERS);
@@ -207,10 +210,28 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const handleApply = () => {
     updateFilters({
       price_min: priceRange[0],
-      price_max: priceRange[1],
+      price_max: priceRange[1] >= PRICE_FILTER_MAX ? undefined : priceRange[1],
       sort: sortOrder,
     });
     setOpen(false);
+  };
+
+  const formatPriceRangeEdge = (value: number) => (
+    value >= PRICE_FILTER_MAX ? `${PRICE_FILTER_MAX}+` : String(value)
+  );
+
+  const requestCollectionSelectOpen = () => {
+    collectionOpenGuardUntil.current = Date.now() + 300;
+    setCollectionSelectOpen(true);
+    window.setTimeout(() => setCollectionSelectOpen(true), 0);
+  };
+
+  const handleCollectionOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && Date.now() < collectionOpenGuardUntil.current) {
+      return;
+    }
+
+    setCollectionSelectOpen(nextOpen);
   };
 
   const filterPopup = (
@@ -224,19 +245,19 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         </Text>
         <Row align="middle" gutter={8} className="mt-[8px]">
           <Col>
-            <Text>{priceRange[0]}</Text>
+            <Text>{formatPriceRangeEdge(priceRange[0])}</Text>
           </Col>
           <Col flex="auto">
             <Slider
               range
               min={0}
-              max={3000}
+              max={PRICE_FILTER_MAX}
               value={priceRange}
               onChange={(val) => setPriceRange(val as [number, number])}
             />
           </Col>
           <Col>
-            <Text>{priceRange[1]}</Text>
+            <Text>{formatPriceRangeEdge(priceRange[1])}</Text>
           </Col>
         </Row>
       </div>
@@ -358,6 +379,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
           loading={loadingCollections}
           options={toSelectOptions(collections, "collections")}
           value={filters.collection_ids}
+          open={collectionSelectOpen ? true : undefined}
+          onOpenChange={handleCollectionOpenChange}
           onChange={handleCollectionChange}
         />
       </Col>
@@ -368,7 +391,19 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
           placeholder={
             filters.collection_ids.length === 0 ? t("filter.selectCollectionFirst") : t("filter.model")
           }
-          disabled={filters.collection_ids.length === 0}
+          open={filters.collection_ids.length === 0 ? false : undefined}
+          onMouseDown={(event) => {
+            if (filters.collection_ids.length === 0) {
+              event.preventDefault();
+              event.stopPropagation();
+              requestCollectionSelectOpen();
+            }
+          }}
+          onFocus={() => {
+            if (filters.collection_ids.length === 0) {
+              requestCollectionSelectOpen();
+            }
+          }}
           loading={loadingModels}
           options={toSelectOptions(models, "models")}
           value={filters.model_ids}

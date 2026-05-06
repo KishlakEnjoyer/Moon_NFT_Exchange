@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from core.auth import get_current_user
+from sqlalchemy import and_, or_
+
+from core.auth import get_current_user, get_optional_current_user_any
 from core.database import get_db
 from core.models import User
 from core.request_models import UpdateProfileRequest, UpdateProfileResponse
@@ -28,9 +30,11 @@ def search_users(
     if q.strip():
         pattern = f"%{q.strip().lower()}%"
         query = query.filter(
-            (User.username.ilike(pattern)) |
-            (User.tg_username.ilike(pattern)) |
-            (User.vk_username.ilike(pattern))
+            or_(
+                User.username.ilike(pattern),
+                and_(User.tg_visibility == 1, User.tg_username.ilike(pattern)),
+                and_(User.vk_visibility == 1, User.vk_username.ilike(pattern)),
+            )
         )
     users = query.limit(limit).all()
     return [
@@ -55,9 +59,17 @@ def get_user_info_by_tg_id(tg_id: int, db: Session = Depends(get_db)):
 
 
 @user_info_router.get("/web/{username}")
-def get_user_info_by_username(username: str, db: Session = Depends(get_db)):
+def get_user_info_by_username(
+    username: str,
+    current_user: User | None = Depends(get_optional_current_user_any),
+    db: Session = Depends(get_db),
+):
     try:
-        return get_user_profile_info_by_username(db, username)
+        return get_user_profile_info_by_username(
+            db,
+            username,
+            viewer_user_id=current_user.user_id if current_user else None,
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

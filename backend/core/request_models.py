@@ -22,6 +22,26 @@ class TopUpRequest(BaseModel):
     amount: Decimal = Field(gt=0, le=10000)
 
 
+class TelegramTopUpInvoiceResponse(BaseModel):
+    topup_id: int
+    user_id: int
+    wallet_address: str
+    amount: str
+    rate_rub_per_ton: str
+    rub_amount: str
+    price_kopecks: int
+    currency: str
+    cooldown_minutes: int
+
+
+class TelegramTopUpPaidRequest(BaseModel):
+    topup_id: int
+    currency: str
+    total_amount: int
+    provider_payment_charge_id: str | None = None
+    telegram_payment_charge_id: str | None = None
+
+
 class TopUpResponse(BaseModel):
     topup_id: int
     user_id: int

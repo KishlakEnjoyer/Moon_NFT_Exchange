@@ -137,6 +137,19 @@ def get_or_create_listing_status_id(db: Session, status_name: str) -> int:
     return int(status.status_id)
 
 
+def get_report_status_name(report: Report) -> str:
+    if not report.report_status or not report.report_status.report_status_name:
+        return ""
+    return report.report_status.report_status_name.strip().lower()
+
+
+def report_is_pending(report: Report) -> bool:
+    return report.closed_at is None and (
+        report.report_status_id == 1
+        or get_report_status_name(report) in PENDING_STATUS_NAMES
+    )
+
+
 def deactivate_user_active_listings(db: Session, user_id: int) -> int:
     active_status_id = get_or_create_listing_status_id(db, "active")
     cancelled_status_id = get_or_create_listing_status_id(db, "cancelled")
@@ -155,6 +168,30 @@ def deactivate_user_active_listings(db: Session, user_id: int) -> int:
         db.query(CartItem).filter(CartItem.listing_id.in_(listing_ids)).delete(synchronize_session=False)
 
     return len(listing_ids)
+
+
+def approve_pending_reports_for_user(db: Session, receiver_id: int, moderator_id: int) -> int:
+    approved_status_id = get_or_create_report_status_id(db, "approved")
+    now = datetime.utcnow()
+    reports = db.scalars(
+        select(Report)
+        .outerjoin(ReportStatus, Report.report_status_id == ReportStatus.report_status_id)
+        .where(
+            Report.receiver_id == receiver_id,
+            Report.closed_at.is_(None),
+            or_(
+                Report.report_status_id == 1,
+                func.lower(ReportStatus.report_status_name).in_(PENDING_STATUS_NAMES),
+            ),
+        )
+    ).all()
+
+    for report in reports:
+        report.report_status_id = approved_status_id
+        report.moderator_id = moderator_id
+        report.closed_at = now
+
+    return len(reports)
 
 
 def money(value) -> str:
@@ -423,9 +460,15 @@ def decide_report(
     current_user: User = Depends(require_manager),
     db: Session = Depends(get_db),
 ):
-    report = db.scalar(select(Report).where(Report.report_id == report_id))
+    report = db.scalar(
+        select(Report)
+        .where(Report.report_id == report_id)
+        .options(joinedload(Report.report_status))
+    )
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if not report_is_pending(report):
+        raise HTTPException(status_code=409, detail="Report is already closed")
 
     status_name = "approved" if payload.decision == "approve" else "rejected"
     report.report_status_id = get_or_create_report_status_id(db, status_name)
@@ -810,7 +853,13 @@ def set_user_active(
         raise HTTPException(status_code=404, detail="User not found")
     user.is_active = payload.is_active
     deactivated_listings = 0
+    approved_reports = 0
     if payload.is_active == 0:
         deactivated_listings = deactivate_user_active_listings(db, user.user_id)
+        approved_reports = approve_pending_reports_for_user(db, user.user_id, current_user.user_id)
     db.commit()
-    return {"ok": True, "deactivated_listings": deactivated_listings}
+    return {
+        "ok": True,
+        "deactivated_listings": deactivated_listings,
+        "approved_reports": approved_reports,
+    }

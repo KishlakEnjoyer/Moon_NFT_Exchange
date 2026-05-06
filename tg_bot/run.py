@@ -25,6 +25,7 @@ async def main():
     commands = [
         BotCommand(command="start", description="Start authentication process"),
         BotCommand(command="profile", description="Info about your profile"),
+        BotCommand(command="topup", description="Top up your balance"),
     ]
     await bot.set_my_commands(commands)
     await dp.start_polling(bot)
