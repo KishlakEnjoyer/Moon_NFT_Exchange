@@ -14,13 +14,14 @@ from services.topup_api import (
     TopupWalletNotFoundError,
     topup_topup_by_wal_adr,
 )
+from services.frontend_url import get_frontend_url
 from states.TopupState import TopupStates
 
 load_dotenv()
 
 router = Router()
 
-SITE_URL = os.getenv("REACT_APP_FRONT_URL")
+SITE_URL = get_frontend_url()
 API_URL = os.getenv("API_DOCKER_URL")
 TOPUP_MAX_AMOUNT = Decimal("10000")
 
