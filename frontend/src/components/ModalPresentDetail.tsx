@@ -1,5 +1,5 @@
 import { Modal, Flex, Typography, Image, Button, Avatar } from "antd";
-import { ApiListing, formatTonPrice, getPresentImageUrl, getSellerAvatarUrl } from "../services/listingService";
+import { ApiListing, formatTonPrice, getPresentImageUrl, getSellerAvatarUrl, recordListingView } from "../services/listingService";
 import TONIcon from "./icons/TONIcon";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCartOutlined } from "@ant-design/icons";
@@ -34,6 +34,16 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [marketStatusKey, setMarketStatusKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !item) {
+      return;
+    }
+
+    recordListingView(item.listing_id).catch((error) => {
+      console.error("Failed to record listing view:", error);
+    });
+  }, [open, item]);
 
   useEffect(() => {
     if (!open || !item) {

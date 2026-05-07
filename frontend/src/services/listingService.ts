@@ -15,6 +15,7 @@ export interface ApiListing {
   seller_username: string | null;
   seller_profile_pic_url: string | null;
   seller_wallet: string | null;
+  views: number;
 }
 
 export interface CartItem {
@@ -48,6 +49,20 @@ export interface BuyListingResponse {
   seller_tx_hash: string | null;
   new_balance: string | null;
   seller_new_balance: string | null;
+}
+
+export interface ListingViewResponse {
+  listing_id: number;
+  views: number;
+  counted: boolean;
+}
+
+export interface TopSpender {
+  user_id: number;
+  username: string | null;
+  profile_pic_url: string | null;
+  spent_ton: string;
+  transactions_count: number;
 }
 
 export interface ListingSearchParams {
@@ -171,6 +186,34 @@ export const buyListing = async (listingId: number): Promise<BuyListingResponse>
     const error = await res.json();
     throw new Error(error.detail || "Failed to buy listing");
   }
+  return res.json();
+};
+
+export const recordListingView = async (listingId: number): Promise<ListingViewResponse | null> => {
+  const res = await authFetch(`${API_URL}/listings/${listingId}/view`, {
+    method: "POST",
+  });
+
+  if (res.status === 401) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || "Failed to record listing view");
+  }
+
+  return res.json();
+};
+
+export const getTopSpenders = async (limit = 20): Promise<TopSpender[]> => {
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  const res = await fetch(`${API_URL}/transactions/top-spenders?${searchParams.toString()}`);
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || "Failed to load top users");
+  }
+
   return res.json();
 };
 

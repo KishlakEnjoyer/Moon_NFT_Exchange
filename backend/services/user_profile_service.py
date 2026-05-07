@@ -223,6 +223,7 @@ def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id
         select(Present)
         .join(CurrentOwner, CurrentOwner.present_id == Present.present_id)
         .where(CurrentOwner.owner_id == user.user_id, Present.is_burned == 0)
+        .order_by(CurrentOwner.owned_since.desc(), Present.present_id.desc())
         .options(
             joinedload(Present.collection),
             joinedload(Present.model),

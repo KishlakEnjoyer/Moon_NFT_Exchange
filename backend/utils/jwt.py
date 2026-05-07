@@ -7,13 +7,15 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM") or "HS256"
+ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS") or "90")
 
 def generate_jwt(user_id: int, role_id: int) -> str:
+    issued_at = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "role_id": role_id,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
-        "iat": datetime.now(timezone.utc)
+        "exp": issued_at + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+        "iat": issued_at
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

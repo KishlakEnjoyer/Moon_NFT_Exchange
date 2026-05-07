@@ -29,6 +29,10 @@ export const clearAuthSession = () => {
   localStorage.removeItem("currentUser");
 };
 
+const notifyAuthStorageChanged = () => {
+  window.dispatchEvent(new Event("storage"));
+};
+
 const markStoredUserBlocked = () => {
   try {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
@@ -56,6 +60,11 @@ export const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}
     ...init,
     headers,
   });
+
+  if (response.status === 401 && accessToken) {
+    clearAuthSession();
+    notifyAuthStorageChanged();
+  }
 
   if (response.status === 403) {
     try {

@@ -20,6 +20,10 @@ class TopupWalletNotFoundError(Exception):
     pass
 
 
+class TopupInvoiceAmountError(Exception):
+    pass
+
+
 def _topup_headers() -> dict[str, str]:
     return {"X-Topup-Secret": TOPUP_INTERNAL_SECRET or ""}
 
@@ -33,6 +37,8 @@ def _raise_for_topup_error(response: httpx.Response) -> None:
         detail = data.get("detail")
         if detail == "User wallet not found":
             raise TopupWalletNotFoundError()
+        if isinstance(detail, str) and detail.startswith("Telegram invoice amount"):
+            raise TopupInvoiceAmountError(detail)
         raise RuntimeError(str(detail))
 
     if response.status_code == 403:
@@ -72,6 +78,16 @@ async def create_telegram_topup_invoice(wallet_adr: str, amount: str) -> dict:
     _raise_for_topup_error(response)
     response.raise_for_status()
     return response.json()
+
+
+async def mark_telegram_topup_invoice_failed(topup_id: int) -> None:
+    url = f"{BACKEND_URL}/topup/telegram-invoice/{topup_id}/failed"
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(url, headers=_topup_headers())
+
+    _raise_for_topup_error(response)
+    response.raise_for_status()
 
 
 async def confirm_telegram_topup_paid(

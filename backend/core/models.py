@@ -334,6 +334,21 @@ class Listing(Base):
     status: Mapped[ListingStatuses] = relationship("ListingStatuses", back_populates="listings")
 
 
+class ListingView(Base):
+    __tablename__ = "listing_views"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    listing_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("listings.listing_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
 class TopupStatuses(Base):
     __tablename__ = "topup_statuses"
 

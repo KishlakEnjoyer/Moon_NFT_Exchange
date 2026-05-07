@@ -13,7 +13,7 @@ import {
   upgradePresent,
 } from "../services/presentService";
 import { authFetch } from "../services/auth";
-import { buyListing } from "../services/listingService";
+import { buyListing, recordListingView } from "../services/listingService";
 import { useTranslation } from "react-i18next";
 
 const { Text, Title } = Typography;
@@ -55,6 +55,16 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
       .catch(() => setDetail(null))
       .finally(() => setLoading(false));
   }, [open, presentId]);
+
+  useEffect(() => {
+    if (!open || canManage || !detail?.active_listing_id) {
+      return;
+    }
+
+    recordListingView(detail.active_listing_id).catch((error) => {
+      console.error("Failed to record listing view:", error);
+    });
+  }, [open, canManage, detail?.active_listing_id]);
 
   if (!detail && !loading) return null;
 

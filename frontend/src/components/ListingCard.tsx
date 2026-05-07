@@ -1,5 +1,5 @@
 import { Button, Card, Space, Typography, Image } from "antd";
-import { ShoppingCartOutlined } from "@ant-design/icons";
+import { EyeOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import TONIcon from "./icons/TONIcon";
 import { ApiListing, formatTonPrice, getPresentImageUrl } from "../services/listingService";
 import { useTranslation } from "react-i18next";
@@ -76,6 +76,16 @@ const ListingCard = ({ item, onPresentClick, onAddToCart, onBuy, isInCart, isOwn
             {item.model_name}
           </Text>
         )}
+        <Text
+          type="secondary"
+          className="block w-full"
+          style={{
+            fontSize: 'var(--size-sm)',
+            fontWeight: 'var(--font-light)',
+          }}
+        >
+          <EyeOutlined /> {item.views}
+        </Text>
       </Space>
 
       <div

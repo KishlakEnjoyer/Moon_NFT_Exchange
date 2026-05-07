@@ -4,7 +4,7 @@ import {
   EyeInvisibleOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Flex, Input, Modal, Switch, Typography, message } from "antd";
+import { Avatar, Button, Flex, Input, Modal, Slider, Switch, Typography, message } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import QrModal from "./QrModal";
@@ -20,8 +20,12 @@ const MAX_USERNAME_LENGTH = 32;
 const MAX_ABOUT_ME_LENGTH = 150;
 const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const AVATAR_CROP_OUTPUT_SIZE = 512;
+const AVATAR_CROP_MAX_ZOOM_MULTIPLIER = 4;
 
 type AuthProvider = "tg" | "vk";
+type CropPosition = { x: number; y: number };
+type ImageSize = { width: number; height: number };
 
 interface EditableProfileData {
   about_me: string | null;
@@ -61,14 +65,102 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+const loadImageElement = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load image"));
+    image.src = src;
+  });
+
+const getMinCropScale = (imageSize: ImageSize | null, stageSize: number) => {
+  if (!imageSize || stageSize <= 0) {
+    return 1;
+  }
+
+  return Math.max(stageSize / imageSize.width, stageSize / imageSize.height);
+};
+
+const clampCropPosition = (
+  position: CropPosition,
+  imageSize: ImageSize | null,
+  scale: number,
+  stageSize: number,
+): CropPosition => {
+  if (!imageSize || stageSize <= 0) {
+    return position;
+  }
+
+  const renderedWidth = imageSize.width * scale;
+  const renderedHeight = imageSize.height * scale;
+
+  const minX = Math.min(0, stageSize - renderedWidth);
+  const minY = Math.min(0, stageSize - renderedHeight);
+  const maxX = Math.max(0, stageSize - renderedWidth);
+  const maxY = Math.max(0, stageSize - renderedHeight);
+
+  return {
+    x: Math.min(maxX, Math.max(minX, position.x)),
+    y: Math.min(maxY, Math.max(minY, position.y)),
+  };
+};
+
+const createCroppedAvatarDataUrl = async (
+  imageSrc: string,
+  imageSize: ImageSize,
+  position: CropPosition,
+  scale: number,
+  stageSize: number,
+) => {
+  const image = await loadImageElement(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_CROP_OUTPUT_SIZE;
+  canvas.height = AVATAR_CROP_OUTPUT_SIZE;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Failed to prepare image crop");
+  }
+
+  const sourceX = Math.max(0, -position.x / scale);
+  const sourceY = Math.max(0, -position.y / scale);
+  const sourceSize = Math.min(
+    imageSize.width - sourceX,
+    imageSize.height - sourceY,
+    stageSize / scale,
+  );
+
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    AVATAR_CROP_OUTPUT_SIZE,
+    AVATAR_CROP_OUTPUT_SIZE,
+  );
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+};
+
 const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditProfileModalProps) => {
   const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cropStageRef = useRef<HTMLDivElement | null>(null);
   const pollingRef = useRef<number | null>(null);
   const authAbortRef = useRef<AbortController | null>(null);
   const profilePhotoCheckAbortRef = useRef<AbortController | null>(null);
   const profilePhotoCheckIdRef = useRef(0);
+  const cropDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origin: CropPosition;
+  } | null>(null);
 
   const [username, setUsername] = useState("");
   const [aboutMe, setAboutMe] = useState("");
@@ -77,6 +169,12 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
   const [profilePicDataUrl, setProfilePicDataUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingProfilePhoto, setIsCheckingProfilePhoto] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [cropImageSize, setCropImageSize] = useState<ImageSize | null>(null);
+  const [cropStageSize, setCropStageSize] = useState(280);
+  const [cropPosition, setCropPosition] = useState<CropPosition>({ x: 0, y: 0 });
+  const [cropScale, setCropScale] = useState(1);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authProvider, setAuthProvider] = useState<AuthProvider>("tg");
@@ -101,6 +199,11 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     setTgVisible(Number(profile.tg_visibility) === 1);
     setVkVisible(Number(profile.vk_visibility) === 1);
     setProfilePicDataUrl(null);
+    setCropModalOpen(false);
+    setCropImageSrc(null);
+    setCropImageSize(null);
+    setCropPosition({ x: 0, y: 0 });
+    setCropScale(1);
   }, [open, profile]);
 
   useEffect(() => {
@@ -120,8 +223,61 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         profilePhotoCheckAbortRef.current.abort();
         profilePhotoCheckAbortRef.current = null;
       }
+
+      cropDragRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!cropModalOpen) {
+      return;
+    }
+
+    const updateStageSize = () => {
+      const node = cropStageRef.current;
+      if (!node) {
+        return;
+      }
+
+      const width = Math.floor(node.getBoundingClientRect().width);
+      if (width > 0) {
+        setCropStageSize(width);
+      }
+    };
+
+    updateStageSize();
+
+    if (typeof ResizeObserver === "undefined" || !cropStageRef.current) {
+      window.addEventListener("resize", updateStageSize);
+      return () => window.removeEventListener("resize", updateStageSize);
+    }
+
+    const observer = new ResizeObserver(updateStageSize);
+    observer.observe(cropStageRef.current);
+    return () => observer.disconnect();
+  }, [cropModalOpen]);
+
+  useEffect(() => {
+    if (!cropImageSize || !cropModalOpen) {
+      return;
+    }
+
+    setCropScale((currentScale) => {
+      const minScale = getMinCropScale(cropImageSize, cropStageSize);
+      const nextScale = Math.max(currentScale, minScale);
+      setCropPosition((currentPosition) => {
+        const nextPosition = currentScale < minScale
+          ? {
+              x: (cropStageSize - cropImageSize.width * nextScale) / 2,
+              y: (cropStageSize - cropImageSize.height * nextScale) / 2,
+            }
+          : currentPosition;
+
+        return clampCropPosition(nextPosition, cropImageSize, nextScale, cropStageSize);
+      });
+      return nextScale;
+    });
+  }, [cropImageSize, cropModalOpen, cropStageSize]);
 
   const previewSrc = useMemo(() => {
     if (profilePicDataUrl) {
@@ -134,6 +290,15 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
 
     return `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
   }, [profile, profilePicDataUrl]);
+
+  const cropMinScale = useMemo(
+    () => getMinCropScale(cropImageSize, cropStageSize),
+    [cropImageSize, cropStageSize],
+  );
+  const cropMaxScale = useMemo(
+    () => Math.max(cropMinScale * AVATAR_CROP_MAX_ZOOM_MULTIPLIER, cropMinScale + 0.1),
+    [cropMinScale],
+  );
 
   const clearAuthPolling = () => {
     if (pollingRef.current) {
@@ -262,6 +427,104 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     fileInputRef.current?.click();
   };
 
+  const closeCropModal = () => {
+    cropDragRef.current = null;
+    setCropModalOpen(false);
+    setCropImageSrc(null);
+    setCropImageSize(null);
+    setCropPosition({ x: 0, y: 0 });
+    setCropScale(1);
+  };
+
+  const handleCropCancel = () => {
+    profilePhotoCheckIdRef.current += 1;
+
+    if (profilePhotoCheckAbortRef.current) {
+      profilePhotoCheckAbortRef.current.abort();
+      profilePhotoCheckAbortRef.current = null;
+    }
+
+    setIsCheckingProfilePhoto(false);
+    closeCropModal();
+  };
+
+  const handleCropImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const imageSize = {
+      width: event.currentTarget.naturalWidth,
+      height: event.currentTarget.naturalHeight,
+    };
+    const minScale = getMinCropScale(imageSize, cropStageSize);
+
+    setCropImageSize(imageSize);
+    setCropScale(minScale);
+    setCropPosition(
+      clampCropPosition(
+        {
+          x: (cropStageSize - imageSize.width * minScale) / 2,
+          y: (cropStageSize - imageSize.height * minScale) / 2,
+        },
+        imageSize,
+        minScale,
+        cropStageSize,
+      ),
+    );
+  };
+
+  const handleCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!cropImageSize || isCheckingProfilePhoto) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cropDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: cropPosition,
+    };
+  };
+
+  const handleCropPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = cropDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !cropImageSize) {
+      return;
+    }
+
+    const nextPosition = {
+      x: drag.origin.x + event.clientX - drag.startX,
+      y: drag.origin.y + event.clientY - drag.startY,
+    };
+
+    setCropPosition(clampCropPosition(nextPosition, cropImageSize, cropScale, cropStageSize));
+  };
+
+  const handleCropPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = cropDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    cropDragRef.current = null;
+  };
+
+  const handleCropScaleChange = (value: number) => {
+    if (!cropImageSize) {
+      return;
+    }
+
+    const nextScale = Math.max(cropMinScale, Math.min(cropMaxScale, value));
+    const center = cropStageSize / 2;
+    const ratio = nextScale / cropScale;
+    const nextPosition = {
+      x: center - (center - cropPosition.x) * ratio,
+      y: center - (center - cropPosition.y) * ratio,
+    };
+
+    setCropScale(nextScale);
+    setCropPosition(clampCropPosition(nextPosition, cropImageSize, nextScale, cropStageSize));
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -291,12 +554,47 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     }
 
     try {
+      const dataUrl = await readFileAsDataUrl(file);
+
+      if (checkId === profilePhotoCheckIdRef.current) {
+        setCropImageSrc(dataUrl);
+        setCropImageSize(null);
+        setCropPosition({ x: 0, y: 0 });
+        setCropScale(1);
+        setCropModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Failed to read profile photo:", error);
+      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedReadImage"));
+    }
+  };
+
+  const handleConfirmCrop = async () => {
+    if (!cropImageSrc || !cropImageSize) {
+      return;
+    }
+
+    profilePhotoCheckIdRef.current += 1;
+    const checkId = profilePhotoCheckIdRef.current;
+
+    if (profilePhotoCheckAbortRef.current) {
+      profilePhotoCheckAbortRef.current.abort();
+      profilePhotoCheckAbortRef.current = null;
+    }
+
+    try {
       const controller = new AbortController();
       profilePhotoCheckAbortRef.current = controller;
       setIsCheckingProfilePhoto(true);
 
-      const dataUrl = await readFileAsDataUrl(file);
-      const isSafe = await detectNsfwImage({ image_data_url: dataUrl }, controller.signal);
+      const croppedDataUrl = await createCroppedAvatarDataUrl(
+        cropImageSrc,
+        cropImageSize,
+        cropPosition,
+        cropScale,
+        cropStageSize,
+      );
+      const isSafe = await detectNsfwImage({ image_data_url: croppedDataUrl }, controller.signal);
 
       if (checkId !== profilePhotoCheckIdRef.current) {
         return;
@@ -308,12 +606,13 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         return;
       }
 
-      setProfilePicDataUrl(dataUrl);
+      setProfilePicDataUrl(croppedDataUrl);
+      closeCropModal();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      console.error("Failed to check profile photo:", error);
+      console.error("Failed to crop or check profile photo:", error);
       messageApi.error(error instanceof Error ? error.message : t("editProfile.failedCheckPhoto"));
     } finally {
       if (checkId === profilePhotoCheckIdRef.current) {
@@ -488,6 +787,60 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
             hidden
             onChange={handleFileChange}
           />
+        </Flex>
+      </Modal>
+
+      <Modal
+        open={cropModalOpen}
+        onCancel={handleCropCancel}
+        onOk={() => void handleConfirmCrop()}
+        okText={t("editProfile.applyPhoto")}
+        cancelText={t("common.cancel")}
+        confirmLoading={isCheckingProfilePhoto}
+        okButtonProps={{ disabled: !cropImageSize }}
+        width="min(420px, calc(100vw - 24px))"
+        title={<Title level={4} className="!mb-0">{t("editProfile.cropTitle")}</Title>}
+        destroyOnHidden
+      >
+        <Flex vertical gap={16} align="center" className="mt-4">
+          <div
+            ref={cropStageRef}
+            className="moon-avatar-crop-stage"
+            onPointerDown={handleCropPointerDown}
+            onPointerMove={handleCropPointerMove}
+            onPointerUp={handleCropPointerEnd}
+            onPointerCancel={handleCropPointerEnd}
+          >
+            {cropImageSrc && (
+              <img
+                src={cropImageSrc}
+                alt=""
+                draggable={false}
+                onLoad={handleCropImageLoad}
+                className="moon-avatar-crop-image"
+                style={{
+                  width: cropImageSize ? cropImageSize.width * cropScale : "auto",
+                  height: cropImageSize ? cropImageSize.height * cropScale : "auto",
+                  transform: `translate3d(${cropPosition.x}px, ${cropPosition.y}px, 0)`,
+                }}
+              />
+            )}
+            <div className="moon-avatar-crop-vignette" />
+            <div className="moon-avatar-crop-ring" />
+          </div>
+
+          <div className="w-full">
+            <Text strong className="block mb-2">{t("editProfile.zoom")}</Text>
+            <Slider
+              min={cropMinScale}
+              max={cropMaxScale}
+              step={0.01}
+              value={cropScale}
+              disabled={!cropImageSize || isCheckingProfilePhoto}
+              tooltip={{ open: false }}
+              onChange={handleCropScaleChange}
+            />
+          </div>
         </Flex>
       </Modal>
 

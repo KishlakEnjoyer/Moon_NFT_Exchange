@@ -14,6 +14,7 @@ from core.request_models import (
 from services.blockchain.topup_service import (
     confirm_paid_telegram_topup,
     create_telegram_topup_invoice,
+    mark_telegram_topup_failed,
     transfer_tokens_to_user_by_wallet_address,
 )
 
@@ -98,6 +99,24 @@ async def telegram_invoice(
             amount=payload.amount,
         )
         return TelegramTopUpInvoiceResponse(**result)
+    except ValueError as e:
+        handle_topup_error(e)
+    except RuntimeError as e:
+        handle_topup_error(e)
+
+
+@topup_router.post("/telegram-invoice/{topup_id}/failed")
+async def telegram_invoice_failed(
+    topup_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_topup_secret),
+) -> dict:
+    try:
+        return await asyncio.to_thread(
+            mark_telegram_topup_failed,
+            db=db,
+            topup_id=topup_id,
+        )
     except ValueError as e:
         handle_topup_error(e)
     except RuntimeError as e:

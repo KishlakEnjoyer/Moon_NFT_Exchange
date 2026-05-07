@@ -18,11 +18,14 @@ from services.blockchain.token_service import (
     to_token_units,
 )
 
-TOPUP_COOLDOWN_MINUTES = 5
+TOPUP_COOLDOWN_MINUTES = int(os.getenv("TOPUP_COOLDOWN_MINUTES", "1"))
 TOPUP_MIN_AMOUNT = Decimal(os.getenv("TOPUP_MIN_AMOUNT", "0"))
 TOPUP_MAX_AMOUNT = Decimal(os.getenv("TOPUP_MAX_AMOUNT", "10000"))
 TOPUP_RUB_PER_TON = Decimal(os.getenv("TOPUP_RUB_PER_TON", "100"))
 TOPUP_CURRENCY = "RUB"
+YOOKASSA_MIN_PAYMENT_RUB = Decimal(os.getenv("YOOKASSA_MIN_PAYMENT_RUB", str(TOPUP_RUB_PER_TON)))
+TELEGRAM_MIN_INVOICE_AMOUNT = int((YOOKASSA_MIN_PAYMENT_RUB * Decimal("100")).to_integral_value(rounding=ROUND_HALF_UP))
+TELEGRAM_MAX_INVOICE_AMOUNT = 99_999_999
 
 
 def _format_decimal(value: Decimal) -> str:
@@ -37,6 +40,15 @@ def get_topup_price_kopecks(amount: Decimal) -> int:
 
 def get_topup_rub_amount(amount: Decimal) -> Decimal:
     return (amount * TOPUP_RUB_PER_TON).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _validate_telegram_invoice_amount(amount: Decimal) -> int:
+    price_kopecks = get_topup_price_kopecks(amount)
+    if price_kopecks < TELEGRAM_MIN_INVOICE_AMOUNT:
+        raise ValueError("Telegram invoice amount is too small")
+    if price_kopecks > TELEGRAM_MAX_INVOICE_AMOUNT:
+        raise ValueError("Telegram invoice amount is too large")
+    return price_kopecks
 
 
 def _get_pending_status_id(db: Session) -> int:
@@ -70,7 +82,10 @@ def _validate_amount(amount: Decimal) -> None:
 def _check_cooldown(db: Session, wallet_adr: int) -> tuple[bool, int]:
     latest_topup = db.scalar(
         select(WalletTopup)
-        .where(WalletTopup.wallet_address == wallet_adr)
+        .where(
+            WalletTopup.wallet_address == wallet_adr,
+            WalletTopup.status == _get_confirmed_status_id(db),
+        )
         .order_by(desc(WalletTopup.created_at))
         .limit(1)
     )
@@ -107,6 +122,7 @@ def _get_active_user_by_wallet_address(db: Session, wallet_address: str) -> User
 
 def create_telegram_topup_invoice(db: Session, wallet_address: str, amount: Decimal) -> dict:
     _validate_amount(amount)
+    price_kopecks = _validate_telegram_invoice_amount(amount)
 
     user = _get_active_user_by_wallet_address(db, wallet_address)
 
@@ -138,9 +154,28 @@ def create_telegram_topup_invoice(db: Session, wallet_address: str, amount: Deci
         "amount": _format_decimal(amount),
         "rate_rub_per_ton": _format_decimal(TOPUP_RUB_PER_TON),
         "rub_amount": _format_decimal(rub_amount),
-        "price_kopecks": get_topup_price_kopecks(amount),
+        "price_kopecks": price_kopecks,
         "currency": TOPUP_CURRENCY,
         "cooldown_minutes": TOPUP_COOLDOWN_MINUTES,
+    }
+
+
+def mark_telegram_topup_failed(db: Session, topup_id: int) -> dict:
+    topup = db.get(WalletTopup, topup_id)
+    if not topup:
+        raise ValueError("Topup not found")
+
+    if topup.requested_via != "telegram_yookassa":
+        raise ValueError("Topup source mismatch")
+
+    pending_status_id = _get_pending_status_id(db)
+    if topup.status == pending_status_id:
+        topup.status = _get_failed_status_id(db)
+        db.commit()
+
+    return {
+        "topup_id": topup.topup_id,
+        "status": "failed",
     }
 
 

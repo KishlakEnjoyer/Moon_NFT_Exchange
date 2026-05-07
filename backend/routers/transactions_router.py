@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -9,6 +10,66 @@ from core.models import TransactionHistory, User
 from core.request_models import TransactionResponse
 
 transactions_router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+
+class TopSpenderResponse(BaseModel):
+    user_id: int
+    username: str | None
+    profile_pic_url: str | None
+    spent_ton: str
+    transactions_count: int
+
+
+@transactions_router.get("/top-spenders", response_model=List[TopSpenderResponse])
+def get_top_spenders(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    spender_id = case(
+        (TransactionHistory.transaction_type == "purchase", TransactionHistory.seller_id),
+        else_=TransactionHistory.buyer_id,
+    ).label("spender_id")
+
+    totals = (
+        db.query(
+            spender_id,
+            func.sum(TransactionHistory.transaction_price).label("spent_ton"),
+            func.count(TransactionHistory.transaction_id).label("transactions_count"),
+        )
+        .filter(TransactionHistory.transaction_status == "confirmed")
+        .group_by(spender_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            User.user_id,
+            User.username,
+            User.profile_pic_url,
+            totals.c.spent_ton,
+            totals.c.transactions_count,
+        )
+        .join(totals, totals.c.spender_id == User.user_id)
+        .filter(User.is_active == 1)
+        .order_by(
+            totals.c.spent_ton.desc(),
+            totals.c.transactions_count.desc(),
+            User.user_id.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        TopSpenderResponse(
+            user_id=row.user_id,
+            username=row.username,
+            profile_pic_url=row.profile_pic_url,
+            spent_ton=str(row.spent_ton or 0),
+            transactions_count=int(row.transactions_count or 0),
+        )
+        for row in rows
+    ]
 
 
 @transactions_router.get("/{user_id}", response_model=List[TransactionResponse])

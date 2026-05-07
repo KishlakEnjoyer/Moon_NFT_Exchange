@@ -1,7 +1,13 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Moon",
+  "name": "Moon Exchange",
+  "description": "Moon Exchange — маркетплейс цифровых подарков и NFT.",
   "icons": [
+    {
+      "src": "images/logo2.png",
+      "sizes": "200x200",
+      "type": "image/png"
+    },
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",

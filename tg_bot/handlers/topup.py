@@ -1,9 +1,10 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_HALF_UP, ROUND_UP
 import os
 from dotenv import load_dotenv
 import requests as rq
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, LabeledPrice, Message, PreCheckoutQuery
@@ -11,10 +12,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.topup_api import (
     TopupCooldownError,
+    TopupInvoiceAmountError,
     TopupUserNotFoundError,
     TopupWalletNotFoundError,
     confirm_telegram_topup_paid,
     create_telegram_topup_invoice,
+    mark_telegram_topup_invoice_failed,
 )
 from services.frontend_url import get_frontend_url
 from states.TopupState import TopupStates
@@ -29,6 +32,15 @@ YOOKASSA_TG_PROVIDER_TOKEN = os.getenv("YOOKASSA_TG_PROVIDER_TOKEN")
 TOPUP_RUB_PER_TON = Decimal(os.getenv("TOPUP_RUB_PER_TON", "100"))
 TOPUP_MIN_AMOUNT = Decimal(os.getenv("TOPUP_MIN_AMOUNT", "0"))
 TOPUP_MAX_AMOUNT = Decimal(os.getenv("TOPUP_MAX_AMOUNT", "10000"))
+YOOKASSA_MIN_PAYMENT_RUB = Decimal(os.getenv("YOOKASSA_MIN_PAYMENT_RUB", str(TOPUP_RUB_PER_TON)))
+TELEGRAM_MIN_INVOICE_AMOUNT = int((YOOKASSA_MIN_PAYMENT_RUB * Decimal("100")).to_integral_value(rounding=ROUND_HALF_UP))
+TELEGRAM_MAX_INVOICE_AMOUNT = 99_999_999
+TEST_PAYMENT_HINT = (
+    "Test payment mode:\n"
+    "- real money will not be charged;\n"
+    "- for card payment use test card 5555 5555 5555 4444, any future date and any CVC;\n"
+    "- for YooMoney wallet payment, log out of your real YooMoney account first."
+)
 
 
 def get_site_link_keyboard() -> InlineKeyboardMarkup | None:
@@ -54,6 +66,29 @@ def format_decimal(value: Decimal | str) -> str:
     return format(decimal_value.normalize(), "f")
 
 
+def get_topup_price_kopecks(amount: Decimal) -> int:
+    rub_amount = (amount * TOPUP_RUB_PER_TON).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return int((rub_amount * Decimal("100")).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def get_effective_max_topup_amount() -> Decimal:
+    telegram_max_rub = Decimal(TELEGRAM_MAX_INVOICE_AMOUNT) / Decimal("100")
+    telegram_max_ton = (telegram_max_rub / TOPUP_RUB_PER_TON).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_DOWN,
+    )
+    return min(TOPUP_MAX_AMOUNT, telegram_max_ton)
+
+
+def get_effective_min_topup_amount() -> Decimal:
+    telegram_min_rub = Decimal(TELEGRAM_MIN_INVOICE_AMOUNT) / Decimal("100")
+    telegram_min_ton = (telegram_min_rub / TOPUP_RUB_PER_TON).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_UP,
+    )
+    return max(TOPUP_MIN_AMOUNT, telegram_min_ton)
+
+
 def parse_topup_payload(payload: str | None) -> int | None:
     if not payload:
         return None
@@ -69,11 +104,14 @@ def parse_topup_payload(payload: str | None) -> int | None:
 
 
 async def start_topup_flow(message: Message, state: FSMContext) -> None:
+    min_amount = get_effective_min_topup_amount()
+    max_amount = get_effective_max_topup_amount()
     await state.set_state(TopupStates.waiting_for_topup_amount)
     await message.answer(
         "Enter the amount in TON.\n\n"
         f"Rate: 1 TON = {format_decimal(TOPUP_RUB_PER_TON)} RUB\n"
-        f"Amount: {format_decimal(TOPUP_MIN_AMOUNT)} - {format_decimal(TOPUP_MAX_AMOUNT)} TON"
+        f"Amount: {format_decimal(min_amount)} - {format_decimal(max_amount)} TON\n\n"
+        f"{TEST_PAYMENT_HINT}"
     )
 
 
@@ -126,8 +164,32 @@ async def top_up_amount_handler(message: Message, state: FSMContext) -> None:
         await message.answer(f"The amount must be at least {format_decimal(TOPUP_MIN_AMOUNT)}.")
         return
 
+    effective_min_amount = get_effective_min_topup_amount()
+    if amount < effective_min_amount:
+        await message.answer(
+            "The payment amount is too small for Telegram/YooMoney payments.\n\n"
+            f"Please enter at least {format_decimal(effective_min_amount)} TON."
+        )
+        return
+
     if amount > TOPUP_MAX_AMOUNT:
         await message.answer(f"The amount must be less than or equal to {format_decimal(TOPUP_MAX_AMOUNT)}.")
+        return
+
+    price_kopecks = get_topup_price_kopecks(amount)
+    if price_kopecks < TELEGRAM_MIN_INVOICE_AMOUNT:
+        await message.answer(
+            "The payment amount is too small for Telegram/YooMoney payments.\n\n"
+            f"Please enter at least {format_decimal(get_effective_min_topup_amount())} TON."
+        )
+        return
+
+    if price_kopecks > TELEGRAM_MAX_INVOICE_AMOUNT:
+        await message.answer(
+            "The payment amount is too large for Telegram payments.\n\n"
+            f"Please enter from {format_decimal(get_effective_min_topup_amount())} "
+            f"to {format_decimal(get_effective_max_topup_amount())} TON."
+        )
         return
 
     try:
@@ -158,31 +220,57 @@ async def top_up_amount_handler(message: Message, state: FSMContext) -> None:
         )
         await state.clear()
         return
+    except TopupInvoiceAmountError:
+        await message.answer(
+            "The payment amount is outside Telegram payment limits.\n\n"
+            f"Please enter from {format_decimal(get_effective_min_topup_amount())} "
+            f"to {format_decimal(get_effective_max_topup_amount())} TON."
+        )
+        return
     except Exception:
         await message.answer("Failed to create a payment invoice. Please try again later.")
         await state.clear()
         return
 
-    await message.answer_invoice(
-        title=f"Moon balance top-up: {invoice['amount']} TON",
-        description=(
-            f"{invoice['amount']} TON at the rate "
-            f"1 TON = {invoice['rate_rub_per_ton']} RUB"
-        ),
-        payload=f"topup:{invoice['topup_id']}:{tg_id}",
-        provider_token=YOOKASSA_TG_PROVIDER_TOKEN,
-        currency=invoice["currency"],
-        prices=[
-            LabeledPrice(
-                label=f"{invoice['amount']} TON",
-                amount=int(invoice["price_kopecks"]),
+    try:
+        await message.answer_invoice(
+            title=f"Moon balance top-up: {invoice['amount']} TON",
+            description=(
+                f"{invoice['amount']} TON at the rate "
+                f"1 TON = {invoice['rate_rub_per_ton']} RUB"
+            ),
+            payload=f"topup:{invoice['topup_id']}:{tg_id}",
+            provider_token=YOOKASSA_TG_PROVIDER_TOKEN,
+            currency=invoice["currency"],
+            prices=[
+                LabeledPrice(
+                    label=f"{invoice['amount']} TON",
+                    amount=int(invoice["price_kopecks"]),
+                )
+            ],
+        )
+    except TelegramBadRequest as exc:
+        try:
+            await mark_telegram_topup_invoice_failed(int(invoice["topup_id"]))
+        except Exception as mark_error:
+            print(f"Failed to mark rejected top-up invoice as failed: {mark_error}")
+
+        if "CURRENCY_TOTAL_AMOUNT_INVALID" in str(exc):
+            await message.answer(
+                "Telegram rejected this payment amount.\n\n"
+                f"Please enter from {format_decimal(get_effective_min_topup_amount())} "
+                f"to {format_decimal(get_effective_max_topup_amount())} TON."
             )
-        ],
-    )
+        else:
+            await message.answer("Telegram rejected the payment invoice. Please try again later.")
+        await state.clear()
+        return
+
     await message.answer(
         "Invoice created.\n\n"
         f"Top-up: {invoice['amount']} TON\n"
-        f"To pay: {invoice['rub_amount']} RUB"
+        f"To pay: {invoice['rub_amount']} RUB\n\n"
+        f"{TEST_PAYMENT_HINT}"
     )
     await state.clear()
 

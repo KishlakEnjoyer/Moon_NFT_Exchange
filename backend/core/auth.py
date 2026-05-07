@@ -65,10 +65,14 @@ def get_optional_current_user_any(
 
     try:
         user_id = _extract_user_id_from_token(credentials.credentials)
-    except Exception:
-        return None
+    except Exception as exc:
+        raise _get_unauthorized_exception("Invalid token") from exc
 
-    return db.query(User).filter(User.user_id == user_id).first()
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise _get_unauthorized_exception("User not found")
+
+    return user
 
 
 def get_current_user(

@@ -1,6 +1,7 @@
 import { FilterOutlined, CloseOutlined, ThunderboltOutlined, SearchOutlined } from "@ant-design/icons";
 import {
   Input,
+  InputNumber,
   Select,
   Row,
   Col,
@@ -57,6 +58,7 @@ interface FilterBarProps {
 
 const MAX_INPUT_LENGTH = 50;
 const PRICE_FILTER_MAX = 10000;
+const PRICE_INPUT_MAX = 100000;
 const DEFAULT_IMAGE_EXT: AssetExt = "webp";
 const BG_EXT: AssetExt = "png";
 
@@ -144,7 +146,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
 
   const [open, setOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, PRICE_FILTER_MAX]);
+  const [priceMin, setPriceMin] = useState<number | null>(null);
+  const [priceMax, setPriceMax] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [smart, setSmart] = useState(false);
@@ -199,7 +202,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const handleClear = () => {
     setSearch("");
     setSmart(false);
-    setPriceRange([0, PRICE_FILTER_MAX]);
+    setPriceMin(null);
+    setPriceMax(null);
     setSortOrder(null);
     setModels([]);
     setFilters(EMPTY_FILTERS);
@@ -207,10 +211,26 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
     setOpen(false);
   };
 
+  const normalizePriceInput = (value: string | number | null) => {
+    if (value === null || value === "") return null;
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return null;
+    return Math.min(Math.max(numericValue, 0), PRICE_INPUT_MAX);
+  };
+
   const handleApply = () => {
+    let nextMin = priceMin ?? undefined;
+    let nextMax = priceMax ?? undefined;
+
+    if (nextMin !== undefined && nextMax !== undefined && nextMin > nextMax) {
+      [nextMin, nextMax] = [nextMax, nextMin];
+      setPriceMin(nextMin);
+      setPriceMax(nextMax);
+    }
+
     updateFilters({
-      price_min: priceRange[0],
-      price_max: priceRange[1] >= PRICE_FILTER_MAX ? undefined : priceRange[1],
+      price_min: nextMin && nextMin > 0 ? nextMin : undefined,
+      price_max: nextMax,
       sort: sortOrder,
     });
     setOpen(false);
@@ -219,6 +239,11 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
   const formatPriceRangeEdge = (value: number) => (
     value >= PRICE_FILTER_MAX ? `${PRICE_FILTER_MAX}+` : String(value)
   );
+
+  const sliderPriceRange: [number, number] = [
+    Math.min(priceMin ?? 0, PRICE_FILTER_MAX),
+    Math.min(priceMax ?? PRICE_FILTER_MAX, PRICE_FILTER_MAX),
+  ];
 
   const requestCollectionSelectOpen = () => {
     collectionOpenGuardUntil.current = Date.now() + 300;
@@ -243,21 +268,51 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
         <Text strong>
           {t("filter.price")}, <TONIcon /> TON
         </Text>
+        <Row gutter={8} className="mt-[8px]">
+          <Col span={12}>
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={PRICE_INPUT_MAX}
+              step={0.01}
+              controls={false}
+              placeholder={t("filter.minPrice")}
+              value={priceMin}
+              onChange={(value) => setPriceMin(normalizePriceInput(value))}
+            />
+          </Col>
+          <Col span={12}>
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={PRICE_INPUT_MAX}
+              step={0.01}
+              controls={false}
+              placeholder={t("filter.maxPrice")}
+              value={priceMax}
+              onChange={(value) => setPriceMax(normalizePriceInput(value))}
+            />
+          </Col>
+        </Row>
         <Row align="middle" gutter={8} className="mt-[8px]">
           <Col>
-            <Text>{formatPriceRangeEdge(priceRange[0])}</Text>
+            <Text>{formatPriceRangeEdge(sliderPriceRange[0])}</Text>
           </Col>
           <Col flex="auto">
             <Slider
               range
               min={0}
               max={PRICE_FILTER_MAX}
-              value={priceRange}
-              onChange={(val) => setPriceRange(val as [number, number])}
+              value={sliderPriceRange}
+              onChange={(val) => {
+                const [nextMin, nextMax] = val as [number, number];
+                setPriceMin(nextMin);
+                setPriceMax(nextMax >= PRICE_FILTER_MAX ? null : nextMax);
+              }}
             />
           </Col>
           <Col>
-            <Text>{formatPriceRangeEdge(priceRange[1])}</Text>
+            <Text>{formatPriceRangeEdge(sliderPriceRange[1])}</Text>
           </Col>
         </Row>
       </div>
@@ -273,6 +328,8 @@ const FilterBar = ({ onFilterChange, loading = false }: FilterBarProps) => {
             { value: "price_desc", label: t("filter.priceDesc") },
             { value: "price_asc", label: t("filter.priceAsc") },
             { value: "newest", label: t("filter.newest") },
+            { value: "oldest", label: t("filter.oldest") },
+            { value: "most_viewed", label: t("filter.mostViewed") },
           ]}
         />
       </div>

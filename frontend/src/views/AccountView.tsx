@@ -495,7 +495,7 @@ const AccountView = () => {
   ) => {
     const isVisible = Number(visibility) === 1;
 
-    if (!isVisible && (!isOwn || provider === "vk")) {
+    if (!isVisible && !isOwn) {
       return (
         <div className="flex min-w-0 items-center gap-2">
           {provider === "tg" ? (

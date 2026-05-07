@@ -1,13 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from typing import List
 from pydantic import BaseModel
 from decimal import Decimal
 
-from core.auth import get_current_user
+from core.auth import get_current_user, get_optional_current_user_any
 from core.database import get_db
-from core.models import ActiveListingsView, CartItem, Listing, ListingStatuses, Present, User, CurrentOwner
+from core.models import (
+    ActiveListingsView,
+    CartItem,
+    CurrentOwner,
+    Listing,
+    ListingStatuses,
+    ListingView,
+    Present,
+    User,
+)
 from services.listing_purchase_service import buy_listing as buy_listing_service
 from services.smart_search_service import SmartSearchItem, smart_search_service
 
@@ -30,6 +40,7 @@ class ListingResponse(BaseModel):
     seller_username: str | None
     seller_profile_pic_url: str | None
     seller_wallet: str | None
+    views: int = 0
 
     class Config:
         from_attributes = True
@@ -67,6 +78,12 @@ class BuyListingResponse(BaseModel):
     seller_new_balance: str | None
 
 
+class ListingViewResponse(BaseModel):
+    listing_id: int
+    views: int
+    counted: bool
+
+
 def get_listing_status_id(db: Session, status_name: str) -> int:
     status_id = db.scalar(
         select(ListingStatuses.status_id).where(ListingStatuses.status_name == status_name)
@@ -87,6 +104,21 @@ def parse_csv_ids(value: str | None, field_name: str) -> list[int]:
         raise HTTPException(status_code=400, detail=f"Invalid {field_name}") from exc
 
 
+def get_listing_view_counts(db: Session, listing_ids: list[int]) -> dict[int, int]:
+    if not listing_ids:
+        return {}
+
+    return {
+        listing_id: int(views_count)
+        for listing_id, views_count in (
+            db.query(ListingView.listing_id, func.count(ListingView.user_id))
+            .filter(ListingView.listing_id.in_(listing_ids))
+            .group_by(ListingView.listing_id)
+            .all()
+        )
+    }
+
+
 def apply_listing_sort(query, sort: str | None):
     if sort == "price_desc":
         return query.order_by(ActiveListingsView.price.desc())
@@ -97,10 +129,36 @@ def apply_listing_sort(query, sort: str | None):
     if sort == "newest":
         return query.order_by(ActiveListingsView.listed_at.desc())
 
+    if sort == "oldest":
+        return query.order_by(ActiveListingsView.listed_at.asc())
+
+    if sort == "most_viewed":
+        views_subquery = (
+            select(
+                ListingView.listing_id,
+                func.count(ListingView.user_id).label("views_count"),
+            )
+            .group_by(ListingView.listing_id)
+            .subquery()
+        )
+        return (
+            query
+            .outerjoin(views_subquery, ActiveListingsView.listing_id == views_subquery.c.listing_id)
+            .order_by(
+                func.coalesce(views_subquery.c.views_count, 0).desc(),
+                ActiveListingsView.listed_at.desc(),
+                ActiveListingsView.listing_id.desc(),
+            )
+        )
+
     return query
 
 
-def sort_listing_rows(listings: list[ActiveListingsView], sort: str | None) -> list[ActiveListingsView]:
+def sort_listing_rows(
+    listings: list[ActiveListingsView],
+    sort: str | None,
+    views_by_listing_id: dict[int, int] | None = None,
+) -> list[ActiveListingsView]:
     if sort == "price_desc":
         return sorted(listings, key=lambda listing: listing.price, reverse=True)
 
@@ -110,14 +168,31 @@ def sort_listing_rows(listings: list[ActiveListingsView], sort: str | None) -> l
     if sort == "newest":
         return sorted(listings, key=lambda listing: listing.listed_at, reverse=True)
 
+    if sort == "oldest":
+        return sorted(listings, key=lambda listing: listing.listed_at)
+
+    if sort == "most_viewed":
+        views = views_by_listing_id or {}
+        return sorted(
+            listings,
+            key=lambda listing: (
+                views.get(listing.listing_id, 0),
+                listing.listed_at,
+                listing.listing_id,
+            ),
+            reverse=True,
+        )
+
     return listings
 
 
 def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> list[ListingResponse]:
     present_ids = [l.present_id for l in listings]
     seller_ids = [l.seller_id for l in listings]
+    listing_ids = [l.listing_id for l in listings]
     present_num_by_id = {}
     seller_profile_pic_by_id = {}
+    views_by_listing_id = {}
 
     if present_ids:
         present_num_by_id = {
@@ -137,6 +212,7 @@ def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> l
                 .all()
             )
         }
+    views_by_listing_id = get_listing_view_counts(db, listing_ids)
 
     return [
         ListingResponse(
@@ -154,6 +230,7 @@ def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> l
             seller_username=l.seller_username,
             seller_profile_pic_url=seller_profile_pic_by_id.get(l.seller_id),
             seller_wallet=l.seller_wallet,
+            views=views_by_listing_id.get(l.listing_id, 0),
         )
         for l in listings
     ]
@@ -170,7 +247,7 @@ def get_active_listings(
     symbol_ids: str | None = Query(default=None),
     price_min: Decimal | None = Query(default=None, ge=0),
     price_max: Decimal | None = Query(default=None, ge=0),
-    sort: str | None = Query(default="newest", pattern="^(price_desc|price_asc|newest)$"),
+    sort: str | None = Query(default="newest", pattern="^(price_desc|price_asc|newest|oldest|most_viewed)$"),
     db: Session = Depends(get_db),
 ):
     search_text = search.strip() if search else ""
@@ -243,7 +320,8 @@ def get_active_listings(
             for result in results
             if result.id in listings_by_id
         ]
-        listings = sort_listing_rows(listings, sort)
+        views_by_listing_id = get_listing_view_counts(db, [listing.listing_id for listing in listings])
+        listings = sort_listing_rows(listings, sort, views_by_listing_id)
 
     return make_listing_responses(db, listings)
 
@@ -337,6 +415,72 @@ def cancel_listing(
         listing_id=listing.listing_id,
         present_id=listing.present_id,
         status="cancelled",
+    )
+
+
+@listings_router.post("/{listing_id}/view", response_model=ListingViewResponse)
+def record_listing_view(
+    listing_id: int,
+    current_user: User | None = Depends(get_optional_current_user_any),
+    db: Session = Depends(get_db),
+):
+    def count_listing_views() -> int:
+        return int(
+            db.scalar(
+                select(func.count())
+                .select_from(ListingView)
+                .where(ListingView.listing_id == listing_id)
+            ) or 0
+        )
+
+    listing = db.scalar(
+        select(Listing)
+        .join(User, Listing.seller_id == User.user_id)
+        .where(
+            Listing.listing_id == listing_id,
+            Listing.status.has(ListingStatuses.status_name == "active"),
+            User.is_active == 1,
+        )
+    )
+    if not listing:
+        raise HTTPException(status_code=404, detail="Active listing not found")
+
+    if not current_user or not current_user.is_active:
+        return ListingViewResponse(
+            listing_id=listing.listing_id,
+            views=count_listing_views(),
+            counted=False,
+        )
+
+    existing_view = db.scalar(
+        select(ListingView).where(
+            ListingView.user_id == current_user.user_id,
+            ListingView.listing_id == listing.listing_id,
+        )
+    )
+    if existing_view:
+        return ListingViewResponse(
+            listing_id=listing.listing_id,
+            views=count_listing_views(),
+            counted=False,
+        )
+
+    db.add(ListingView(user_id=current_user.user_id, listing_id=listing.listing_id))
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return ListingViewResponse(
+            listing_id=listing_id,
+            views=count_listing_views(),
+            counted=False,
+        )
+
+    return ListingViewResponse(
+        listing_id=listing.listing_id,
+        views=count_listing_views(),
+        counted=True,
     )
 
 
