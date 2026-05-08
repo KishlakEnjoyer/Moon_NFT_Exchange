@@ -297,3 +297,42 @@ def buy_listing(db: Session, buyer: User, listing_id: int) -> dict:
         "new_balance": send_balance_update_safely(buyer.user_id, buyer.wallet_address),
         "seller_new_balance": send_balance_update_safely(seller.user_id, seller.wallet_address),
     }
+
+
+def prevalidate_cart_purchase(db: Session, buyer: User, listing_ids: list[int]) -> tuple[list[int], Decimal]:
+    unique_listing_ids = list(dict.fromkeys(listing_ids))
+    if not unique_listing_ids:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    required_units = 0
+    total = Decimal("0")
+
+    for listing_id in unique_listing_ids:
+        listing, _present, _owner, seller = get_listing_for_purchase(db, listing_id, buyer.user_id)
+        validate_wallets(buyer, seller)
+        price, _platform_fee, _seller_received = calculate_listing_amounts(listing.price)
+        total += price
+        required_units += to_token_units(str(price))
+
+    balance_raw = get_token_balance_raw(buyer.wallet_address)
+    if balance_raw < required_units:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient balance. Need {money(total)}, have {from_token_units(balance_raw)}",
+        )
+
+    return unique_listing_ids, money(total)
+
+
+def buy_cart_listings(db: Session, buyer: User, listing_ids: list[int]) -> dict:
+    unique_listing_ids, total = prevalidate_cart_purchase(db, buyer, listing_ids)
+    purchases = [
+        buy_listing(db=db, buyer=buyer, listing_id=listing_id)
+        for listing_id in unique_listing_ids
+    ]
+
+    return {
+        "purchases": purchases,
+        "total": str(total),
+        "new_balance": purchases[-1].get("new_balance") if purchases else None,
+    }

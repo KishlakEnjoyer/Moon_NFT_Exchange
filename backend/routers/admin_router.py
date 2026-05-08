@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -24,6 +25,12 @@ from core.models import (
     Transaction,
     User,
 )
+from services.notification_service import (
+    NOTIFICATION_TYPE_REPORT_WARNING,
+    create_notification,
+    manager,
+    notification_to_dict,
+)
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -38,6 +45,11 @@ archive_columns_checked = False
 
 class ReportDecisionRequest(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
+
+
+class ReportWarningRequest(BaseModel):
+    reason_ru: str | None = Field(default=None, max_length=255)
+    reason_en: str | None = Field(default=None, max_length=255)
 
 
 class DictionaryItemPayload(BaseModel):
@@ -223,6 +235,22 @@ def serialize_report(report: Report) -> dict:
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "closed_at": report.closed_at.isoformat() if report.closed_at else None,
     }
+
+
+def send_notification_ws_safely(user_id: int, data: dict) -> None:
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(manager.send_to_user(user_id, data))
+        else:
+            asyncio.run(manager.send_to_user(user_id, data))
+    except Exception:
+        pass
+
+
+def clean_warning_reason(value: str | None, fallback: str) -> str:
+    text_value = (value or "").strip()
+    return text_value or fallback
 
 
 def serialize_collection(item: Collections) -> dict:
@@ -491,6 +519,58 @@ def decide_report(
     )
 
     return serialize_report(report)
+
+
+@admin_router.post("/reports/{report_id}/warning")
+def send_report_warning(
+    report_id: int,
+    payload: ReportWarningRequest,
+    current_user: User = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    report = db.scalar(
+        select(Report)
+        .where(Report.report_id == report_id)
+        .options(
+            joinedload(Report.receiver),
+            joinedload(Report.report_type),
+        )
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not report.receiver:
+        raise HTTPException(status_code=404, detail="Report target not found")
+    if not report.receiver.is_active:
+        raise HTTPException(status_code=409, detail="Report target account is blocked")
+
+    fallback_reason = (report.report_type.report_type_title if report.report_type else None) or "Report reason"
+    reason_ru = clean_warning_reason(payload.reason_ru, fallback_reason)
+    reason_en = clean_warning_reason(payload.reason_en, fallback_reason)
+
+    notification = create_notification(
+        db=db,
+        user_id=report.receiver_id,
+        type_name=NOTIFICATION_TYPE_REPORT_WARNING,
+        entity_type="report",
+        entity_id=report.report_id,
+        payload={
+            "report_id": report.report_id,
+            "reason": fallback_reason,
+            "reason_ru": reason_ru,
+            "reason_en": reason_en,
+            "moderator_id": current_user.user_id,
+            "moderator_username": user_label(current_user),
+        },
+        type_description="Report warning",
+        create_type_if_missing=True,
+    )
+
+    db.commit()
+    db.refresh(notification)
+    notification_dict = notification_to_dict(notification)
+    send_notification_ws_safely(report.receiver_id, notification_dict)
+
+    return {"ok": True, "notification": notification_dict}
 
 
 @admin_router.get("/dictionaries/{kind}")

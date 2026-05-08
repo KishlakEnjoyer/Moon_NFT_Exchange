@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ConfigProvider, Layout, theme } from 'antd';
 import enUS from 'antd/locale/en_US';
 import ruRU from 'antd/locale/ru_RU';
@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 function App() {
   const { i18n } = useTranslation();
+  const themeTransitionTimerRef = useRef<number | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('darkMode');
     return savedTheme ? JSON.parse(savedTheme) : false;
@@ -22,6 +23,7 @@ function App() {
   const [showSuccessGlow, setShowSuccessGlow] = useState(false);
   const [showFailGlow, setShowFailGlow] = useState(false);
   const [showLogoutGlow, setShowLogoutGlow] = useState(false);
+  const [showWarningGlow, setShowWarningGlow] = useState(false);
   const [isAccountBlocked, setIsAccountBlocked] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('currentUser') || '{}')?.is_active === 0;
@@ -48,9 +50,31 @@ function App() {
   };
 
 
+  const handleThemeChange = (checked: boolean) => {
+    document.documentElement.classList.add('moon-theme-changing');
+    if (themeTransitionTimerRef.current) {
+      window.clearTimeout(themeTransitionTimerRef.current);
+    }
+    themeTransitionTimerRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove('moon-theme-changing');
+      themeTransitionTimerRef.current = null;
+    }, 420);
+
+    setDarkMode(checked);
+  };
+
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light';
   }, [darkMode]);
+
+  useEffect(() => () => {
+    if (themeTransitionTimerRef.current) {
+      window.clearTimeout(themeTransitionTimerRef.current);
+    }
+    document.documentElement.classList.remove('moon-theme-changing');
+  }, []);
 
   useEffect(() => {
     const syncBlockedState = () => {
@@ -72,7 +96,7 @@ function App() {
 
   return (
     <>
-    <div className={`glow-blum big ${showSuccessGlow ? 'success' : ''} ${showFailGlow || isAccountBlocked ? 'fail' : ''} ${showLogoutGlow ? 'logout' : ''}`}></div>
+    <div className={`glow-blum big ${showSuccessGlow ? 'success' : ''} ${showFailGlow || isAccountBlocked || showWarningGlow ? 'fail' : ''} ${showLogoutGlow ? 'logout' : ''}`}></div>
     <div className="glow-blum small"></div>
 
     <ConfigProvider locale={i18n.language.startsWith('ru') ? ruRU : enUS} theme={{
@@ -99,7 +123,7 @@ function App() {
       }
     }}>
       <Layout className='App'>
-        <MainHeader darkMode={darkMode} onThemeChange={setDarkMode} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow} onLogout={triggerLogoutGlow}/>
+        <MainHeader darkMode={darkMode} onThemeChange={handleThemeChange} onAuthSuccess={triggerSuccessGlow} onAuthFail={triggerFailGlow} onLogout={triggerLogoutGlow} onWarningOpenChange={setShowWarningGlow}/>
           <Routes> 
             <Route path="/" element={<MainView />} />
             <Route path="/account/:username" element={<AccountView/>} />

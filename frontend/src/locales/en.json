@@ -60,12 +60,15 @@
     "buyFor": "Buy for {{price}} TON",
     "owner": "Owner",
     "model": "Model",
+    "background": "Background",
     "symbol": "Symbol",
     "market": "Market",
     "checkingMarket": "Checking market...",
     "aboveMarket": "Above market",
     "belowMarket": "Below market",
-    "marketPrice": "Market price"
+    "marketPrice": "Market price",
+    "confirmBuyTitle": "Buy this gift?",
+    "confirmBuyDescription": "{{title}} for {{price}} TON"
   },
   "filter": {
     "price": "Price",
@@ -171,10 +174,14 @@
     "clear": "Clear cart",
     "total": "Total:",
     "buy": "Buy",
+    "buyAll": "Buy all",
+    "buyItem": "Buy lot",
     "purchaseCompleted": "Purchase completed",
+    "itemPurchased": "Lot purchased",
     "failedRemoveItem": "Failed to remove item",
     "failedClearCart": "Failed to clear cart",
-    "failedBuyCart": "Failed to buy cart"
+    "failedBuyCart": "Failed to buy cart",
+    "failedBuyItem": "Failed to buy lot"
   },
   "sendGift": {
     "title": "Send Gift",
@@ -202,6 +209,13 @@
     "failedLoadTypes": "Failed to load report types",
     "failedSubmit": "Failed to submit report",
     "submitted": "Report submitted"
+  },
+  "reportWarning": {
+    "title": "Moderation warning",
+    "description": "A complaint against your account was reviewed. Please fix the behavior described below.",
+    "reason": "Complaint reason",
+    "reasonFallback": "Reason not specified",
+    "ok": "I understand"
   },
   "people": {
     "title": "People",
@@ -376,6 +390,16 @@
       "reportRejected": "Report rejected",
       "alreadyClosed": "Report is already closed",
       "processFailed": "Failed to process report",
+      "warn": "Warn",
+      "warningTitle": "Send warning",
+      "warningDescription": "The warning will be sent to {{user}} as a notification and a modal alert.",
+      "warningReasonRu": "Reason in Russian",
+      "warningReasonEn": "Reason in English",
+      "enterWarningReasonRu": "Enter the Russian reason",
+      "enterWarningReasonEn": "Enter the English reason",
+      "sendWarning": "Send warning",
+      "warningSent": "Warning sent",
+      "warningFailed": "Failed to send warning",
       "userUnbanned": "User unbanned",
       "userBanned": "User banned",
       "userStatusFailed": "Failed to change user status",

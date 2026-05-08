@@ -12,14 +12,60 @@
   text-decoration: none;
 }
 
+:root {
+  --moon-page-bg: #f4f6ff;
+  --moon-page-fg: rgba(0, 0, 0, 0.88);
+}
+
 body {
   overflow-x: hidden;
   min-width: 320px;
+  background: var(--moon-page-bg);
+  color: var(--moon-page-fg);
+}
+
+html[data-theme="light"] {
+  --moon-page-bg: #f4f6ff;
+  --moon-page-fg: rgba(0, 0, 0, 0.88);
+}
+
+html[data-theme="dark"] {
+  --moon-page-bg: #05070d;
+  --moon-page-fg: rgba(255, 255, 255, 0.88);
 }
 
 .App {
   min-height: 100vh;
   min-height: 100svh;
+  background: transparent;
+  color: inherit;
+}
+
+.ant-layout {
+  background: transparent;
+}
+
+.moon-theme-changing,
+.moon-theme-changing body,
+.moon-theme-changing #root,
+.moon-theme-changing .App,
+.moon-theme-changing .ant-layout,
+.moon-theme-changing .ant-card,
+.moon-theme-changing .ant-modal-content,
+.moon-theme-changing .ant-popover-inner,
+.moon-theme-changing .ant-drawer-content,
+.moon-theme-changing .ant-btn,
+.moon-theme-changing .ant-input,
+.moon-theme-changing .ant-select-selector,
+.moon-theme-changing .ant-dropdown-menu {
+  transition:
+    background-color 0.36s ease,
+    background 0.36s ease,
+    color 0.36s ease,
+    border-color 0.36s ease,
+    box-shadow 0.36s ease,
+    fill 0.36s ease,
+    stroke 0.36s ease !important;
 }
 
 .icon-antd {

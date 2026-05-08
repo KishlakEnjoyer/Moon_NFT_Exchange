@@ -1,5 +1,5 @@
 import useDocumentTitle from "../hooks/useDocumentTitle";
-import { Avatar, FloatButton, Layout, Spin, Empty, Flex, Tag, Tabs, Typography } from "antd";
+import { Avatar, FloatButton, Layout, Spin, Empty, Flex, Tag, Tabs, Typography, Modal } from "antd";
 import { Content } from "antd/es/layout/layout";
 import FilterBar from "../components/FilterBar";
 import type { FilterState } from "../components/FilterBar";
@@ -60,6 +60,7 @@ const MainView = () => {
   const { t } = useTranslation();
   useDocumentTitle("Moon Exchange - Home");
   const [messageApi, contextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
 
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +108,7 @@ const MainView = () => {
   const loadTopUsers = useCallback(async () => {
     setTopUsersLoading(true);
     try {
-      const data = await getTopSpenders(20);
+      const data = await getTopSpenders(10);
       setTopUsers(data);
     } catch (e: any) {
       setTopUsers([]);
@@ -166,7 +167,7 @@ const MainView = () => {
     }
   };
 
-  const handleBuyListing = async (listingId: number) => {
+  const executeBuyListing = async (listingId: number) => {
     if (!currentUserId) {
       messageApi.warning(t("marketplace.loginBuyLots"));
       return;
@@ -191,6 +192,33 @@ const MainView = () => {
     } finally {
       setBuyingListingId(null);
     }
+  };
+
+  const handleBuyListing = (listingId: number) => {
+    if (!currentUserId) {
+      messageApi.warning(t("marketplace.loginBuyLots"));
+      return;
+    }
+    if (currentUserBlocked) {
+      messageApi.error("Аккаунт заблокирован");
+      return;
+    }
+
+    const listing = listings.find((item) => item.listing_id === listingId)
+      || (selectedPresent?.listing_id === listingId ? selectedPresent : null);
+    const title = listing
+      ? `${listing.collection_name || t("marketplace.unknownCollection")} # ${listing.present_num}`
+      : t("listing.buy");
+    const price = listing ? formatTonPrice(listing.price) : "";
+
+    modalApi.confirm({
+      title: t("listing.confirmBuyTitle"),
+      content: t("listing.confirmBuyDescription", { title, price }),
+      okText: t("listing.buy"),
+      cancelText: t("common.cancel"),
+      centered: true,
+      onOk: () => executeBuyListing(listingId),
+    });
   };
 
   const cartListingIds = new Set(cartItems.map((i) => i.listing_id));
@@ -329,6 +357,7 @@ const MainView = () => {
   return (
     <Layout className="min-h-screen">
       {contextHolder}
+      {modalContextHolder}
       <Content className="py-[var(--size-2xs)] px-2 sm:px-4 lg:px-[var(--size-4xl)]">
         <div className="sticky top-0 z-[200] py-2 sm:py-[var(--size-sm)] h-auto">
           <Tabs

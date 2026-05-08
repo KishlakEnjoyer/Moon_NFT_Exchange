@@ -60,12 +60,15 @@
     "buyFor": "Купить за {{price}} TON",
     "owner": "Владелец",
     "model": "Модель",
+    "background": "\u0424\u043e\u043d",
     "symbol": "Символ",
     "market": "Рынок",
     "checkingMarket": "Проверка рынка...",
     "aboveMarket": "Выше рынка",
     "belowMarket": "Ниже рынка",
-    "marketPrice": "Рыночная цена"
+    "marketPrice": "Рыночная цена",
+    "confirmBuyTitle": "\u041a\u0443\u043f\u0438\u0442\u044c \u043f\u043e\u0434\u0430\u0440\u043e\u043a?",
+    "confirmBuyDescription": "{{title}} \u0437\u0430 {{price}} TON"
   },
   "filter": {
     "price": "Цена",
@@ -171,10 +174,14 @@
     "clear": "Очистить корзину",
     "total": "Итого:",
     "buy": "Купить",
+    "buyAll": "\u041a\u0443\u043f\u0438\u0442\u044c \u0432\u0441\u0435",
+    "buyItem": "\u041a\u0443\u043f\u0438\u0442\u044c \u043b\u043e\u0442",
     "purchaseCompleted": "Покупка завершена",
+    "itemPurchased": "\u041b\u043e\u0442 \u043a\u0443\u043f\u043b\u0435\u043d",
     "failedRemoveItem": "Не удалось удалить лот",
     "failedClearCart": "Не удалось очистить корзину",
-    "failedBuyCart": "Не удалось купить корзину"
+    "failedBuyCart": "Не удалось купить корзину",
+    "failedBuyItem": "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043a\u0443\u043f\u0438\u0442\u044c \u043b\u043e\u0442"
   },
   "sendGift": {
     "title": "Отправить подарок",
@@ -202,6 +209,13 @@
     "failedLoadTypes": "Не удалось загрузить причины жалобы",
     "failedSubmit": "Не удалось отправить жалобу",
     "submitted": "Жалоба отправлена"
+  },
+  "reportWarning": {
+    "title": "Предупреждение модерации",
+    "description": "Администрация рассмотрела жалобу на ваш аккаунт. Пожалуйста, исправьте поведение, указанное ниже.",
+    "reason": "Причина жалобы",
+    "reasonFallback": "Причина не указана",
+    "ok": "Понятно"
   },
   "people": {
     "title": "Люди",
@@ -376,6 +390,16 @@
       "reportRejected": "Жалоба отклонена",
       "alreadyClosed": "Жалоба уже закрыта",
       "processFailed": "Не удалось обработать жалобу",
+      "warn": "Предупредить",
+      "warningTitle": "Отправить предупреждение",
+      "warningDescription": "Предупреждение уйдёт пользователю {{user}} как уведомление и модальное окно.",
+      "warningReasonRu": "Причина на русском",
+      "warningReasonEn": "Причина на английском",
+      "enterWarningReasonRu": "Введите причину на русском",
+      "enterWarningReasonEn": "Введите причину на английском",
+      "sendWarning": "Отправить предупреждение",
+      "warningSent": "Предупреждение отправлено",
+      "warningFailed": "Не удалось отправить предупреждение",
       "userUnbanned": "Пользователь разбанен",
       "userBanned": "Пользователь забанен",
       "userStatusFailed": "Не удалось изменить статус пользователя",

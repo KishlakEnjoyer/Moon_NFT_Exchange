@@ -6,6 +6,7 @@ from typing import List
 from core.auth import get_current_user
 from core.database import get_db
 from core.models import ActiveListingsView, CartItem, Present, User
+from services.listing_purchase_service import buy_cart_listings
 
 cart_router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -32,6 +33,26 @@ class CartResponse(BaseModel):
     user_id: int
     items: List[CartItemResponse]
     total: str
+
+
+class CartPurchaseItemResponse(BaseModel):
+    listing_id: int
+    present_id: int
+    buyer_id: int
+    seller_id: int
+    price: str
+    platform_fee: str
+    seller_received: str
+    buyer_tx_hash: str
+    seller_tx_hash: str | None
+    new_balance: str | None
+    seller_new_balance: str | None
+
+
+class CartPurchaseResponse(BaseModel):
+    purchases: List[CartPurchaseItemResponse]
+    total: str
+    new_balance: str | None
 
 
 @cart_router.get("/{user_id}", response_model=CartResponse)
@@ -175,3 +196,28 @@ def clear_cart(
     db.query(CartItem).filter(CartItem.user_id == current_user.user_id).delete()
     db.commit()
     return {"ok": True}
+
+
+@cart_router.post("/{user_id}/buy", response_model=CartPurchaseResponse)
+def buy_cart(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Cannot buy another user's cart")
+
+    cart_items = (
+        db.query(CartItem)
+        .filter(CartItem.user_id == current_user.user_id)
+        .order_by(CartItem.added_at.asc(), CartItem.cart_item_id.asc())
+        .all()
+    )
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    return buy_cart_listings(
+        db=db,
+        buyer=current_user,
+        listing_ids=[item.listing_id for item in cart_items],
+    )

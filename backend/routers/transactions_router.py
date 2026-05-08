@@ -22,7 +22,7 @@ class TopSpenderResponse(BaseModel):
 
 @transactions_router.get("/top-spenders", response_model=List[TopSpenderResponse])
 def get_top_spenders(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=10, ge=1, le=10),
     db: Session = Depends(get_db),
 ):
     spender_id = case(

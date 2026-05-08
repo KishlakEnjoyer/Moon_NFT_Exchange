@@ -1,7 +1,7 @@
 import { Modal, Button, Flex, Divider, Typography, Empty, message } from "antd";
 import { useState, useEffect, useCallback } from "react";
 import TONIcon from "./icons/TONIcon";
-import { CartItem, getCart, removeFromCart, clearCart, buyListing } from "../services/listingService";
+import { CartItem, getCart, removeFromCart, clearCart, buyListing, buyCart } from "../services/listingService";
 import CartItemRow from "./CartItem";
 import { useTranslation } from "react-i18next";
 
@@ -36,7 +36,8 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
   const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [purchasing, setPurchasing] = useState(false);
+  const [purchasingCart, setPurchasingCart] = useState(false);
+  const [purchasingListingId, setPurchasingListingId] = useState<number | null>(null);
 
   const currentUser = getStoredCurrentUser();
   const currentUserId = currentUser.user_id;
@@ -84,25 +85,48 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       return;
     }
 
-    setPurchasing(true);
-    const purchasedListingIds: number[] = [];
+    setPurchasingCart(true);
 
     try {
-      for (const item of cartItems) {
-        const result = await buyListing(item.listing_id);
-        purchasedListingIds.push(item.listing_id);
-        updateStoredBalance(result.new_balance);
-      }
+      const result = await buyCart(currentUserId);
+      const purchasedListingIds = result.purchases.map((purchase) => purchase.listing_id);
+      const latestBalance = result.new_balance
+        ?? result.purchases[result.purchases.length - 1]?.new_balance
+        ?? null;
+      updateStoredBalance(latestBalance);
 
-      setCartItems([]);
+      setCartItems((prev) => prev.filter((item) => !purchasedListingIds.includes(item.listing_id)));
       window.dispatchEvent(new Event("listingsChanged"));
       messageApi.success(t("cart.purchaseCompleted"));
     } catch (e: any) {
-      setCartItems((prev) => prev.filter((item) => !purchasedListingIds.includes(item.listing_id)));
+      await loadCart();
       window.dispatchEvent(new Event("listingsChanged"));
       messageApi.error(e.message || t("cart.failedBuyCart"));
     } finally {
-      setPurchasing(false);
+      setPurchasingCart(false);
+    }
+  };
+
+  const handleBuyItem = async (item: CartItem) => {
+    if (!currentUserId) return;
+    if (currentUserBlocked) {
+      messageApi.error("Аккаунт заблокирован");
+      return;
+    }
+
+    setPurchasingListingId(item.listing_id);
+
+    try {
+      const result = await buyListing(item.listing_id);
+      updateStoredBalance(result.new_balance);
+      setCartItems((prev) => prev.filter((cartItem) => cartItem.listing_id !== item.listing_id));
+      window.dispatchEvent(new Event("listingsChanged"));
+      messageApi.success(t("cart.itemPurchased"));
+    } catch (e: any) {
+      messageApi.error(e.message || t("cart.failedBuyItem"));
+      await loadCart();
+    } finally {
+      setPurchasingListingId(null);
     }
   };
 
@@ -129,7 +153,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
             ) : (
               <>
                 <Flex justify="flex-end">
-                  <Button type="link" size="small" onClick={handleClearCart}>
+                  <Button type="link" size="small" disabled={purchasingCart || purchasingListingId !== null} onClick={handleClearCart}>
                     {t("cart.clear")}
                   </Button>
                 </Flex>
@@ -138,6 +162,9 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
                     key={item.cart_item_id}
                     item={item}
                     onRemove={handleRemove}
+                    onBuy={handleBuyItem}
+                    buying={purchasingListingId === item.listing_id}
+                    disabled={purchasingCart || currentUserBlocked || (purchasingListingId !== null && purchasingListingId !== item.listing_id)}
                     onPresentClick={handlePresentClick}
                     onClose={onClose}
                   />
@@ -156,8 +183,8 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
                   <TONIcon />
                 </Flex>
               </Flex>
-              <Button type="primary" size="large" block loading={purchasing} disabled={currentUserBlocked} onClick={handleBuyCart}>
-                {t("cart.buy")}
+              <Button type="primary" size="large" block loading={purchasingCart} disabled={currentUserBlocked || purchasingListingId !== null} onClick={handleBuyCart}>
+                {t("cart.buyAll")}
               </Button>
             </>
           )}

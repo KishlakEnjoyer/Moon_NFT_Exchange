@@ -1,5 +1,12 @@
 import { Modal, Flex, Typography, Image, Button, Avatar } from "antd";
-import { ApiListing, formatTonPrice, getPresentImageUrl, getSellerAvatarUrl, recordListingView } from "../services/listingService";
+import {
+  ApiListing,
+  formatTonPrice,
+  getBackgroundImageUrl,
+  getPresentImageUrl,
+  getSellerAvatarUrl,
+  recordListingView,
+} from "../services/listingService";
 import TONIcon from "./icons/TONIcon";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCartOutlined } from "@ant-design/icons";
@@ -9,6 +16,17 @@ import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
 const MARKET_TOLERANCE = 0.05;
+
+const formatAssetName = (value: string | null | undefined) => {
+  if (!value) return "-";
+  const fileName = value.split(/[\\/]/).pop() || value;
+  return fileName
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
 
 interface ModalPresentDetailProps {
   open: boolean;
@@ -93,6 +111,7 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
 
   const price = formatTonPrice(item.price, true);
   const fullPrice = formatTonPrice(item.price);
+  const backgroundImageUrl = getBackgroundImageUrl(item.background_image_url);
 
   const handleSellerClick = () => {
     onClose();
@@ -125,6 +144,22 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
     {
       key: t("listing.model"),
       value: item.model_name || '-',
+    },
+    {
+      key: t("listing.background"),
+      value: backgroundImageUrl ? (
+        <Flex align="center" gap={8} className="min-w-0">
+          <Avatar
+            size={28}
+            shape="square"
+            src={backgroundImageUrl}
+            className="shrink-0 rounded-[var(--size-2xs)] border border-solid border-[var(--black-transparent)]"
+          />
+          <Text className="min-w-0 max-w-[150px]" ellipsis={{ tooltip: formatAssetName(item.background_image_url) }}>
+            {formatAssetName(item.background_image_url)}
+          </Text>
+        </Flex>
+      ) : "-",
     },
     {
       key: t("listing.symbol"),

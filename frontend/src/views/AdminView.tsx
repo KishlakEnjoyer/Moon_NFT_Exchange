@@ -35,6 +35,7 @@ import {
   TeamOutlined,
   UnlockOutlined,
   UpOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import type { TFunction } from "i18next";
@@ -66,6 +67,7 @@ import {
   getAdminSummary,
   getAdminUsers,
   getDictionaryItems,
+  sendAdminReportWarning,
   setAdminUserActive,
   setAdminUserRole,
   setDictionaryItemArchived,
@@ -597,7 +599,10 @@ const ReportsPanel = ({
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [userProcessingId, setUserProcessingId] = useState<number | null>(null);
+  const [warningProcessingId, setWarningProcessingId] = useState<number | null>(null);
   const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
+  const [warningReport, setWarningReport] = useState<AdminReport | null>(null);
+  const [warningForm] = Form.useForm<{ reason_ru: string; reason_en: string }>();
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -659,6 +664,33 @@ const ReportsPanel = ({
       messageApi.error(t("admin.reports.userStatusFailed"));
     } finally {
       setUserProcessingId(null);
+    }
+  };
+
+  const openWarningModal = (report: AdminReport) => {
+    const reason = report.report_type_title || t("admin.reports.notSpecified");
+    setWarningReport(report);
+    warningForm.setFieldsValue({
+      reason_ru: reason,
+      reason_en: reason,
+    });
+  };
+
+  const handleSendWarning = async () => {
+    if (!warningReport) return;
+
+    const values = await warningForm.validateFields();
+    setWarningProcessingId(warningReport.report_id);
+
+    try {
+      await sendAdminReportWarning(warningReport.report_id, values);
+      messageApi.success(t("admin.reports.warningSent"));
+      setWarningReport(null);
+      warningForm.resetFields();
+    } catch {
+      messageApi.error(t("admin.reports.warningFailed"));
+    } finally {
+      setWarningProcessingId(null);
     }
   };
 
@@ -728,7 +760,7 @@ const ReportsPanel = ({
               {
                 title: t("admin.reports.decision"),
                 fixed: "right",
-                width: 260,
+                width: 390,
                 render: (_, record: AdminReport) => {
                   const canHandleReport = reportCanBeHandled(record);
 
@@ -742,6 +774,17 @@ const ReportsPanel = ({
                       >
                         {t("admin.reports.view")}
                       </Button>
+                      {canHandleReport && (
+                        <Button
+                          size="small"
+                          icon={<WarningOutlined />}
+                          loading={warningProcessingId === record.report_id}
+                          disabled={record.receiver_is_active === 0}
+                          onClick={() => openWarningModal(record)}
+                        >
+                          {t("admin.reports.warn")}
+                        </Button>
+                      )}
                       {canAdmin && canHandleReport && (
                         record.receiver_is_active === 0 ? (
                           <Button
@@ -787,6 +830,15 @@ const ReportsPanel = ({
         footer={[
           <Button key="cancel" onClick={() => setSelectedReport(null)}>{t("admin.reports.close")}</Button>,
           ...(selectedReportCanBeHandled ? [
+            <Button
+              key="warn"
+              icon={<WarningOutlined />}
+              loading={selectedReport ? warningProcessingId === selectedReport.report_id : false}
+              disabled={selectedReport?.receiver_is_active === 0}
+              onClick={() => selectedReport && openWarningModal(selectedReport)}
+            >
+              {t("admin.reports.warn")}
+            </Button>,
             <Button
               key="reject"
               danger
@@ -860,6 +912,62 @@ const ReportsPanel = ({
                 )}
               </Flex>
             )}
+          </Flex>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(warningReport)}
+        title={t("admin.reports.warningTitle")}
+        onCancel={() => {
+          setWarningReport(null);
+          warningForm.resetFields();
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setWarningReport(null);
+              warningForm.resetFields();
+            }}
+          >
+            {t("admin.cancel")}
+          </Button>,
+          <Button
+            key="send"
+            type="primary"
+            danger
+            icon={<WarningOutlined />}
+            loading={warningReport ? warningProcessingId === warningReport.report_id : false}
+            onClick={handleSendWarning}
+          >
+            {t("admin.reports.sendWarning")}
+          </Button>,
+        ]}
+      >
+        {warningReport && (
+          <Flex vertical gap={12} className="mt-3">
+            <Text type="secondary">
+              {t("admin.reports.warningDescription", {
+                user: warningReport.receiver_username || `#${warningReport.receiver_id}`,
+              })}
+            </Text>
+            <Form form={warningForm} layout="vertical">
+              <Form.Item
+                name="reason_ru"
+                label={t("admin.reports.warningReasonRu")}
+                rules={[{ required: true, message: t("admin.reports.enterWarningReasonRu") }]}
+              >
+                <Input maxLength={255} />
+              </Form.Item>
+              <Form.Item
+                name="reason_en"
+                label={t("admin.reports.warningReasonEn")}
+                rules={[{ required: true, message: t("admin.reports.enterWarningReasonEn") }]}
+              >
+                <Input maxLength={255} />
+              </Form.Item>
+            </Form>
           </Flex>
         )}
       </Modal>

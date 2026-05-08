@@ -51,6 +51,12 @@ export interface BuyListingResponse {
   seller_new_balance: string | null;
 }
 
+export interface BuyCartResponse {
+  purchases: BuyListingResponse[];
+  total: string;
+  new_balance: string | null;
+}
+
 export interface ListingViewResponse {
   listing_id: number;
   views: number;
@@ -79,6 +85,22 @@ export interface ListingSearchParams {
 
 const API_URL = process.env.REACT_APP_API_URL;
 const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
+
+const hasFileExtension = (value: string) => /\.[a-z0-9]+$/i.test(value);
+const withDefaultExtension = (value: string, extension: string) => (
+  hasFileExtension(value) ? value : `${value}.${extension}`
+);
+const isAbsoluteAssetUrl = (value: string) => /^(https?:)?\/\//i.test(value) || value.startsWith("/");
+
+const getAssetImageUrl = (
+  folder: string,
+  imageUrl: string | null | undefined,
+  extension: string,
+): string | null => {
+  if (!imageUrl) return null;
+  if (isAbsoluteAssetUrl(imageUrl)) return imageUrl;
+  return `${IMAGES_URL || ""}/${folder}/${withDefaultExtension(imageUrl, extension)}`;
+};
 
 export const formatTonPrice = (price: string | number, compact = false): string => {
   const amount = Number(price);
@@ -189,6 +211,17 @@ export const buyListing = async (listingId: number): Promise<BuyListingResponse>
   return res.json();
 };
 
+export const buyCart = async (userId: number): Promise<BuyCartResponse> => {
+  const res = await authFetch(`${API_URL}/cart/${userId}/buy`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to buy cart");
+  }
+  return res.json();
+};
+
 export const recordListingView = async (listingId: number): Promise<ListingViewResponse | null> => {
   const res = await authFetch(`${API_URL}/listings/${listingId}/view`, {
     method: "POST",
@@ -206,7 +239,7 @@ export const recordListingView = async (listingId: number): Promise<ListingViewR
   return res.json();
 };
 
-export const getTopSpenders = async (limit = 20): Promise<TopSpender[]> => {
+export const getTopSpenders = async (limit = 10): Promise<TopSpender[]> => {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   const res = await fetch(`${API_URL}/transactions/top-spenders?${searchParams.toString()}`);
   if (!res.ok) {
@@ -226,3 +259,7 @@ export const getSellerAvatarUrl = (profilePicUrl: string | null | undefined): st
   if (!profilePicUrl) return `${IMAGES_URL}/pfps/example_user.png`;
   return `${IMAGES_URL}/pfps/${profilePicUrl}`;
 };
+
+export const getBackgroundImageUrl = (imageUrl: string | null | undefined): string | null => (
+  getAssetImageUrl("bgs", imageUrl, "png")
+);

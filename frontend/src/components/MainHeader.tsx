@@ -1,7 +1,7 @@
 import { Header } from "antd/es/layout/layout";
 import {
   Avatar, Badge, Button, Drawer, Dropdown, Flex, Grid,
-  MenuProps, Popover, Typography, message, theme,
+  MenuProps, Modal, Popover, Typography, message, theme,
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +23,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
   UserOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 
 import TONIcon from "./icons/TONIcon";
@@ -43,6 +44,7 @@ interface MainHeaderProps {
   onAuthSuccess?: () => void;
   onAuthFail?: () => void;
   onLogout?: () => void;
+  onWarningOpenChange?: (open: boolean) => void;
 }
 
 const getStoredCurrentUser = () => {
@@ -114,12 +116,24 @@ const humanizeNotificationType = (value: string | null | undefined, isRu: boolea
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
+const getReportWarningReason = (item: AppNotification | null, isRu: boolean) => {
+  if (!item?.payload) return "";
+  return (
+    (isRu ? item.payload.reason_ru : item.payload.reason_en)
+    || item.payload.reason
+    || item.payload.reason_ru
+    || item.payload.reason_en
+    || ""
+  ).trim();
+};
+
 const MainHeader: React.FC<MainHeaderProps> = ({
   darkMode,
   onThemeChange,
   onAuthSuccess,
   onAuthFail,
   onLogout,
+  onWarningOpenChange,
 }) => {
   const { t, i18n } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
@@ -132,6 +146,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const [cartOpen, setCartOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [activeWarning, setActiveWarning] = useState<AppNotification | null>(null);
+  const [dismissedWarningIds, setDismissedWarningIds] = useState<Set<number>>(() => new Set());
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasPendingAuth, setHasPendingAuth] = useState(false);
@@ -149,9 +165,36 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const currentUserBlocked = currentUser.is_active === 0;
   const useNotificationsDrawer = screens.sm === false;
 
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications(
+  const { notifications, unreadCount, markAllRead, markRead, markingAllRead } = useNotifications(
     isAuthenticated && currentUser.is_active !== 0 ? (currentUser.user_id ?? null) : null
   );
+
+  useEffect(() => {
+    if (!isAuthenticated || currentUser.is_active === 0) {
+      setActiveWarning(null);
+      return;
+    }
+
+    if (activeWarning) return;
+
+    const nextWarning = notifications.find((notification) => (
+      normalizeNotificationType(notification.type) === "report_warning"
+      && notification.is_read === 0
+      && !dismissedWarningIds.has(notification.notification_id)
+    ));
+
+    if (nextWarning) {
+      setActiveWarning(nextWarning);
+    }
+  }, [activeWarning, currentUser.is_active, dismissedWarningIds, isAuthenticated, notifications]);
+
+  useEffect(() => {
+    onWarningOpenChange?.(Boolean(activeWarning));
+  }, [activeWarning, onWarningOpenChange]);
+
+  useEffect(() => () => {
+    onWarningOpenChange?.(false);
+  }, [onWarningOpenChange]);
 
   const clearPolling = () => {
     if (pollingRef.current) {
@@ -559,6 +602,18 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           color: "var(--red-fail)",
           background: "rgba(181, 51, 51, 0.16)",
         };
+      case "report_warning": {
+        const reason = getReportWarningReason(item, isRuLanguage);
+        return {
+          title: isRuLanguage ? "Предупреждение по жалобе" : "Report warning",
+          description: reason
+            ? (isRuLanguage ? `Причина: ${reason}` : `Reason: ${reason}`)
+            : (isRuLanguage ? "Администрация отправила вам предупреждение." : "Moderation sent you a warning."),
+          icon: <WarningOutlined />,
+          color: "var(--red-fail)",
+          background: "rgba(181, 51, 51, 0.18)",
+        };
+      }
       default:
         return {
           title: fallbackTitle,
@@ -579,8 +634,24 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   };
 
   const handleNotificationClick = (item: AppNotification) => {
+    if (normalizeNotificationType(item.type) === "report_warning") {
+      setActiveWarning(item);
+      return;
+    }
+
     if (item.is_read === 0) {
       void markRead(item.notification_id);
+    }
+  };
+
+  const handleCloseWarning = () => {
+    if (!activeWarning) return;
+
+    const notificationId = activeWarning.notification_id;
+    setDismissedWarningIds((prev) => new Set(prev).add(notificationId));
+    setActiveWarning(null);
+    if (activeWarning.is_read === 0) {
+      void markRead(notificationId);
     }
   };
 
@@ -592,9 +663,11 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     <Button
       type="text"
       size="small"
+      loading={markingAllRead}
+      disabled={markingAllRead}
       onClick={(event) => {
         event.stopPropagation();
-        void markAllRead();
+        void markAllRead().catch(() => undefined);
       }}
     >
       {t("header.markAllAsRead")}
@@ -695,6 +768,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       {notificationsList}
     </div>
   );
+
+  const activeWarningReason = getReportWarningReason(activeWarning, isRuLanguage);
 
   return (
     <Header className="w-full h-auto py-2 sm:py-[var(--size-base)] px-3 sm:px-4 lg:px-[var(--size-4xl)] flex flex-wrap justify-between items-center gap-2 bg-transparent">
@@ -872,6 +947,37 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           </div>
         )}
       </div>
+
+      <Modal
+        open={Boolean(activeWarning)}
+        title={
+          <Flex align="center" gap={8}>
+            <WarningOutlined style={{ color: "var(--red-fail)" }} />
+            <span>{t("reportWarning.title")}</span>
+          </Flex>
+        }
+        onCancel={handleCloseWarning}
+        maskClosable={false}
+        keyboard={false}
+        centered
+        footer={[
+          <Button key="ok" type="primary" danger onClick={handleCloseWarning}>
+            {t("reportWarning.ok")}
+          </Button>,
+        ]}
+      >
+        <Flex vertical gap={12} className="mt-3">
+          <Text>{t("reportWarning.description")}</Text>
+          <div className="rounded-lg border border-solid border-[var(--red-fail)] bg-[rgba(181,51,51,0.12)] p-3">
+            <Text type="secondary" className="block text-xs">
+              {t("reportWarning.reason")}
+            </Text>
+            <Text strong className="block break-words">
+              {activeWarningReason || t("reportWarning.reasonFallback")}
+            </Text>
+          </div>
+        </Flex>
+      </Modal>
 
       <QrModal
         open={qrModalOpen}

@@ -1,5 +1,5 @@
 import { Avatar, Button, Flex, Typography } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, ShoppingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TONIcon from "./icons/TONIcon";
 import { CartItem as CartItemType, getPresentImageUrl } from "../services/listingService";
@@ -10,11 +10,14 @@ const { Text } = Typography;
 interface CartItemProps {
   item: CartItemType;
   onRemove: (cart_item_id: number) => void;
+  onBuy?: (item: CartItemType) => void;
+  buying?: boolean;
+  disabled?: boolean;
   onPresentClick?: (item: CartItemType) => void;
   onClose?: () => void;
 }
 
-const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onClose }) => {
+const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onBuy, buying, disabled, onPresentClick, onClose }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const price = parseFloat(item.price).toFixed(2);
@@ -65,9 +68,20 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onPresentClick, onC
           <TONIcon />
         </Flex>
         <Button
+          type="primary"
+          icon={<ShoppingOutlined />}
+          loading={buying}
+          disabled={disabled || buying}
+          title={t("cart.buyItem")}
+          onClick={() => onBuy?.(item)}
+        >
+          <span className="hidden sm:inline">{t("cart.buyItem")}</span>
+        </Button>
+        <Button
           type="text"
           danger
           icon={<DeleteOutlined />}
+          disabled={disabled || buying}
           onClick={() => onRemove(item.cart_item_id)}
         />
       </Flex>

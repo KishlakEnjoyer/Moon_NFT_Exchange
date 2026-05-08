@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from core.auth import get_current_user, get_user_id_from_token
 from core.database import get_db
 from core.models import Notification, User
-from services.notification_service import manager
+from services.notification_service import ensure_notification_payload_column, manager, notification_to_dict
 
 notification_router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -46,6 +46,7 @@ def get_notifications(
     if user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Cannot access another user's notifications")
 
+    ensure_notification_payload_column(db)
     cutoff = datetime.utcnow() - timedelta(days=30)
 
     notifications = db.scalars(
@@ -59,18 +60,7 @@ def get_notifications(
         .limit(100)
     ).all()
 
-    return [
-        {
-            "notification_id": n.notification_id,
-            "type": n.notification_type.type_name,
-            "description": n.notification_type.description,
-            "entity_type": n.entity_type,
-            "entity_id": n.entity_id,
-            "is_read": n.is_read,
-            "created_at": n.created_at.isoformat(),
-        }
-        for n in notifications
-    ]
+    return [notification_to_dict(n) for n in notifications]
 
 
 @notification_router.post("/{user_id}/read-all")
@@ -84,8 +74,13 @@ def mark_all_read(
 
     db.execute(
         update(Notification)
-        .where(Notification.user_id == user_id, Notification.is_read == 0)
+        .where(
+            Notification.user_id == user_id,
+            Notification.is_read == 0,
+            Notification.created_at >= datetime.utcnow() - timedelta(days=30),
+        )
         .values(is_read=1)
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     return {"ok": True}

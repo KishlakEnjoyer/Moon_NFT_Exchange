@@ -479,6 +479,7 @@ class Notification(Base):
     )
     entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     entity_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_read: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
 

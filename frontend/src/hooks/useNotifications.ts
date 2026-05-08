@@ -8,6 +8,14 @@ export interface AppNotification {
   description: string | null;
   entity_type: string | null;
   entity_id: number | null;
+  payload?: {
+    report_id?: number;
+    reason?: string;
+    reason_ru?: string;
+    reason_en?: string;
+    moderator_id?: number;
+    moderator_username?: string | null;
+  } | null;
   is_read: number;
   created_at: string;
 }
@@ -22,6 +30,7 @@ const isRecentNotification = (notification: AppNotification) => {
 
 export function useNotifications(userId: number | null, onGiftReceived?: () => void) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -61,12 +70,37 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
   }, [userId, onGiftReceived]);
 
   const markAllRead = useCallback(async () => {
-    if (!userId) return;
-    await authFetch(`${API_BASE_URL}/notifications/${userId}/read-all`, {
-      method: "POST",
-    });
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
-  }, [userId]);
+    if (!userId || markingAllRead) return;
+
+    const unreadIds = notifications
+      .filter((notification) => notification.is_read === 0)
+      .map((notification) => notification.notification_id);
+
+    if (unreadIds.length === 0) return;
+
+    const unreadIdSet = new Set(unreadIds);
+    setMarkingAllRead(true);
+    setNotifications(prev => prev.map(n => (
+      unreadIdSet.has(n.notification_id) ? { ...n, is_read: 1 } : n
+    )));
+
+    try {
+      const res = await authFetch(`${API_BASE_URL}/notifications/${userId}/read-all`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to mark notifications as read");
+      }
+    } catch (error) {
+      setNotifications(prev => prev.map(n => (
+        unreadIdSet.has(n.notification_id) ? { ...n, is_read: 0 } : n
+      )));
+      throw error;
+    } finally {
+      setMarkingAllRead(false);
+    }
+  }, [userId, notifications, markingAllRead]);
 
   const markRead = useCallback(async (notificationId: number) => {
     if (!userId) return;
@@ -80,5 +114,5 @@ export function useNotifications(userId: number | null, onGiftReceived?: () => v
 
   const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
-  return { notifications, unreadCount, markAllRead, markRead };
+  return { notifications, unreadCount, markAllRead, markRead, markingAllRead };
 }

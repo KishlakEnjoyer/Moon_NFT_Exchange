@@ -6,6 +6,26 @@ export type ReportStatusFilter = "pending" | "approved" | "rejected" | "all";
 export type ReportDecision = "approve" | "reject";
 export type DictionaryKind = "collections" | "models" | "backgrounds" | "symbols";
 
+export interface NotificationPayload {
+  report_id?: number;
+  reason?: string;
+  reason_ru?: string;
+  reason_en?: string;
+  moderator_id?: number;
+  moderator_username?: string | null;
+}
+
+export interface AdminNotification {
+  notification_id: number;
+  type: string;
+  description: string | null;
+  entity_type: string | null;
+  entity_id: number | null;
+  payload?: NotificationPayload | null;
+  is_read: number;
+  created_at: string;
+}
+
 export interface AdminAccess {
   user_id: number;
   role_id: number;
@@ -147,6 +167,18 @@ export async function decideAdminReport(reportId: number, decision: ReportDecisi
     body: JSON.stringify({ decision }),
   });
   return parseResponse<AdminReport>(response, "Не удалось обработать жалобу");
+}
+
+export async function sendAdminReportWarning(
+  reportId: number,
+  payload: { reason_ru?: string | null; reason_en?: string | null },
+): Promise<{ ok: boolean; notification: AdminNotification }> {
+  const response = await authFetch(`${API_URL}/admin/reports/${reportId}/warning`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse<{ ok: boolean; notification: AdminNotification }>(response, "Не удалось отправить предупреждение");
 }
 
 export async function getDictionaryItems(kind: DictionaryKind): Promise<DictionaryItem[]> {
