@@ -13,6 +13,9 @@ export interface AppNotification {
     reason?: string;
     reason_ru?: string;
     reason_en?: string;
+    title?: string;
+    description?: string;
+    image_url?: string | null;
     moderator_id?: number;
     moderator_username?: string | null;
   } | null;

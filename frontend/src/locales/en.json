@@ -31,7 +31,8 @@
     "sendGift": "Send Gift",
     "history": "History",
     "report": "Report",
-    "edit": "Edit"
+    "edit": "Edit",
+    "admin": "Admin Panel"
   },
   "marketplace": {
     "noLots": "No lots available",
@@ -107,7 +108,35 @@
     "telegramConnected": "Telegram connected",
     "telegramNotConnected": "Telegram not connected",
     "vkNotConnected": "VK not connected",
-    "socialHidden": "Don't peek"
+    "socialHidden": "Don't peek",
+    "subs": "Subscribers",
+    "following": "Following",
+    "achievements": "Achievements",
+    "achievements2": "Achievements",
+    "followersCount": "{{count}} followers",
+    "followingCount": "{{count}} following",
+    "achievementsCount": "{{count}} achievements",
+    "achievementsProgress": "{{earned}}/{{total}} achievements",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "followers": "Followers",
+    "close": "Close",
+    "accountBlocked": "Account blocked",
+    "topRank": "Top #{{rank}}",
+    "failedToggleFollow": "Failed to update subscription",
+    "failedToggleAchievementVisibility": "Failed to update visibility",
+    "failedLoadSocialList": "Failed to load users",
+    "failedUpdateBadge": "Failed to update badge",
+    "badgeUpdated": "Badge updated",
+    "noAchievements": "No public achievements yet",
+    "noSocialUsers": "No users yet",
+    "hideAchievement": "Hide",
+    "showAchievement": "Show",
+    "achievementUsersPercent": "Owned by {{percent}}% of users",
+    "hiddenAchievementsCount": "{{count}} achievements are hidden",
+    "setAsBadge": "Set as badge",
+    "currentBadge": "Current badge",
+    "removeBadge": "Remove badge"
   },
   "profileCard": {
     "onSale": "On Sale"
@@ -323,12 +352,21 @@
     "cancel": "Cancel",
     "save": "Save",
     "refresh": "Refresh",
+    "whoandwhat": "Who and What changed in admin panel",
+    "imageUpload": {
+      "uploadImage": "Upload image",
+      "removeNewFile": "Remove new file"
+    },
     "tabs": {
       "dashboard": "Dashboard",
       "reports": "Reports",
       "analytics": "Analytics",
       "dictionaries": "Dictionaries",
-      "usersRoles": "Roles and Access"
+      "usersRoles": "Roles and Access",
+      "achievements": "Achievements",
+      "moderation": "Moderation",
+      "audit": "Audit",
+      "featured": "Featured"
     },
     "dictionary": {
       "collections": "Collections",
@@ -430,6 +468,60 @@
       "unbanUser": "Unban User",
       "banUser": "Ban User"
     },
+    "achievements": {
+      "loadFailed": "Failed to load achievements",
+      "imageRequired": "Upload an achievement image",
+      "savedWithAwarded": "Saved. Awarded now: {{count}}",
+      "saveFailed": "Failed to save achievement",
+      "backfillDone": "Check completed. New awards: {{count}}",
+      "backfillFailed": "Failed to recalculate achievements",
+      "description": "Create badges and automatic award rules.",
+      "backfillAll": "Recalculate for everyone",
+      "new": "New achievement",
+      "image": "Image",
+      "title": "Title",
+      "details": "Description",
+      "rule": "Rule",
+      "awarded": "Awarded",
+      "usersPercent": "% of users",
+      "status": "Status",
+      "actions": "Actions",
+      "edit": "Edit",
+      "enable": "Enable",
+      "disable": "Disable",
+      "editTitle": "Edit achievement",
+      "newTitle": "New achievement",
+      "enterTitle": "Enter a title",
+      "enterDescription": "Enter a description",
+      "ruleValue": "Rule value",
+      "backfillExisting": "Immediately award users who already qualify"
+    },
+    "moderation": {
+      "loadFailed": "Failed to load moderation queue",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "processFailed": "Failed to process request",
+      "type": "Type",
+      "action": "Action",
+      "target": "Target",
+      "preview": "Preview",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "featured": {
+      "loadFailed": "Failed to load featured collections",
+      "saved": "Featured collections saved",
+      "saveFailed": "Failed to save collection picks",
+      "description": "Select collections to manually pin as recommended.",
+      "placeholder": "Choose collections"
+    },
+    "audit": {
+      "loadFailed": "Failed to load audit log",
+      "actor": "Actor",
+      "action": "Action",
+      "entity": "Entity",
+      "date": "Date"
+    },
     "dictionaries": {
       "loadFailed": "Failed to load dictionary",
       "saveFailed": "Failed to save entry",
@@ -458,7 +550,12 @@
       "enterName": "Enter a name",
       "chooseCollectionMsg": "Choose a collection",
       "enterLimit": "Enter a limit",
-      "enterPrice": "Enter a price"
+      "enterPrice": "Enter a price",
+      "uploadImage": "Upload image",
+      "chooseFile": "Choose file",
+      "moderationHint": "The new file will be saved only after approval in the moderation queue.",
+      "uploadRequired": "Upload an image for moderation",
+      "sentToModeration": "Sent to moderation"
     },
     "users": {
       "loadFailed": "Failed to load access settings",
@@ -469,6 +566,7 @@
       "roleDeleteFailed": "Failed to delete role",
       "userRoleChanged": "User role changed",
       "userRoleFailed": "Failed to change role",
+      "roleChangeBlocked": "You cannot change your own role or a master admin role",
       "userStatusChanged": "User status changed",
       "userStatusFailed": "Failed to change status",
       "users": "Users",
@@ -496,7 +594,17 @@
       "delete": "Delete",
       "editRoleTitle": "Edit Role",
       "newRoleTitle": "New Role",
-      "enterRoleName": "Enter a role name"
+      "enterRoleName": "Enter a role name",
+      "permissions": "Permissions",
+      "sanctions": "Sanctions",
+      "history": "History",
+      "loadSanctionsFailed": "Failed to load sanction history",
+      "sanctionsHistory": "Sanction history",
+      "sanctionsHistoryFor": "Sanction history: {{user}}",
+      "sanctionAction": "Action",
+      "sanctionReason": "Reason",
+      "sanctionModerator": "Moderator",
+      "sanctionDate": "Date"
     },
     "analytics": {
       "loadFailed": "Failed to load analytics",

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -12,18 +13,55 @@ from core.auth import get_current_user
 from core.database import get_db
 from core.models import (
     Backgrounds,
+    Achievement,
+    AuditLog,
     CartItem,
     Collections,
+    FeaturedCollection,
     Listing,
     ListingStatuses,
+    ModerationQueueItem,
     Models,
     Present,
     Report,
     ReportStatus,
     Role,
+    RolePermission,
     Symbols,
     Transaction,
     User,
+    UserSanction,
+)
+from services.achievement_service import (
+    ACHIEVEMENT_RULES,
+    achievement_to_dict,
+    backfill_achievement,
+    backfill_all_achievements,
+    save_achievement_image,
+)
+from services.admin_platform_service import (
+    PERMISSION_KEYS,
+    PERMISSION_LABELS,
+    MASTER_ROLE_ID,
+    MASTER_ROLE_NAMES,
+    audit_to_dict,
+    create_moderation_item,
+    ensure_admin_platform_schema,
+    featured_to_dict,
+    log_audit,
+    moderation_to_dict,
+    parse_payload_json,
+    record_sanction,
+    require_permission,
+    sanction_to_dict,
+    save_image_data_url,
+    seed_master_role,
+    set_role_permissions,
+    user_has_permission,
+    user_is_admin as platform_user_is_admin,
+    user_is_master as platform_user_is_master,
+    user_is_manager as platform_user_is_manager,
+    user_permissions,
 )
 from services.notification_service import (
     NOTIFICATION_TYPE_REPORT_WARNING,
@@ -55,6 +93,7 @@ class ReportWarningRequest(BaseModel):
 class DictionaryItemPayload(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     image_url: str | None = None
+    image_data_url: str | None = None
     collection_id: int | None = None
     collection_limit: int | None = Field(default=None, ge=1)
     purchase_limit: int | None = Field(default=None, ge=1)
@@ -64,6 +103,7 @@ class DictionaryItemPayload(BaseModel):
 class RolePayload(BaseModel):
     role_name: str = Field(min_length=2, max_length=50)
     description: str | None = None
+    permissions: list[str] = Field(default_factory=list)
 
 
 class UserRolePayload(BaseModel):
@@ -72,6 +112,31 @@ class UserRolePayload(BaseModel):
 
 class UserActivePayload(BaseModel):
     is_active: int = Field(ge=0, le=1)
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class AchievementPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=500)
+    image_data_url: str | None = None
+    image_url: str | None = None
+    rule_key: str | None = None
+    rule_value: int | None = Field(default=None, ge=1)
+    is_active: int = Field(default=1, ge=0, le=1)
+    backfill_existing: bool = True
+
+
+class AchievementActivePayload(BaseModel):
+    is_active: int = Field(ge=0, le=1)
+
+
+class ModerationDecisionPayload(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class FeaturedCollectionPayload(BaseModel):
+    collection_ids: list[int] = Field(default_factory=list)
 
 
 def get_role_name(user: User) -> str:
@@ -81,23 +146,44 @@ def get_role_name(user: User) -> str:
 
 
 def user_is_admin(user: User) -> bool:
-    return user.role_id in ADMIN_ROLE_IDS or get_role_name(user) in ADMIN_ROLE_NAMES
+    return platform_user_is_admin(user)
+
+
+def user_is_master(user: User) -> bool:
+    return platform_user_is_master(user)
 
 
 def user_is_manager(user: User) -> bool:
-    return user.role_id in MANAGER_ROLE_IDS or get_role_name(user) in MANAGER_ROLE_NAMES
+    return platform_user_is_manager(user)
 
 
-def require_manager(current_user: User = Depends(get_current_user)) -> User:
-    if not user_is_manager(current_user):
+def role_name_is_master(role_name: str | None) -> bool:
+    return bool(role_name and role_name.strip().lower() in MASTER_ROLE_NAMES)
+
+
+def require_manager(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+    ensure_admin_platform_schema()
+    seed_master_role(db)
+    db.commit()
+    if not (user_is_manager(current_user) or bool(user_permissions(db, current_user))):
         raise HTTPException(status_code=403, detail="Manager role is required")
     return current_user
 
 
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
+def require_admin(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+    ensure_admin_platform_schema()
+    seed_master_role(db)
+    db.commit()
     if not user_is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin role is required")
     return current_user
+
+
+def require_admin_permission(permission: str, current_user: User, db: Session) -> None:
+    ensure_admin_platform_schema()
+    seed_master_role(db)
+    db.commit()
+    require_permission(db, current_user, permission)
 
 
 def ensure_archive_columns(db: Session) -> None:
@@ -282,13 +368,22 @@ def check_dictionary_kind(kind: str) -> str:
 
 
 @admin_router.get("/me")
-def get_admin_access(current_user: User = Depends(get_current_user)):
+def get_admin_access(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ensure_admin_platform_schema()
+    seed_master_role(db)
+    db.commit()
+    permissions = user_permissions(db, current_user)
     return {
         "user_id": current_user.user_id,
         "role_id": current_user.role_id,
         "role_name": current_user.role.role_name if current_user.role else None,
-        "can_moderate": user_is_manager(current_user),
-        "can_admin": user_is_admin(current_user),
+        "can_moderate": user_is_manager(current_user) or "reports.manage" in permissions,
+        "can_admin": user_is_admin(current_user) or any(permission.endswith(".manage") for permission in permissions),
+        "permissions": permissions,
+        "available_permissions": [
+            {"key": key, "label": PERMISSION_LABELS.get(key, key)}
+            for key in PERMISSION_KEYS
+        ],
     }
 
 
@@ -502,6 +597,7 @@ def decide_report(
     report.report_status_id = get_or_create_report_status_id(db, status_name)
     report.moderator_id = current_user.user_id
     report.closed_at = datetime.utcnow()
+    log_audit(db, current_user.user_id, f"report.{payload.decision}", "report", report_id)
 
     db.commit()
     db.refresh(report)
@@ -566,6 +662,9 @@ def send_report_warning(
     )
 
     db.commit()
+    record_sanction(db, report.receiver_id, current_user.user_id, "warning", reason_ru, report.report_id)
+    log_audit(db, current_user.user_id, "report.warning", "report", report.report_id, {"receiver_id": report.receiver_id})
+    db.commit()
     db.refresh(notification)
     notification_dict = notification_to_dict(notification)
     send_notification_ws_safely(report.receiver_id, notification_dict)
@@ -577,9 +676,10 @@ def send_report_warning(
 def list_dictionary_items(
     kind: str,
     include_archived: bool = Query(default=True),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("dictionaries.manage", current_user, db)
     kind = check_dictionary_kind(kind)
     ensure_archive_columns(db)
 
@@ -639,12 +739,31 @@ def list_dictionary_items(
 def create_dictionary_item(
     kind: str,
     payload: DictionaryItemPayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("dictionaries.manage", current_user, db)
     kind = check_dictionary_kind(kind)
     ensure_archive_columns(db)
     name = payload.name.strip()
+
+    if not payload.image_data_url:
+        raise HTTPException(status_code=400, detail="Image upload is required")
+
+    if payload.image_data_url:
+        item = create_moderation_item(
+            db=db,
+            item_type="dictionary_image",
+            action="create",
+            target_kind=kind,
+            target_id=None,
+            submitted_by=current_user.user_id,
+            image_data_url=payload.image_data_url,
+            payload=payload.model_dump(exclude={"image_data_url"}),
+        )
+        log_audit(db, current_user.user_id, "moderation.create", "moderation", item.moderation_id, {"kind": kind, "action": "create"})
+        db.commit()
+        return {"ok": True, "id": None, "moderation_id": item.moderation_id, "status": "pending"}
 
     if kind == "collections":
         item = Collections(
@@ -678,6 +797,7 @@ def create_dictionary_item(
         )
 
     db.add(item)
+    log_audit(db, current_user.user_id, "dictionary.create", kind, None, payload.model_dump(exclude={"image_data_url"}))
     db.commit()
     db.refresh(item)
     return {"ok": True, "id": getattr(item, f"{kind[:-1]}_id", None)}
@@ -688,19 +808,36 @@ def update_dictionary_item(
     kind: str,
     item_id: int,
     payload: DictionaryItemPayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("dictionaries.manage", current_user, db)
     kind = check_dictionary_kind(kind)
     ensure_archive_columns(db)
     name = payload.name.strip()
+
+    if payload.image_data_url:
+        item = create_moderation_item(
+            db=db,
+            item_type="dictionary_image",
+            action="update",
+            target_kind=kind,
+            target_id=item_id,
+            submitted_by=current_user.user_id,
+            image_data_url=payload.image_data_url,
+            payload=payload.model_dump(exclude={"image_data_url"}),
+        )
+        log_audit(db, current_user.user_id, "moderation.create", "moderation", item.moderation_id, {"kind": kind, "target_id": item_id, "action": "update"})
+        db.commit()
+        return {"ok": True, "moderation_id": item.moderation_id, "status": "pending"}
 
     if kind == "collections":
         item = db.get(Collections, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Collection not found")
         item.collection_name = name
-        item.collection_image_url = payload.image_url
+        if payload.image_url is not None:
+            item.collection_image_url = payload.image_url
         item.collection_limit = payload.collection_limit or item.collection_limit
         item.purchase_limit = payload.purchase_limit
         item.base_price = payload.base_price or item.base_price
@@ -714,21 +851,25 @@ def update_dictionary_item(
                 raise HTTPException(status_code=404, detail="Collection not found")
             item.collection_id = payload.collection_id
         item.model_name = name
-        item.model_image_url = payload.image_url
+        if payload.image_url is not None:
+            item.model_image_url = payload.image_url
     elif kind == "backgrounds":
         item = db.get(Backgrounds, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Background not found")
         item.background_name = name
-        item.background_image_url = payload.image_url
+        if payload.image_url is not None:
+            item.background_image_url = payload.image_url
     else:
         item = db.get(Symbols, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Symbol not found")
         item.symbol_name = name
-        item.symbol_image_url = payload.image_url or item.symbol_image_url
+        if payload.image_url is not None:
+            item.symbol_image_url = payload.image_url or item.symbol_image_url
 
     db.commit()
+    log_audit(db, current_user.user_id, "dictionary.update", kind, item_id, payload.model_dump(exclude={"image_data_url"}))
     return {"ok": True}
 
 
@@ -736,9 +877,11 @@ def update_dictionary_item(
 def archive_dictionary_item(
     kind: str,
     item_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("dictionaries.manage", current_user, db)
+    log_audit(db, current_user.user_id, "dictionary.archive", kind, item_id)
     return set_dictionary_item_active(kind, item_id, 0, db)
 
 
@@ -746,9 +889,11 @@ def archive_dictionary_item(
 def restore_dictionary_item(
     kind: str,
     item_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("dictionaries.manage", current_user, db)
+    log_audit(db, current_user.user_id, "dictionary.restore", kind, item_id)
     return set_dictionary_item_active(kind, item_id, 1, db)
 
 
@@ -780,11 +925,360 @@ def set_dictionary_item_active(kind: str, item_id: int, is_active: int, db: Sess
     return {"ok": True}
 
 
-@admin_router.get("/roles")
-def list_roles(
-    current_user: User = Depends(require_admin),
+def dictionary_image_folder(kind: str) -> str:
+    return {
+        "collections": "collections",
+        "models": "models",
+        "backgrounds": "bgs",
+        "symbols": "symbols",
+    }[kind]
+
+
+def apply_dictionary_moderation(db: Session, item: ModerationQueueItem, reviewer: User) -> dict:
+    kind = check_dictionary_kind(item.target_kind or "")
+    payload = parse_payload_json(item.payload_json)
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Moderation payload is missing a name")
+    if not item.image_data_url:
+        raise HTTPException(status_code=400, detail="Moderation item is missing an image")
+
+    filename = save_image_data_url(item.image_data_url, dictionary_image_folder(kind), name)
+
+    if kind == "collections":
+        if item.action == "create":
+            target = Collections(
+                collection_name=name,
+                collection_image_url=filename,
+                collection_limit=int(payload.get("collection_limit") or 100),
+                purchase_limit=payload.get("purchase_limit"),
+                base_price=Decimal(str(payload.get("base_price") or "100")),
+                is_active=1,
+            )
+            db.add(target)
+            db.flush()
+        else:
+            target = db.get(Collections, item.target_id)
+            if not target:
+                raise HTTPException(status_code=404, detail="Collection not found")
+            target.collection_name = name
+            target.collection_image_url = filename
+            target.collection_limit = int(payload.get("collection_limit") or target.collection_limit)
+            target.purchase_limit = payload.get("purchase_limit")
+            target.base_price = Decimal(str(payload.get("base_price") or target.base_price))
+    elif kind == "models":
+        collection_id = int(payload.get("collection_id") or 0)
+        if not db.get(Collections, collection_id):
+            raise HTTPException(status_code=404, detail="Collection not found")
+        if item.action == "create":
+            target = Models(collection_id=collection_id, model_name=name, model_image_url=filename)
+            db.add(target)
+            db.flush()
+        else:
+            target = db.get(Models, item.target_id)
+            if not target:
+                raise HTTPException(status_code=404, detail="Model not found")
+            target.collection_id = collection_id
+            target.model_name = name
+            target.model_image_url = filename
+    elif kind == "backgrounds":
+        if item.action == "create":
+            target = Backgrounds(background_name=name, background_image_url=filename)
+            db.add(target)
+            db.flush()
+        else:
+            target = db.get(Backgrounds, item.target_id)
+            if not target:
+                raise HTTPException(status_code=404, detail="Background not found")
+            target.background_name = name
+            target.background_image_url = filename
+    else:
+        if item.action == "create":
+            target = Symbols(symbol_name=name, symbol_image_url=filename)
+            db.add(target)
+            db.flush()
+        else:
+            target = db.get(Symbols, item.target_id)
+            if not target:
+                raise HTTPException(status_code=404, detail="Symbol not found")
+            target.symbol_name = name
+            target.symbol_image_url = filename
+
+    item.target_id = getattr(target, f"{kind[:-1]}_id", item.target_id)
+    item.status = "approved"
+    item.reviewed_by = reviewer.user_id
+    item.reviewed_at = datetime.utcnow()
+    log_audit(db, reviewer.user_id, "moderation.approve", "moderation", item.moderation_id, {"target_kind": kind, "target_id": item.target_id})
+    return {"ok": True, "target_id": item.target_id, "image_url": filename}
+
+
+def apply_profile_photo_moderation(db: Session, item: ModerationQueueItem, reviewer: User) -> dict:
+    payload = parse_payload_json(item.payload_json)
+    user_id = int(payload.get("user_id") or item.target_id or 0)
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not item.image_data_url:
+        raise HTTPException(status_code=400, detail="Moderation item is missing an image")
+
+    filename = save_image_data_url(item.image_data_url, "pfps", user.username or f"user_{user.user_id}")
+    user.profile_pic_url = filename
+    item.status = "approved"
+    item.reviewed_by = reviewer.user_id
+    item.reviewed_at = datetime.utcnow()
+    create_notification(
+        db=db,
+        user_id=user.user_id,
+        type_name="profile_photo_approved",
+        entity_type="user",
+        entity_id=user.user_id,
+        payload={"profile_pic_url": filename},
+        type_description="Profile photo approved",
+        create_type_if_missing=True,
+    )
+    log_audit(db, reviewer.user_id, "moderation.approve", "moderation", item.moderation_id, {"target_kind": "users", "target_id": user.user_id})
+    return {"ok": True, "target_id": user.user_id, "image_url": filename}
+
+
+@admin_router.get("/achievements/rules")
+def list_achievement_rules(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("achievements.manage", current_user, db)
+    return [{"key": key, "label": label} for key, label in ACHIEVEMENT_RULES.items()]
+
+
+@admin_router.get("/achievements")
+def list_achievements(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("achievements.manage", current_user, db)
+    achievements = db.scalars(select(Achievement).order_by(Achievement.created_at.desc())).all()
+    return [achievement_to_dict(db, achievement) for achievement in achievements]
+
+
+@admin_router.post("/achievements")
+def create_achievement(
+    payload: AchievementPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("achievements.manage", current_user, db)
+    rule_key = payload.rule_key or "manual"
+    if rule_key not in ACHIEVEMENT_RULES:
+        raise HTTPException(status_code=400, detail="Unknown achievement rule")
+
+    image_url = save_achievement_image(payload.image_data_url, payload.title, payload.image_url)
+    if not image_url:
+        raise HTTPException(status_code=400, detail="Achievement image is required")
+    achievement = Achievement(
+        title=payload.title.strip(),
+        description=payload.description.strip(),
+        image_url=image_url,
+        rule_key=rule_key,
+        rule_value=payload.rule_value,
+        is_active=payload.is_active,
+        created_by=current_user.user_id,
+    )
+    db.add(achievement)
+    db.flush()
+    awarded = backfill_achievement(db, achievement, notify=True) if payload.backfill_existing else 0
+    log_audit(db, current_user.user_id, "achievement.create", "achievement", achievement.achievement_id, {"awarded": awarded, "rule_key": rule_key})
+    db.commit()
+    db.refresh(achievement)
+    return achievement_to_dict(db, achievement) | {"awarded_now": awarded}
+
+
+@admin_router.patch("/achievements/{achievement_id}")
+def update_achievement(
+    achievement_id: int,
+    payload: AchievementPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("achievements.manage", current_user, db)
+    achievement = db.get(Achievement, achievement_id)
+    if not achievement:
+        raise HTTPException(status_code=404, detail="Achievement not found")
+
+    rule_key = payload.rule_key or "manual"
+    if rule_key not in ACHIEVEMENT_RULES:
+        raise HTTPException(status_code=400, detail="Unknown achievement rule")
+
+    achievement.title = payload.title.strip()
+    achievement.description = payload.description.strip()
+    current_image = payload.image_url if payload.image_url is not None else achievement.image_url
+    achievement.image_url = save_achievement_image(payload.image_data_url, payload.title, current_image)
+    achievement.rule_key = rule_key
+    achievement.rule_value = payload.rule_value
+    achievement.is_active = payload.is_active
+    awarded = backfill_achievement(db, achievement, notify=True) if payload.backfill_existing else 0
+    log_audit(db, current_user.user_id, "achievement.update", "achievement", achievement.achievement_id, {"awarded": awarded, "rule_key": rule_key})
+    db.commit()
+    db.refresh(achievement)
+    return achievement_to_dict(db, achievement) | {"awarded_now": awarded}
+
+
+@admin_router.patch("/achievements/{achievement_id}/active")
+def set_achievement_active(
+    achievement_id: int,
+    payload: AchievementActivePayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("achievements.manage", current_user, db)
+    achievement = db.get(Achievement, achievement_id)
+    if not achievement:
+        raise HTTPException(status_code=404, detail="Achievement not found")
+    achievement.is_active = payload.is_active
+    awarded = backfill_achievement(db, achievement, notify=True) if payload.is_active else 0
+    log_audit(db, current_user.user_id, "achievement.active", "achievement", achievement_id, {"is_active": payload.is_active, "awarded": awarded})
+    db.commit()
+    return {"ok": True, "awarded_now": awarded}
+
+
+@admin_router.post("/achievements/backfill")
+def backfill_achievements(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("achievements.manage", current_user, db)
+    awarded = backfill_all_achievements(db, notify=True)
+    log_audit(db, current_user.user_id, "achievement.backfill", "achievement", None, {"awarded": awarded})
+    db.commit()
+    return {"ok": True, "awarded": awarded}
+
+
+@admin_router.get("/moderation")
+def list_moderation_queue(
+    status: str = Query(default="pending", pattern="^(pending|approved|rejected|all)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("moderation.manage", current_user, db)
+    query = select(ModerationQueueItem).order_by(ModerationQueueItem.created_at.desc())
+    if status != "all":
+        query = query.where(ModerationQueueItem.status == status)
+    return [moderation_to_dict(item) for item in db.scalars(query.limit(100)).all()]
+
+
+@admin_router.patch("/moderation/{moderation_id}/decision")
+def decide_moderation_item(
+    moderation_id: int,
+    payload: ModerationDecisionPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("moderation.manage", current_user, db)
+    item = db.get(ModerationQueueItem, moderation_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Moderation item not found")
+    if item.status != "pending":
+        raise HTTPException(status_code=409, detail="Moderation item is already closed")
+
+    if payload.decision == "reject":
+        item.status = "rejected"
+        item.reason = payload.reason
+        item.reviewed_by = current_user.user_id
+        item.reviewed_at = datetime.utcnow()
+        if item.item_type == "profile_photo" and item.target_id:
+            create_notification(
+                db=db,
+                user_id=item.target_id,
+                type_name="profile_photo_rejected",
+                entity_type="user",
+                entity_id=item.target_id,
+                payload={"reason": payload.reason},
+                type_description="Profile photo rejected",
+                create_type_if_missing=True,
+            )
+        log_audit(db, current_user.user_id, "moderation.reject", "moderation", moderation_id, {"reason": payload.reason})
+        db.commit()
+        return {"ok": True}
+
+    if item.item_type == "dictionary_image":
+        result = apply_dictionary_moderation(db, item, current_user)
+    elif item.item_type == "profile_photo":
+        result = apply_profile_photo_moderation(db, item, current_user)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported moderation item")
+
+    db.commit()
+    return result
+
+
+@admin_router.get("/audit-logs")
+def list_audit_logs(
+    limit: int = Query(default=100, ge=1, le=300),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("audit.view", current_user, db)
+    rows = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)).all()
+    return [audit_to_dict(row) for row in rows]
+
+
+@admin_router.get("/users/{user_id}/sanctions")
+def list_user_sanctions(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("users.manage", current_user, db)
+    rows = db.scalars(
+        select(UserSanction)
+        .where(UserSanction.user_id == user_id)
+        .order_by(UserSanction.created_at.desc())
+    ).all()
+    return [sanction_to_dict(row) for row in rows]
+
+
+@admin_router.get("/featured-collections")
+def list_featured_collections(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("featured.manage", current_user, db)
+    rows = (
+        db.query(FeaturedCollection, Collections.collection_name, Collections.collection_image_url)
+        .join(Collections, Collections.collection_id == FeaturedCollection.collection_id)
+        .order_by(FeaturedCollection.display_order.asc(), Collections.collection_name.asc())
+        .all()
+    )
+    return [featured_to_dict(row, name, image_url) for row, name, image_url in rows]
+
+
+@admin_router.put("/featured-collections")
+def set_featured_collections(
+    payload: FeaturedCollectionPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("featured.manage", current_user, db)
+    db.query(FeaturedCollection).delete(synchronize_session=False)
+    for index, collection_id in enumerate(dict.fromkeys(payload.collection_ids)):
+        if db.get(Collections, collection_id):
+            db.add(FeaturedCollection(collection_id=collection_id, display_order=index))
+    log_audit(db, current_user.user_id, "featured.update", "collection", None, {"collection_ids": payload.collection_ids})
+    db.commit()
+    return {"ok": True}
+
+
+@admin_router.get("/roles")
+def list_roles(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ensure_admin_platform_schema()
+    seed_master_role(db)
+    db.commit()
+    if not (
+        user_has_permission(db, current_user, "roles.manage")
+        or user_has_permission(db, current_user, "users.manage")
+    ):
+        raise HTTPException(status_code=403, detail="Permission required: roles.manage")
     counts = dict(
         db.query(User.role_id, func.count(User.user_id))
         .group_by(User.role_id)
@@ -796,6 +1290,7 @@ def list_roles(
             "role_id": role.role_id,
             "role_name": role.role_name,
             "description": role.description,
+            "permissions": user_permissions(db, User(role_id=role.role_id, role=role)),
             "users_count": int(counts.get(role.role_id, 0)),
         }
         for role in roles
@@ -805,32 +1300,45 @@ def list_roles(
 @admin_router.post("/roles")
 def create_role(
     payload: RolePayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("roles.manage", current_user, db)
     role_name = payload.role_name.strip()
+    if role_name_is_master(role_name) and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Only a master admin can create master admin roles")
     existing = db.scalar(select(Role).where(func.lower(Role.role_name) == role_name.lower()))
     if existing:
         raise HTTPException(status_code=409, detail="Role already exists")
     role = Role(role_name=role_name, description=payload.description)
     db.add(role)
+    db.flush()
+    set_role_permissions(db, role.role_id, payload.permissions)
+    log_audit(db, current_user.user_id, "role.create", "role", role.role_id, {"role_name": role.role_name, "permissions": payload.permissions})
     db.commit()
     db.refresh(role)
-    return {"role_id": role.role_id, "role_name": role.role_name, "description": role.description}
+    return {"role_id": role.role_id, "role_name": role.role_name, "description": role.description, "permissions": user_permissions(db, User(role_id=role.role_id, role=role))}
 
 
 @admin_router.patch("/roles/{role_id}")
 def update_role(
     role_id: int,
     payload: RolePayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("roles.manage", current_user, db)
     role = db.get(Role, role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if role.role_id == MASTER_ROLE_ID and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Cannot edit master admin role")
+    if role_name_is_master(payload.role_name) and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Only a master admin can create master admin roles")
     role.role_name = payload.role_name.strip()
     role.description = payload.description
+    set_role_permissions(db, role.role_id, payload.permissions)
+    log_audit(db, current_user.user_id, "role.update", "role", role.role_id, {"role_name": role.role_name, "permissions": payload.permissions})
     db.commit()
     return {"ok": True}
 
@@ -838,16 +1346,20 @@ def update_role(
 @admin_router.delete("/roles/{role_id}")
 def delete_role(
     role_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users_count = db.query(func.count(User.user_id)).filter(User.role_id == role_id).scalar() or 0
-    if users_count:
-        raise HTTPException(status_code=400, detail="Role is used by users")
+    require_admin_permission("roles.manage", current_user, db)
     role = db.get(Role, role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if role.role_id == MASTER_ROLE_ID and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Cannot delete master admin role")
+    users_count = db.query(func.count(User.user_id)).filter(User.role_id == role_id).scalar() or 0
+    if users_count:
+        raise HTTPException(status_code=400, detail="Role is used by users")
     db.delete(role)
+    log_audit(db, current_user.user_id, "role.delete", "role", role_id)
     db.commit()
     return {"ok": True}
 
@@ -857,9 +1369,10 @@ def list_users(
     q: str = Query(default="", max_length=100),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(require_manager),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("users.manage", current_user, db)
     query = select(User).options(joinedload(User.role)).order_by(User.created_at.desc())
     if q.strip():
         pattern = f"%{q.strip()}%"
@@ -905,16 +1418,24 @@ def list_users(
 def set_user_role(
     user_id: int,
     payload: UserRolePayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("users.manage", current_user, db)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+    if user_is_master(user) and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Cannot change a master admin role")
     role = db.get(Role, payload.role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if (payload.role_id == MASTER_ROLE_ID or role_name_is_master(role.role_name)) and not user_is_master(current_user):
+        raise HTTPException(status_code=403, detail="Only a master admin can assign master admin role")
     user.role_id = payload.role_id
+    log_audit(db, current_user.user_id, "user.role", "user", user_id, {"role_id": payload.role_id})
     db.commit()
     return {"ok": True}
 
@@ -923,9 +1444,10 @@ def set_user_role(
 def set_user_active(
     user_id: int,
     payload: UserActivePayload,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_admin_permission("users.manage", current_user, db)
     if user_id == current_user.user_id and payload.is_active == 0:
         raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
     user = db.get(User, user_id)
@@ -937,6 +1459,10 @@ def set_user_active(
     if payload.is_active == 0:
         deactivated_listings = deactivate_user_active_listings(db, user.user_id)
         approved_reports = approve_pending_reports_for_user(db, user.user_id, current_user.user_id)
+        record_sanction(db, user.user_id, current_user.user_id, "ban", payload.reason, None)
+    else:
+        record_sanction(db, user.user_id, current_user.user_id, "unban", payload.reason, None)
+    log_audit(db, current_user.user_id, "user.active", "user", user_id, {"is_active": payload.is_active, "reason": payload.reason})
     db.commit()
     return {
         "ok": True,

@@ -15,6 +15,90 @@ export interface NotificationPayload {
   moderator_username?: string | null;
 }
 
+export async function getAchievementRules(): Promise<AchievementRule[]> {
+  const response = await authFetch(`${API_URL}/admin/achievements/rules`);
+  return parseResponse<AchievementRule[]>(response, "Failed to load achievement rules");
+}
+
+export async function getAdminAchievements(): Promise<AdminAchievement[]> {
+  const response = await authFetch(`${API_URL}/admin/achievements`);
+  return parseResponse<AdminAchievement[]>(response, "Failed to load achievements");
+}
+
+export async function createAchievement(payload: AchievementPayload): Promise<AdminAchievement> {
+  const response = await authFetch(`${API_URL}/admin/achievements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse<AdminAchievement>(response, "Failed to create achievement");
+}
+
+export async function updateAchievement(achievementId: number, payload: AchievementPayload): Promise<AdminAchievement> {
+  const response = await authFetch(`${API_URL}/admin/achievements/${achievementId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse<AdminAchievement>(response, "Failed to update achievement");
+}
+
+export async function setAchievementActive(achievementId: number, isActive: number): Promise<{ ok: boolean; awarded_now: number }> {
+  const response = await authFetch(`${API_URL}/admin/achievements/${achievementId}/active`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  return parseResponse<{ ok: boolean; awarded_now: number }>(response, "Failed to update achievement");
+}
+
+export async function backfillAchievements(): Promise<{ ok: boolean; awarded: number }> {
+  const response = await authFetch(`${API_URL}/admin/achievements/backfill`, { method: "POST" });
+  return parseResponse<{ ok: boolean; awarded: number }>(response, "Failed to backfill achievements");
+}
+
+export async function getModerationQueue(status = "pending"): Promise<ModerationItem[]> {
+  const response = await authFetch(`${API_URL}/admin/moderation?status=${status}`);
+  return parseResponse<ModerationItem[]>(response, "Failed to load moderation queue");
+}
+
+export async function decideModerationItem(
+  moderationId: number,
+  decision: "approve" | "reject",
+  reason?: string | null,
+): Promise<{ ok: boolean }> {
+  const response = await authFetch(`${API_URL}/admin/moderation/${moderationId}/decision`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, reason }),
+  });
+  return parseResponse<{ ok: boolean }>(response, "Failed to process moderation item");
+}
+
+export async function getAuditLogs(limit = 100): Promise<AuditLog[]> {
+  const response = await authFetch(`${API_URL}/admin/audit-logs?limit=${limit}`);
+  return parseResponse<AuditLog[]>(response, "Failed to load audit log");
+}
+
+export async function getUserSanctions(userId: number): Promise<UserSanction[]> {
+  const response = await authFetch(`${API_URL}/admin/users/${userId}/sanctions`);
+  return parseResponse<UserSanction[]>(response, "Failed to load sanction history");
+}
+
+export async function getFeaturedCollections(): Promise<FeaturedCollection[]> {
+  const response = await authFetch(`${API_URL}/admin/featured-collections`);
+  return parseResponse<FeaturedCollection[]>(response, "Failed to load featured collections");
+}
+
+export async function setFeaturedCollections(collectionIds: number[]): Promise<{ ok: boolean }> {
+  const response = await authFetch(`${API_URL}/admin/featured-collections`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ collection_ids: collectionIds }),
+  });
+  return parseResponse<{ ok: boolean }>(response, "Failed to save featured collections");
+}
+
 export interface AdminNotification {
   notification_id: number;
   type: string;
@@ -32,6 +116,8 @@ export interface AdminAccess {
   role_name: string | null;
   can_moderate: boolean;
   can_admin: boolean;
+  permissions: string[];
+  available_permissions: { key: string; label: string }[];
 }
 
 export interface AdminSummary {
@@ -90,6 +176,7 @@ export interface DictionaryItem {
 export interface DictionaryItemPayload {
   name: string;
   image_url?: string | null;
+  image_data_url?: string | null;
   collection_id?: number | null;
   collection_limit?: number | null;
   purchase_limit?: number | null;
@@ -100,6 +187,7 @@ export interface AdminRole {
   role_id: number;
   role_name: string;
   description: string | null;
+  permissions: string[];
   users_count: number;
 }
 
@@ -120,6 +208,82 @@ export interface AdminUser {
   purchases_count: number;
   reports_sent: number;
   reports_received: number;
+}
+
+export interface AchievementRule {
+  key: string;
+  label: string;
+}
+
+export interface AdminAchievement {
+  achievement_id: number;
+  title: string;
+  description: string;
+  image_url: string | null;
+  rule_key: string | null;
+  rule_value: number | null;
+  is_active: number;
+  created_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  awarded_count: number;
+  users_percent: number;
+  awarded_now?: number;
+}
+
+export interface AchievementPayload {
+  title: string;
+  description: string;
+  image_url?: string | null;
+  image_data_url?: string | null;
+  rule_key?: string | null;
+  rule_value?: number | null;
+  is_active?: number;
+  backfill_existing?: boolean;
+}
+
+export interface ModerationItem {
+  moderation_id: number;
+  item_type: string;
+  action: string;
+  target_kind: string | null;
+  target_id: number | null;
+  submitted_by: number | null;
+  reviewed_by: number | null;
+  status: string;
+  image_data_url: string | null;
+  payload: Record<string, any>;
+  reason: string | null;
+  created_at: string | null;
+  reviewed_at: string | null;
+}
+
+export interface AuditLog {
+  audit_id: number;
+  actor_user_id: number | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  payload: Record<string, any>;
+  created_at: string | null;
+}
+
+export interface UserSanction {
+  sanction_id: number;
+  user_id: number;
+  moderator_id: number | null;
+  action: string;
+  reason: string | null;
+  report_id: number | null;
+  created_at: string | null;
+}
+
+export interface FeaturedCollection {
+  collection_id: number;
+  collection_name: string | null;
+  collection_image_url: string | null;
+  display_order: number;
+  created_at: string | null;
 }
 
 async function parseResponse<T>(response: Response, fallback: string): Promise<T> {
@@ -228,7 +392,7 @@ export async function getAdminRoles(): Promise<AdminRole[]> {
   return parseResponse<AdminRole[]>(response, "Не удалось загрузить роли");
 }
 
-export async function createAdminRole(payload: { role_name: string; description?: string | null }): Promise<AdminRole> {
+export async function createAdminRole(payload: { role_name: string; description?: string | null; permissions?: string[] }): Promise<AdminRole> {
   const response = await authFetch(`${API_URL}/admin/roles`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -239,7 +403,7 @@ export async function createAdminRole(payload: { role_name: string; description?
 
 export async function updateAdminRole(
   roleId: number,
-  payload: { role_name: string; description?: string | null },
+  payload: { role_name: string; description?: string | null; permissions?: string[] },
 ): Promise<{ ok: boolean }> {
   const response = await authFetch(`${API_URL}/admin/roles/${roleId}`, {
     method: "PATCH",
@@ -276,11 +440,12 @@ export async function setAdminUserRole(userId: number, roleId: number): Promise<
 export async function setAdminUserActive(
   userId: number,
   isActive: number,
+  reason?: string | null,
 ): Promise<{ ok: boolean; deactivated_listings?: number; approved_reports?: number }> {
   const response = await authFetch(`${API_URL}/admin/users/${userId}/active`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ is_active: isActive }),
+    body: JSON.stringify({ is_active: isActive, reason }),
   });
   return parseResponse<{ ok: boolean }>(response, "Не удалось изменить статус пользователя");
 }

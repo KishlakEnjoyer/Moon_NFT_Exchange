@@ -161,6 +161,17 @@ export const getActiveListings = async (params: ListingSearchParams = {}): Promi
   return res.json();
 };
 
+export const getRecommendedListings = async (limit = 50): Promise<ApiListing[]> => {
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  const res = await authFetch(`${API_URL}/listings/recommended?${searchParams.toString()}`);
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || "Failed to load recommendations");
+  }
+
+  return res.json();
+};
+
 export const getCart = async (userId: number): Promise<Cart> => {
   const res = await authFetch(`${API_URL}/cart/${userId}`);
   if (!res.ok) return { user_id: userId, items: [], total: "0" };

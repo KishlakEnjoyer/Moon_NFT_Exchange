@@ -13,9 +13,28 @@ services:
     restart: unless-stopped
     volumes:
       - ./images:/app/images
+      - ./backend/ml:/app/ml
     depends_on:
       - db
       - redis
+    networks:
+      - moon_net
+
+  recsys-trainer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: moon_recsys_trainer
+    command: python ml/retrain_loop.py
+    env_file:
+      - ./.env
+    environment:
+      RECSYS_RETRAIN_INTERVAL_SECONDS: ${RECSYS_RETRAIN_INTERVAL_SECONDS:-10800}
+    restart: unless-stopped
+    volumes:
+      - ./backend/ml:/app/ml
+    depends_on:
+      - db
     networks:
       - moon_net
 

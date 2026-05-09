@@ -19,6 +19,7 @@ from core.models import (
     User,
 )
 from services.listing_purchase_service import buy_listing as buy_listing_service
+from services.recommendation_service import get_recommended_listing_ids
 from services.smart_search_service import SmartSearchItem, smart_search_service
 
 listings_router = APIRouter(prefix="/listings", tags=["listings"])
@@ -324,6 +325,34 @@ def get_active_listings(
         listings = sort_listing_rows(listings, sort, views_by_listing_id)
 
     return make_listing_responses(db, listings)
+
+
+@listings_router.get("/recommended", response_model=List[ListingResponse])
+def get_recommended_listings(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User | None = Depends(get_optional_current_user_any),
+    db: Session = Depends(get_db),
+):
+    user_id = current_user.user_id if current_user and current_user.is_active else None
+    listing_ids = get_recommended_listing_ids(db=db, user_id=user_id, limit=limit)
+    if not listing_ids:
+        return []
+
+    listings_by_id = {
+        listing.listing_id: listing
+        for listing in (
+            db.query(ActiveListingsView)
+            .filter(ActiveListingsView.listing_id.in_(listing_ids))
+            .all()
+        )
+    }
+    ordered_listings = [
+        listings_by_id[listing_id]
+        for listing_id in listing_ids
+        if listing_id in listings_by_id
+    ]
+
+    return make_listing_responses(db, ordered_listings)
 
 
 @listings_router.post("/create", response_model=CreateListingResponse)

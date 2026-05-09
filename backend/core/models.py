@@ -36,7 +36,7 @@ class User(Base):
     vk_visibility: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     username: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     profile_pic_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-
+    
     wallet_address: Mapped[str | None] = mapped_column(String(42), unique=True, nullable=True)
     wallet_private_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     wallet_encryption_version: Mapped[int | None] = mapped_column(SmallInteger, nullable=True, default=1)
@@ -104,6 +104,34 @@ class Role(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     users: Mapped[list[User]] = relationship("User", back_populates="role")
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    role_id: Mapped[int] = mapped_column(
+        SmallInteger,
+        ForeignKey("roles.role_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    permission_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+
+
+class UserFollow(Base):
+    __tablename__ = "user_follows"
+
+    follower_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    following_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
 
 
 class Symbols(Base):
@@ -694,3 +722,94 @@ class TransactionHistory(Base):
 
     seller_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     seller_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+
+    achievement_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rule_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    rule_value: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+
+class UserAchievement(Base):
+    __tablename__ = "user_achievements"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    achievement_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("achievements.achievement_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    is_visible: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    awarded_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    audit_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    actor_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+
+
+class UserSanction(Base):
+    __tablename__ = "user_sanctions"
+
+    sanction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    moderator_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    report_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("reports.report_id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+
+
+class ModerationQueueItem(Base):
+    __tablename__ = "moderation_queue"
+
+    moderation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    item_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_kind: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    submitted_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
+    image_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+
+
+class FeaturedCollection(Base):
+    __tablename__ = "featured_collections"
+
+    collection_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("collections.collection_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)

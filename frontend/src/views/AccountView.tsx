@@ -6,6 +6,7 @@ import {
   Image,
   Input,
   Layout,
+  Modal,
   Segmented,
   Spin,
   Tag,
@@ -18,8 +19,11 @@ import {
   FlagOutlined,
   GiftOutlined,
   HistoryOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
   PlusOutlined,
   SmileOutlined,
+  TrophyOutlined,
   UpOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -43,6 +47,15 @@ import { createAlbum, deleteAlbum, renameAlbum } from "../services/albumService"
 import { authFetch } from "../services/auth";
 import { getPresentDisplayImageUrl } from "../services/presentService";
 import { UpdateProfileResponse } from "../services/profileService";
+import {
+  followUser,
+  getFollowers,
+  getFollowing,
+  setAchievementVisibility,
+  setProfileBadge,
+  SocialUser,
+  unfollowUser,
+} from "../services/socialService";
 import { useNotifications } from "../hooks/useNotifications";
 import NotFound from "./NotFound";
 import { useTranslation } from "react-i18next";
@@ -79,8 +92,28 @@ interface UserProfile {
   profile_pic_url: string | null;
   about_me: string | null;
   is_active: number;
+  followers_count: number;
+  following_count: number;
+  is_following: boolean;
+  achievements_total_count: number;
+  achievements_earned_count: number;
+  achievements_visible_count: number;
+  achievements: ProfileAchievement[];
+  profile_badge_achievement_id: number | null;
+  profile_badge_achievement: ProfileAchievement | null;
+  top_spender_rank: number | null;
   presents: Present[];
   albums: Album[];
+}
+
+interface ProfileAchievement {
+  achievement_id: number;
+  title: string;
+  description: string;
+  image_url: string | null;
+  users_percent: number;
+  is_visible: number;
+  awarded_at: string | null;
 }
 
 const ALL_TAB = "All";
@@ -88,8 +121,12 @@ const DEFAULT_VISIBLE_COUNT = 36;
 const MAX_ALBUMS_PER_USER = 10;
 const MAX_ALBUM_TITLE_LENGTH = 30;
 const PROFILE_AVATAR_SIZE = { xs: 92, sm: 116, md: 140, lg: 140, xl: 140, xxl: 140 };
+const achievementImageUrl = (imageUrl: string | null | undefined) => (
+  imageUrl ? `${process.env.REACT_APP_IMAGES_URL}/achievements/${imageUrl}` : undefined
+);
 
 type SegmentedValue = typeof ALL_TAB | number;
+type SocialListKind = "followers" | "following";
 
 const getStoredCurrentUser = () => {
   try {
@@ -117,7 +154,13 @@ const AccountView = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isGiftOpen, setIsGiftOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [selectedGiftId, setSelectedGiftId] = useState<number | null>(null);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [socialListKind, setSocialListKind] = useState<SocialListKind | null>(null);
+  const [socialUsers, setSocialUsers] = useState<SocialUser[]>([]);
+  const [socialUsersLoading, setSocialUsersLoading] = useState(false);
+  const [badgeSaving, setBadgeSaving] = useState(false);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -168,7 +211,7 @@ const AccountView = () => {
       });
   };
 
-  const { notifications, unreadCount, markAllRead } = useNotifications(
+  useNotifications(
     isOwn ? getStoredCurrentUser().user_id : null,
     () => loadUser()
   );
@@ -419,6 +462,86 @@ const AccountView = () => {
     }
   };
 
+  const handleToggleFollow = async () => {
+    if (!user || isOwn || !currentUser.user_id) {
+      return;
+    }
+
+    setFollowLoading(true);
+    try {
+      const result = user.is_following
+        ? await unfollowUser(user.user_id)
+        : await followUser(user.user_id);
+      setUser((prev) => prev ? {
+        ...prev,
+        is_following: result.following,
+        followers_count: result.followers_count,
+        following_count: result.following_count,
+      } : prev);
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedToggleFollow"));
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleToggleAchievementVisibility = async (achievementId: number, isVisible: number) => {
+    try {
+      await setAchievementVisibility(achievementId, isVisible);
+      setUser((prev) => prev ? {
+        ...prev,
+        achievements: prev.achievements.map((achievement) => (
+          achievement.achievement_id === achievementId
+            ? { ...achievement, is_visible: isVisible }
+            : achievement
+        )),
+        achievements_visible_count: prev.achievements_visible_count + (isVisible ? 1 : -1),
+        profile_badge_achievement_id: isVisible === 0 && prev.profile_badge_achievement_id === achievementId
+          ? null
+          : prev.profile_badge_achievement_id,
+        profile_badge_achievement: isVisible === 0 && prev.profile_badge_achievement_id === achievementId
+          ? null
+          : prev.profile_badge_achievement,
+      } : prev);
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedToggleAchievementVisibility"));
+    }
+  };
+
+  const handleSetProfileBadge = async (achievement: ProfileAchievement | null) => {
+    setBadgeSaving(true);
+    try {
+      const result = await setProfileBadge(achievement?.achievement_id ?? null);
+      setUser((prev) => prev ? {
+        ...prev,
+        profile_badge_achievement_id: result.profile_badge_achievement_id,
+        profile_badge_achievement: result.profile_badge_achievement_id ? achievement : null,
+      } : prev);
+      messageApi.success(t("profile.badgeUpdated"));
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedUpdateBadge"));
+    } finally {
+      setBadgeSaving(false);
+    }
+  };
+
+  const openSocialList = async (kind: SocialListKind) => {
+    if (!user) return;
+    setSocialListKind(kind);
+    setSocialUsersLoading(true);
+    try {
+      const loadedUsers = kind === "followers"
+        ? await getFollowers(user.user_id)
+        : await getFollowing(user.user_id);
+      setSocialUsers(loadedUsers);
+    } catch (error) {
+      setSocialUsers([]);
+      messageApi.error(error instanceof Error ? error.message : t("profile.failedLoadSocialList"));
+    } finally {
+      setSocialUsersLoading(false);
+    }
+  };
+
   const renderAlbumLabel = (album: Album) => {
     if (renamingAlbumId === album.album_id) {
       return (
@@ -584,13 +707,41 @@ const AccountView = () => {
                 <Title level={2} className="!mb-0 break-all !text-[28px] sm:!text-[30px]">
                   {user.username}
                 </Title>
-                {isBlockedProfile && <Tag color="red">Аккаунт заблокирован</Tag>}
+                {user.profile_badge_achievement && (
+                  <Tooltip title={user.profile_badge_achievement.title}>
+                    <Avatar
+                      shape="square"
+                      size={32}
+                      src={achievementImageUrl(user.profile_badge_achievement.image_url)}
+                      icon={!user.profile_badge_achievement.image_url ? <TrophyOutlined /> : undefined}
+                      className="border border-amber-300 bg-amber-100"
+                    />
+                  </Tooltip>
+                )}
+                {user.top_spender_rank && (
+                  <Tag color="gold">{t("profile.topRank", { rank: user.top_spender_rank })}</Tag>
+                )}
+                {isBlockedProfile && <Tag color="red">{t("profile.accountBlocked")}</Tag>}
               </Flex>
 
               {renderSocialAccount("tg", user.tg_username, user.user_tg_id, user.tg_visibility)}
               {renderSocialAccount("vk", user.vk_username, user.user_vk_id, user.vk_visibility)}
 
               <Text className="mt-3 leading-relaxed break-words">{user.about_me}</Text>
+              <Flex gap={8} wrap="wrap" className="mt-3">
+                <Tag className="cursor-pointer" onClick={() => openSocialList("followers")}>
+                  {t("profile.followersCount", { count: user.followers_count || 0 })}
+                </Tag>
+                <Tag className="cursor-pointer" onClick={() => openSocialList("following")}>
+                  {t("profile.followingCount", { count: user.following_count || 0 })}
+                </Tag>
+                <Tag color={user.achievements_earned_count ? "gold" : "default"}>
+                  {t("profile.achievementsProgress", {
+                    earned: user.achievements_earned_count || 0,
+                    total: user.achievements_total_count || 0,
+                  })}
+                </Tag>
+              </Flex>
             </Flex>
           </Flex>
 
@@ -614,6 +765,14 @@ const AccountView = () => {
                   icon={<HistoryOutlined />}
                   className="!bg-[var(--liquid-glass-bg)]"
                   onClick={() => setIsHistoryOpen(true)}
+                />
+              </Tooltip>
+              <Tooltip title={t("profile.achievements2")}>
+                <Button
+                  size="large"
+                  icon={<TrophyOutlined />}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                  onClick={() => setIsAchievementsOpen(true)}
                 />
               </Tooltip>
               <Button
@@ -640,6 +799,24 @@ const AccountView = () => {
                   </Button>
                 </Tooltip>
               )}
+              {currentUser.user_id && (
+                <Button
+                  size="large"
+                  loading={followLoading}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                  onClick={handleToggleFollow}
+                >
+                  {user.is_following ? t("profile.unfollow") : t("profile.follow")}
+                </Button>
+              )}
+              <Tooltip title={t("profile.achievements2")}>
+                <Button
+                  size="large"
+                  icon={<TrophyOutlined />}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                  onClick={() => setIsAchievementsOpen(true)}
+                />
+              </Tooltip>
               {currentUser.user_id && canReportProfile && (
                 <Tooltip title={t("profile.report")}>
                   <Button
@@ -791,6 +968,155 @@ const AccountView = () => {
           userId={user.user_id}
           currentUsername={user.username}
         />
+
+        <Modal
+          open={socialListKind !== null}
+          onCancel={() => setSocialListKind(null)}
+          title={socialListKind === "followers" ? t("profile.followers") : t("profile.following")}
+          footer={[<Button key="close" onClick={() => setSocialListKind(null)}>{t("profile.close")}</Button>]}
+          width={560}
+        >
+          <Spin spinning={socialUsersLoading}>
+            {socialUsers.length === 0 ? (
+              <Flex vertical align="center" className="py-10 gap-2 text-center">
+                <UserOutlined className="text-4xl text-gray-400" />
+                <Text type="secondary">{t("profile.noSocialUsers")}</Text>
+              </Flex>
+            ) : (
+              <Flex vertical gap={10}>
+                {socialUsers.map((socialUser) => (
+                  <Flex
+                    key={socialUser.user_id}
+                    align="center"
+                    justify="space-between"
+                    gap={12}
+                    className="rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg-secondary)] p-3"
+                  >
+                    <Flex align="center" gap={10} className="min-w-0">
+                      <Avatar
+                        src={socialUser.profile_pic_url ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${socialUser.profile_pic_url}` : undefined}
+                        icon={!socialUser.profile_pic_url ? <UserOutlined /> : undefined}
+                      />
+                      <Button
+                        type="link"
+                        className="!h-auto !p-0 min-w-0"
+                        onClick={() => {
+                          if (!socialUser.username) return;
+                          setSocialListKind(null);
+                          navigate(`/account/${socialUser.username}`);
+                        }}
+                      >
+                        <span className="truncate">{socialUser.username || `#${socialUser.user_id}`}</span>
+                      </Button>
+                      {socialUser.profile_badge_image_url && (
+                        <Avatar
+                          shape="square"
+                          size={24}
+                          src={achievementImageUrl(socialUser.profile_badge_image_url)}
+                          icon={!socialUser.profile_badge_image_url ? <TrophyOutlined /> : undefined}
+                        />
+                      )}
+                    </Flex>
+                    {socialUser.is_following && <Tag>{t("profile.following")}</Tag>}
+                  </Flex>
+                ))}
+              </Flex>
+            )}
+          </Spin>
+        </Modal>
+
+        <Modal
+          open={isAchievementsOpen}
+          onCancel={() => setIsAchievementsOpen(false)}
+          title={
+            <Flex align="center" gap={8}>
+              <TrophyOutlined />
+              <span>
+                {t("profile.achievementsProgress", {
+                  earned: user.achievements_earned_count || 0,
+                  total: user.achievements_total_count || 0,
+                })}
+              </span>
+            </Flex>
+          }
+          footer={[<Button key="close" onClick={() => setIsAchievementsOpen(false)}>{t("profile.close")}</Button>]}
+          width={760}
+        >
+          {isOwn && user.profile_badge_achievement && (
+            <Flex justify="flex-end" className="mb-3">
+              <Button size="small" loading={badgeSaving} onClick={() => handleSetProfileBadge(null)}>
+                {t("profile.removeBadge")}
+              </Button>
+            </Flex>
+          )}
+          {!isOwn && user.achievements_visible_count < user.achievements_earned_count && (
+            <Text type="secondary" className="mb-3 block">
+              {t("profile.hiddenAchievementsCount", {
+                count: user.achievements_earned_count - user.achievements_visible_count,
+              })}
+            </Text>
+          )}
+          {user.achievements.length === 0 ? (
+            <Flex vertical align="center" className="py-10 gap-3 text-center">
+              <TrophyOutlined className="text-5xl text-gray-400" />
+              <Text type="secondary">{t("profile.noAchievements")}</Text>
+            </Flex>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {user.achievements.map((achievement) => (
+                <div
+                  key={achievement.achievement_id}
+                  className="rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg-secondary)] p-3"
+                >
+                  <Flex gap={12} align="flex-start">
+                    <Avatar
+                      shape="square"
+                      size={64}
+                      src={achievementImageUrl(achievement.image_url)}
+                      icon={!achievement.image_url ? <TrophyOutlined /> : undefined}
+                      className="shrink-0"
+                    />
+                    <Flex vertical className="min-w-0 flex-1">
+                      <Flex justify="space-between" gap={8} align="start">
+                        <Text strong className="break-words">{achievement.title}</Text>
+                        {isOwn && (
+                          <Tooltip title={achievement.is_visible ? t("profile.hideAchievement") : t("profile.showAchievement")}>
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={achievement.is_visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                              onClick={() => handleToggleAchievementVisibility(
+                                achievement.achievement_id,
+                                achievement.is_visible ? 0 : 1,
+                              )}
+                            />
+                          </Tooltip>
+                        )}
+                      </Flex>
+                      <Text type="secondary" className="text-sm leading-5">{achievement.description}</Text>
+                      <Tag color="gold" className="mt-2 w-fit">
+                        {t("profile.achievementUsersPercent", { percent: achievement.users_percent })}
+                      </Tag>
+                      {isOwn && achievement.is_visible === 1 && (
+                        <Button
+                          size="small"
+                          className="mt-2 w-fit"
+                          loading={badgeSaving}
+                          disabled={user.profile_badge_achievement_id === achievement.achievement_id}
+                          onClick={() => handleSetProfileBadge(achievement)}
+                        >
+                          {user.profile_badge_achievement_id === achievement.achievement_id
+                            ? t("profile.currentBadge")
+                            : t("profile.setAsBadge")}
+                        </Button>
+                      )}
+                    </Flex>
+                  </Flex>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
 
         <GiftDetailModal
           open={!!selectedGiftId}

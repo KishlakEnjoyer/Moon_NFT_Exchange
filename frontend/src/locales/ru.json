@@ -31,7 +31,8 @@
     "sendGift": "Отправить подарок",
     "history": "История",
     "report": "Жалоба",
-    "edit": "Редактировать"
+    "edit": "Редактировать",
+    "admin": "Админ-панель"
   },
   "marketplace": {
     "noLots": "Лотов пока нет",
@@ -107,7 +108,35 @@
     "telegramConnected": "Telegram подключён",
     "telegramNotConnected": "Telegram не подключён",
     "vkNotConnected": "VK не подключён",
-    "socialHidden": "Не подсматривай"
+    "socialHidden": "Не подсматривай",
+    "subs": "Подписчики",
+    "following": "Подписки",
+    "achievements": "Достижений",
+    "achievements2": "Достижения",
+    "followersCount": "{{count}} подписчиков",
+    "followingCount": "{{count}} подписок",
+    "achievementsCount": "{{count}} достижений",
+    "achievementsProgress": "{{earned}}/{{total}} достижений",
+    "follow": "Подписаться",
+    "unfollow": "Отписаться",
+    "followers": "Подписчики",
+    "close": "Закрыть",
+    "accountBlocked": "Аккаунт заблокирован",
+    "topRank": "Топ #{{rank}}",
+    "failedToggleFollow": "Не удалось изменить подписку",
+    "failedToggleAchievementVisibility": "Не удалось изменить видимость",
+    "failedLoadSocialList": "Не удалось загрузить пользователей",
+    "failedUpdateBadge": "Не удалось обновить бейдж",
+    "badgeUpdated": "Бейдж обновлён",
+    "noAchievements": "Пока нет открытых достижений",
+    "noSocialUsers": "Пока никого нет",
+    "hideAchievement": "Скрыть",
+    "showAchievement": "Показать",
+    "achievementUsersPercent": "Есть у {{percent}}% пользователей",
+    "hiddenAchievementsCount": "{{count}} достижений скрыто",
+    "setAsBadge": "Поставить бейдж",
+    "currentBadge": "Текущий бейдж",
+    "removeBadge": "Убрать бейдж"
   },
   "profileCard": {
     "onSale": "На продаже"
@@ -323,12 +352,21 @@
     "cancel": "Отмена",
     "save": "Сохранить",
     "refresh": "Обновить",
+    "whoandwhat": "Кто и что менял в админке",
+    "imageUpload": {
+      "uploadImage": "Загрузить изображение",
+      "removeNewFile": "Убрать новый файл"
+    },
     "tabs": {
       "dashboard": "Дашборд",
       "reports": "Жалобы",
       "analytics": "Аналитика",
       "dictionaries": "Справочники",
-      "usersRoles": "Роли и доступ"
+      "usersRoles": "Роли и доступ",
+      "achievements": "Достижения",
+      "moderation": "Модерация",
+      "audit": "Аудит",
+      "featured": "Избранное"
     },
     "dictionary": {
       "collections": "Коллекции",
@@ -430,6 +468,60 @@
       "unbanUser": "Разбанить пользователя",
       "banUser": "Забанить пользователя"
     },
+    "achievements": {
+      "loadFailed": "Не удалось загрузить достижения",
+      "imageRequired": "Загрузите картинку достижения",
+      "savedWithAwarded": "Сохранено. Выдано сейчас: {{count}}",
+      "saveFailed": "Не удалось сохранить достижение",
+      "backfillDone": "Проверка завершена. Новых выдач: {{count}}",
+      "backfillFailed": "Не удалось пересчитать достижения",
+      "description": "Создавайте бейджи и правила автоматической выдачи.",
+      "backfillAll": "Пересчитать всем",
+      "new": "Новое достижение",
+      "image": "Картинка",
+      "title": "Название",
+      "details": "Описание",
+      "rule": "Правило",
+      "awarded": "Выдано",
+      "usersPercent": "% пользователей",
+      "status": "Статус",
+      "actions": "Действия",
+      "edit": "Изменить",
+      "enable": "Включить",
+      "disable": "Отключить",
+      "editTitle": "Редактировать достижение",
+      "newTitle": "Новое достижение",
+      "enterTitle": "Введите название",
+      "enterDescription": "Введите описание",
+      "ruleValue": "Число для правила",
+      "backfillExisting": "Сразу выдать тем, кто уже выполнил"
+    },
+    "moderation": {
+      "loadFailed": "Не удалось загрузить очередь модерации",
+      "approved": "Одобрено",
+      "rejected": "Отклонено",
+      "processFailed": "Не удалось обработать заявку",
+      "type": "Тип",
+      "action": "Действие",
+      "target": "Цель",
+      "preview": "Превью",
+      "status": "Статус",
+      "actions": "Действия"
+    },
+    "featured": {
+      "loadFailed": "Не удалось загрузить избранные коллекции",
+      "saved": "Избранные коллекции сохранены",
+      "saveFailed": "Не удалось сохранить подборку",
+      "description": "Выберите коллекции, которые нужно вручную закрепить как рекомендованные.",
+      "placeholder": "Выберите коллекции"
+    },
+    "audit": {
+      "loadFailed": "Не удалось загрузить аудит",
+      "actor": "Кто",
+      "action": "Действие",
+      "entity": "Сущность",
+      "date": "Дата"
+    },
     "dictionaries": {
       "loadFailed": "Не удалось загрузить справочник",
       "saveFailed": "Не удалось сохранить запись",
@@ -458,7 +550,12 @@
       "enterName": "Введите название",
       "chooseCollectionMsg": "Выберите коллекцию",
       "enterLimit": "Введите лимит",
-      "enterPrice": "Введите цену"
+      "enterPrice": "Введите цену",
+      "uploadImage": "Загрузить картинку",
+      "chooseFile": "Выбрать файл",
+      "moderationHint": "Новый файл сохранится только после одобрения в очереди модерации.",
+      "uploadRequired": "Загрузите картинку для модерации",
+      "sentToModeration": "Отправлено на модерацию"
     },
     "users": {
       "loadFailed": "Не удалось загрузить доступы",
@@ -469,6 +566,7 @@
       "roleDeleteFailed": "Не удалось удалить роль",
       "userRoleChanged": "Роль пользователя изменена",
       "userRoleFailed": "Не удалось изменить роль",
+      "roleChangeBlocked": "Нельзя менять свою роль или роль мастер-админа",
       "userStatusChanged": "Статус пользователя изменен",
       "userStatusFailed": "Не удалось изменить статус",
       "users": "Пользователи",
@@ -496,7 +594,17 @@
       "delete": "Удалить",
       "editRoleTitle": "Редактирование роли",
       "newRoleTitle": "Новая роль",
-      "enterRoleName": "Введите название роли"
+      "enterRoleName": "Введите название роли",
+      "permissions": "Права",
+      "sanctions": "Санкции",
+      "history": "История",
+      "loadSanctionsFailed": "Не удалось загрузить историю санкций",
+      "sanctionsHistory": "История санкций",
+      "sanctionsHistoryFor": "История санкций: {{user}}",
+      "sanctionAction": "Действие",
+      "sanctionReason": "Причина",
+      "sanctionModerator": "Модератор",
+      "sanctionDate": "Дата"
     },
     "analytics": {
       "loadFailed": "Не удалось загрузить аналитику",

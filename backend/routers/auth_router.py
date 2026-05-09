@@ -26,6 +26,7 @@ def serialize_auth_user(user: User, balance=0) -> dict:
         "role_id": user.role_id,
         "user_tg_id": user.user_tg_id,
         "user_vk_id": user.user_vk_id,
+        "role_name": user.role.role_name if user.role else None,
         "tg_username": user.tg_username,
         "vk_username": user.vk_username,
         "tg_visibility": user.tg_visibility,

@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import {
   ApiListing,
   getActiveListings,
+  getRecommendedListings,
   addToCart,
   CartItem,
   getCart,
@@ -88,14 +89,17 @@ const MainView = () => {
   }, [currentUserId]);
 
   const loadListings = useCallback(async () => {
-    if (activeTab !== "all" && activeTab !== "most_viewed") return;
+    if (activeTab !== "all" && activeTab !== "most_viewed" && activeTab !== "for_you") return;
 
     setLoading(true);
     try {
-      const effectiveFilters = activeTab === "most_viewed"
-        ? { ...listingFilters, sort: "most_viewed" }
-        : listingFilters;
-      const data = await getActiveListings(effectiveFilters);
+      const data = activeTab === "for_you"
+        ? await getRecommendedListings(50)
+        : await getActiveListings(
+          activeTab === "most_viewed"
+            ? { ...listingFilters, sort: "most_viewed" }
+            : listingFilters,
+        );
       setListings(data);
     } catch (e: any) {
       setListings([]);
@@ -123,7 +127,7 @@ const MainView = () => {
   }, [loadCart]);
 
   useEffect(() => {
-    if (activeTab === "all" || activeTab === "most_viewed") {
+    if (activeTab === "all" || activeTab === "most_viewed" || activeTab === "for_you") {
       loadListings();
     }
   }, [activeTab, loadListings]);
@@ -136,7 +140,7 @@ const MainView = () => {
 
   useEffect(() => {
     const handleListingsChanged = () => {
-      if (activeTab === "all" || activeTab === "most_viewed") {
+      if (activeTab === "all" || activeTab === "most_viewed" || activeTab === "for_you") {
         loadListings();
       }
       if (activeTab === "top_users") {
@@ -273,20 +277,6 @@ const MainView = () => {
     );
   };
 
-  const renderForYouContent = () => (
-    <Flex vertical align="center" justify="center" className="min-h-[60vh] gap-4">
-      <Empty
-        image={<InboxOutlined style={{ fontSize: 80, color: "var(--liquid-glass-fg)", opacity: 0.3 }} />}
-        styles={{ image: { height: 100 } }}
-        description={
-          <Text type="secondary" style={{ fontSize: "var(--size-lg)" }}>
-            {t("marketplace.forYouPlaceholder")}
-          </Text>
-        }
-      />
-    </Flex>
-  );
-
   const renderTopUsersContent = () => {
     if (topUsersLoading) {
       return <Spin size="large" className="my-20" />;
@@ -349,7 +339,7 @@ const MainView = () => {
   };
 
   const renderContent = () => {
-    if (activeTab === "for_you") return renderForYouContent();
+    if (activeTab === "for_you") return renderListingContent();
     if (activeTab === "top_users") return renderTopUsersContent();
     return renderListingContent();
   };

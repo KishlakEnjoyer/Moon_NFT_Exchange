@@ -5,6 +5,8 @@ import {
   Flex,
   FloatButton,
   Form,
+  Checkbox,
+  Image,
   Input,
   InputNumber,
   Layout,
@@ -18,7 +20,9 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
+  Upload,
   message,
 } from "antd";
 import {
@@ -28,15 +32,19 @@ import {
   DatabaseOutlined,
   EditOutlined,
   EyeOutlined,
+  FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  StarOutlined,
   StopOutlined,
   TeamOutlined,
+  TrophyOutlined,
   UnlockOutlined,
   UpOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
+import type { UploadProps } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
@@ -48,6 +56,9 @@ import Title from "antd/es/typography/Title";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import {
   AdminAccess,
+  AdminAchievement,
+  AuditLog,
+  FeaturedCollection,
   AdminReport,
   AdminRole,
   AdminSummary,
@@ -56,22 +67,36 @@ import {
   DictionaryItem,
   DictionaryItemPayload,
   DictionaryKind,
+  ModerationItem,
   ReportStatusFilter,
+  AchievementPayload,
+  backfillAchievements,
   createAdminRole,
+  createAchievement,
   createDictionaryItem,
   decideAdminReport,
+  decideModerationItem,
   deleteAdminRole,
+  getAchievementRules,
   getAdminAccess,
+  getAdminAchievements,
+  getAuditLogs,
+  getFeaturedCollections,
   getAdminReports,
   getAdminRoles,
   getAdminSummary,
   getAdminUsers,
   getDictionaryItems,
+  getModerationQueue,
+  getUserSanctions,
   sendAdminReportWarning,
+  setAchievementActive,
   setAdminUserActive,
   setAdminUserRole,
   setDictionaryItemArchived,
+  setFeaturedCollections,
   updateAdminRole,
+  updateAchievement,
   updateDictionaryItem,
 } from "../services/adminService";
 
@@ -83,8 +108,34 @@ type SalesRangePreset = "7" | "14" | "30" | "custom";
 type DashboardSection = "overview" | "charts" | "tables";
 type AccessSection = "users" | "roles";
 type AnalyticsSection = "reports" | "roles" | "sales" | "collections";
+type ModerationStatusFilter = "pending" | "approved" | "rejected" | "all";
 
 const dictionaryKinds: DictionaryKind[] = ["collections", "models", "backgrounds", "symbols"];
+const IMAGES_URL = process.env.REACT_APP_IMAGES_URL || "";
+
+const dictionaryFolderByKind: Record<DictionaryKind, string> = {
+  collections: "collections",
+  models: "models",
+  backgrounds: "bgs",
+  symbols: "symbols",
+};
+
+const achievementImageUrl = (imageUrl: string | null | undefined) => (
+  imageUrl ? `${IMAGES_URL}/achievements/${imageUrl}` : undefined
+);
+
+const dictionaryImageUrl = (kind: DictionaryKind, imageUrl: string | null | undefined) => {
+  if (!imageUrl) return undefined;
+  if (/^(https?:)?\/\//i.test(imageUrl) || imageUrl.startsWith("/")) return imageUrl;
+  return `${IMAGES_URL}/${dictionaryFolderByKind[kind]}/${imageUrl}`;
+};
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ""));
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
 
 const statusColors: Record<string, string> = {
   pending: "blue",
@@ -329,6 +380,7 @@ const AdminView = () => {
   }, []);
 
   const tabItems = useMemo(() => {
+    const hasPermission = (permission: string) => Boolean(access?.permissions?.includes(permission));
     const items = [
       {
         key: "dashboard",
@@ -350,27 +402,62 @@ const AdminView = () => {
       },
     ];
 
-    if (access?.can_admin) {
-      items.splice(
-        2,
-        0,
-        {
-          key: "dictionaries",
-          label: t("admin.tabs.dictionaries"),
-          icon: <DatabaseOutlined />,
-          children: <DictionariesPanel messageApi={messageApi} />,
-        },
-        {
-          key: "users",
-          label: t("admin.tabs.usersRoles"),
-          icon: <TeamOutlined />,
-          children: <UsersAndRolesPanel messageApi={messageApi} />,
-        },
-      );
+    const adminItems = [];
+    if (hasPermission("achievements.manage")) {
+      adminItems.push({
+        key: "achievements",
+        label: t("admin.tabs.achievements"),
+        icon: <TrophyOutlined />,
+        children: <AchievementsPanel messageApi={messageApi} />,
+      });
+    }
+    if (hasPermission("dictionaries.manage")) {
+      adminItems.push({
+        key: "dictionaries",
+        label: t("admin.tabs.dictionaries"),
+        icon: <DatabaseOutlined />,
+        children: <DictionariesPanel messageApi={messageApi} />,
+      });
+    }
+    if (hasPermission("moderation.manage")) {
+      adminItems.push({
+        key: "moderation",
+        label: t("admin.tabs.moderation"),
+        icon: <FileSearchOutlined />,
+        children: <ModerationPanel messageApi={messageApi} />,
+      });
+    }
+    if (hasPermission("featured.manage")) {
+      adminItems.push({
+        key: "featured",
+        label: t("admin.tabs.featured"),
+        icon: <StarOutlined />,
+        children: <FeaturedCollectionsPanel messageApi={messageApi} />,
+      });
+    }
+    if (access && (hasPermission("users.manage") || hasPermission("roles.manage"))) {
+      adminItems.push({
+        key: "users",
+        label: t("admin.tabs.usersRoles"),
+        icon: <TeamOutlined />,
+        children: <UsersAndRolesPanel messageApi={messageApi} access={access} />,
+      });
+    }
+    if (hasPermission("audit.view")) {
+      adminItems.push({
+        key: "audit",
+        label: t("admin.tabs.audit"),
+        icon: <SafetyCertificateOutlined />,
+        children: <AuditPanel messageApi={messageApi} />,
+      });
+    }
+
+    if (adminItems.length) {
+      items.splice(2, 0, ...adminItems);
     }
 
     return items;
-  }, [access?.can_admin, messageApi, t]);
+  }, [access, messageApi, t]);
 
   if (loading) {
     return <Spin size="large" className="my-20" />;
@@ -975,6 +1062,412 @@ const ReportsPanel = ({
   );
 };
 
+const ImageUploadPreview = ({
+  value,
+  onChange,
+  existingSrc,
+  label,
+}: {
+  value?: string | null;
+  onChange: (dataUrl: string | null) => void;
+  existingSrc?: string;
+  label?: string;
+}) => {
+  const { t } = useTranslation();
+  const beforeUpload: UploadProps["beforeUpload"] = async (file) => {
+    if (!file.type.match(/^image\/(png|jpeg|jpg|webp)$/)) {
+      return Upload.LIST_IGNORE;
+    }
+    const dataUrl = await readFileAsDataUrl(file as File);
+    onChange(dataUrl);
+    return false;
+  };
+
+  const src = value || existingSrc;
+  return (
+    <Flex vertical gap={8}>
+      {src && (
+        <Image
+          src={src}
+          width={112}
+          height={112}
+          preview
+          style={{ objectFit: "cover", borderRadius: 8 }}
+        />
+      )}
+      <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={beforeUpload}>
+        <Button>{label || t("admin.imageUpload.uploadImage")}</Button>
+      </Upload>
+      {value && <Button size="small" onClick={() => onChange(null)}>{t("admin.imageUpload.removeNewFile")}</Button>}
+    </Flex>
+  );
+};
+
+const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<AdminAchievement[]>([]);
+  const [rules, setRules] = useState<{ key: string; label: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AdminAchievement | null>(null);
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form] = Form.useForm<AchievementPayload>();
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [loadedItems, loadedRules] = await Promise.all([
+        getAdminAchievements(),
+        getAchievementRules(),
+      ]);
+      setItems(loadedItems);
+      setRules(loadedRules);
+    } catch {
+      messageApi.error(t("admin.achievements.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [messageApi, t]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const openModal = (item: AdminAchievement | null) => {
+    setEditingItem(item);
+    setImageDataUrl(null);
+    form.setFieldsValue({
+      title: item?.title || "",
+      description: item?.description || "",
+      rule_key: item?.rule_key || "manual",
+      rule_value: item?.rule_value || undefined,
+      is_active: item?.is_active ?? 1,
+      backfill_existing: true,
+    });
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    const values = await form.validateFields();
+    if (!editingItem && !imageDataUrl) {
+      messageApi.error(t("admin.achievements.imageRequired"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = { ...values, image_url: editingItem?.image_url ?? values.image_url, image_data_url: imageDataUrl };
+      const result = editingItem
+        ? await updateAchievement(editingItem.achievement_id, payload)
+        : await createAchievement(payload);
+      messageApi.success(t("admin.achievements.savedWithAwarded", { count: result.awarded_now || 0 }));
+      setModalOpen(false);
+      await loadAll();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("admin.achievements.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBackfill = async () => {
+    try {
+      const result = await backfillAchievements();
+      messageApi.success(t("admin.achievements.backfillDone", { count: result.awarded }));
+      await loadAll();
+    } catch {
+      messageApi.error(t("admin.achievements.backfillFailed"));
+    }
+  };
+
+  return (
+    <PanelShell>
+      <Flex vertical gap={16}>
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <Text type="secondary">{t("admin.achievements.description")}</Text>
+          <Flex gap={8} wrap="wrap">
+            <Button icon={<ReloadOutlined />} onClick={handleBackfill}>{t("admin.achievements.backfillAll")}</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal(null)}>{t("admin.achievements.new")}</Button>
+          </Flex>
+        </Flex>
+        <Table
+          rowKey="achievement_id"
+          loading={loading}
+          dataSource={items}
+          scroll={{ x: 980 }}
+          columns={[
+            {
+              title: t("admin.achievements.image"),
+              width: 96,
+              render: (_, record) => record.image_url ? <Image width={56} height={56} src={achievementImageUrl(record.image_url)} style={{ objectFit: "cover", borderRadius: 8 }} /> : <TrophyOutlined />,
+            },
+            { title: t("admin.achievements.title"), dataIndex: "title" },
+            { title: t("admin.achievements.details"), dataIndex: "description", ellipsis: true },
+            { title: t("admin.achievements.rule"), dataIndex: "rule_key", width: 180 },
+            { title: t("admin.achievements.awarded"), dataIndex: "awarded_count", width: 100 },
+            {
+              title: t("admin.achievements.usersPercent"),
+              dataIndex: "users_percent",
+              width: 150,
+              render: (value: number) => `${value}%`,
+            },
+            {
+              title: t("admin.achievements.status"),
+              dataIndex: "is_active",
+              width: 120,
+              render: (value: number) => value ? <Tag color="green">{t("admin.status.active")}</Tag> : <Tag>{t("admin.status.hidden")}</Tag>,
+            },
+            {
+              title: t("admin.achievements.actions"),
+              fixed: "right",
+              width: 220,
+              render: (_, record) => (
+                <Flex gap={8}>
+                  <Button size="small" icon={<EditOutlined />} onClick={() => openModal(record)}>{t("admin.achievements.edit")}</Button>
+                  <Button size="small" onClick={async () => {
+                    await setAchievementActive(record.achievement_id, record.is_active ? 0 : 1);
+                    await loadAll();
+                  }}>
+                    {record.is_active ? t("admin.achievements.disable") : t("admin.achievements.enable")}
+                  </Button>
+                </Flex>
+              ),
+            },
+          ]}
+        />
+      </Flex>
+
+      <Modal
+        open={modalOpen}
+        title={editingItem ? t("admin.achievements.editTitle") : t("admin.achievements.newTitle")}
+        onCancel={() => setModalOpen(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setModalOpen(false)}>{t("admin.cancel")}</Button>,
+          <Button key="save" type="primary" loading={saving} onClick={handleSave}>{t("admin.save")}</Button>,
+        ]}
+      >
+        <Form form={form} layout="vertical" className="mt-4">
+          <Form.Item name="title" label={t("admin.achievements.title")} rules={[{ required: true, message: t("admin.achievements.enterTitle") }]}>
+            <Input maxLength={120} />
+          </Form.Item>
+          <Form.Item name="description" label={t("admin.achievements.details")} rules={[{ required: true, message: t("admin.achievements.enterDescription") }]}>
+            <Input.TextArea rows={3} maxLength={500} />
+          </Form.Item>
+          <Form.Item label={t("admin.achievements.image")}>
+            <ImageUploadPreview
+              value={imageDataUrl}
+              existingSrc={achievementImageUrl(editingItem?.image_url)}
+              onChange={setImageDataUrl}
+            />
+          </Form.Item>
+          <Form.Item name="rule_key" label={t("admin.achievements.rule")}>
+            <Select options={rules.map((rule) => ({ value: rule.key, label: rule.label }))} />
+          </Form.Item>
+          <Form.Item name="rule_value" label={t("admin.achievements.ruleValue")}>
+            <InputNumber min={1} className="w-full" />
+          </Form.Item>
+          <Form.Item name="is_active" label={t("admin.status.active")} valuePropName="checked" getValueFromEvent={(checked) => checked ? 1 : 0}>
+            <Switch />
+          </Form.Item>
+          <Form.Item name="backfill_existing" label={t("admin.achievements.backfillExisting")} valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </PanelShell>
+  );
+};
+
+const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<ModerationItem[]>([]);
+  const [status, setStatus] = useState<ModerationStatusFilter>("pending");
+  const [loading, setLoading] = useState(true);
+
+  const loadItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      setItems(await getModerationQueue(status));
+    } catch {
+      messageApi.error(t("admin.moderation.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [messageApi, status, t]);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const handleDecision = async (id: number, decision: "approve" | "reject") => {
+    try {
+      await decideModerationItem(id, decision);
+      messageApi.success(decision === "approve" ? t("admin.moderation.approved") : t("admin.moderation.rejected"));
+      await loadItems();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("admin.moderation.processFailed"));
+    }
+  };
+
+  return (
+    <PanelShell>
+      <Flex vertical gap={16}>
+        <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+          <Segmented<ModerationStatusFilter>
+            value={status}
+            onChange={setStatus}
+            options={[
+              { label: t("admin.status.pending"), value: "pending" },
+              { label: t("admin.status.approved"), value: "approved" },
+              { label: t("admin.status.rejected"), value: "rejected" },
+              { label: t("admin.reports.all"), value: "all" },
+            ]}
+          />
+          <Button icon={<ReloadOutlined />} onClick={loadItems}>{t("admin.refresh")}</Button>
+        </Flex>
+        <Table
+          rowKey="moderation_id"
+          loading={loading}
+          dataSource={items}
+          scroll={{ x: 980 }}
+          columns={[
+            { title: "ID", dataIndex: "moderation_id", width: 80 },
+            { title: t("admin.moderation.type"), dataIndex: "item_type", width: 150 },
+            { title: t("admin.moderation.action"), dataIndex: "action", width: 120 },
+            { title: t("admin.moderation.target"), render: (_, record) => `${record.target_kind || "-"} ${record.target_id || ""}`, width: 160 },
+            {
+              title: t("admin.moderation.preview"),
+              width: 120,
+              render: (_, record) => record.image_data_url ? <Image src={record.image_data_url} width={72} height={72} style={{ objectFit: "cover", borderRadius: 8 }} /> : null,
+            },
+            { title: "Payload", render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
+            {
+              title: t("admin.moderation.status"),
+              dataIndex: "status",
+              width: 110,
+              render: (value: string) => <Tag color={value === "approved" ? "green" : value === "rejected" ? "red" : "blue"}>{value}</Tag>,
+            },
+            {
+              title: t("admin.moderation.actions"),
+              fixed: "right",
+              width: 180,
+              render: (_, record) => record.status === "pending" ? (
+                <Flex gap={8}>
+                  <Button size="small" type="primary" onClick={() => handleDecision(record.moderation_id, "approve")}>OK</Button>
+                  <Button size="small" danger onClick={() => handleDecision(record.moderation_id, "reject")}>{t("admin.reports.reject")}</Button>
+                </Flex>
+              ) : null,
+            },
+          ]}
+        />
+      </Flex>
+    </PanelShell>
+  );
+};
+
+const FeaturedCollectionsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
+  const { t } = useTranslation();
+  const [collections, setCollections] = useState<DictionaryItem[]>([]);
+  const [featured, setFeatured] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [loadedCollections, loadedFeatured] = await Promise.all([
+        getDictionaryItems("collections"),
+        getFeaturedCollections(),
+      ]);
+      setCollections(loadedCollections);
+      setFeatured(loadedFeatured.map((item: FeaturedCollection) => item.collection_id));
+    } catch {
+      messageApi.error(t("admin.featured.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [messageApi, t]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const handleSave = async () => {
+    try {
+      await setFeaturedCollections(featured);
+      messageApi.success(t("admin.featured.saved"));
+    } catch {
+      messageApi.error(t("admin.featured.saveFailed"));
+    }
+  };
+
+  return (
+    <PanelShell>
+      <Flex vertical gap={16}>
+        <Text type="secondary">{t("admin.featured.description")}</Text>
+        <Select
+          mode="multiple"
+          loading={loading}
+          value={featured}
+          onChange={setFeatured}
+          options={collections.map((collection) => ({ value: collection.id, label: collection.name }))}
+          className="w-full"
+          placeholder={t("admin.featured.placeholder")}
+        />
+        <Flex justify="flex-end" gap={8}>
+          <Button icon={<ReloadOutlined />} onClick={loadAll}>{t("admin.refresh")}</Button>
+          <Button type="primary" onClick={handleSave}>{t("admin.save")}</Button>
+        </Flex>
+      </Flex>
+    </PanelShell>
+  );
+};
+
+const AuditPanel = ({ messageApi }: { messageApi: MessageApi }) => {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      setItems(await getAuditLogs(150));
+    } catch {
+      messageApi.error(t("admin.audit.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [messageApi, t]);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  return (
+    <PanelShell>
+      <Flex vertical gap={16}>
+        <Flex justify="space-between" align="center">
+          <Text type="secondary">{t("admin.whoandwhat")}</Text>
+          <Button icon={<ReloadOutlined />} onClick={loadItems}>{t("admin.refresh")}</Button>
+        </Flex>
+        <Table
+          rowKey="audit_id"
+          loading={loading}
+          dataSource={items}
+          scroll={{ x: 900 }}
+          columns={[
+            { title: "ID", dataIndex: "audit_id", width: 80 },
+            { title: t("admin.audit.actor"), dataIndex: "actor_user_id", width: 100 },
+            { title: t("admin.audit.action"), dataIndex: "action", width: 180 },
+            { title: t("admin.audit.entity"), render: (_, record) => `${record.entity_type || "-"} ${record.entity_id || ""}`, width: 180 },
+            { title: "Payload", render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
+            { title: t("admin.audit.date"), dataIndex: "created_at", width: 180 },
+          ]}
+        />
+      </Flex>
+    </PanelShell>
+  );
+};
+
 const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const { t, i18n } = useTranslation();
   const locale = getAdminLocale(i18n.language);
@@ -985,6 +1478,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [form] = Form.useForm<DictionaryItemPayload>();
 
   const loadItems = useCallback(async () => {
@@ -1015,6 +1509,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
 
   const openCreate = () => {
     setEditingItem(null);
+    setImageDataUrl(null);
     form.resetFields();
     form.setFieldsValue({
       collection_limit: 100,
@@ -1025,6 +1520,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
 
   const openEdit = (item: DictionaryItem) => {
     setEditingItem(item);
+    setImageDataUrl(null);
     form.setFieldsValue({
       name: item.name,
       image_url: item.image_url,
@@ -1038,14 +1534,19 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
 
   const handleSave = async () => {
     const values = await form.validateFields();
+    if (!editingItem && !imageDataUrl) {
+      messageApi.error(t("admin.dictionaries.uploadRequired"));
+      return;
+    }
     setSaving(true);
     try {
+      const payload = { ...values, image_url: editingItem?.image_url ?? values.image_url, image_data_url: imageDataUrl };
       if (editingItem) {
-        await updateDictionaryItem(kind, editingItem.id, values);
-        messageApi.success(t("admin.dictionaries.updated"));
+        const result = await updateDictionaryItem(kind, editingItem.id, payload);
+        messageApi.success((result as any).status === "pending" ? t("admin.dictionaries.sentToModeration") : t("admin.dictionaries.updated"));
       } else {
-        await createDictionaryItem(kind, values);
-        messageApi.success(t("admin.dictionaries.created"));
+        const result = await createDictionaryItem(kind, payload);
+        messageApi.success((result as any).status === "pending" ? t("admin.dictionaries.sentToModeration") : t("admin.dictionaries.created"));
       }
       setModalOpen(false);
       await loadItems();
@@ -1139,8 +1640,16 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             <Input />
           </Form.Item>
 
-          <Form.Item name="image_url" label={t("admin.dictionaries.imageNameOrUrl")}>
-            <Input />
+          <Form.Item label={t("admin.dictionaries.uploadImage")}>
+            <ImageUploadPreview
+              value={imageDataUrl}
+              existingSrc={dictionaryImageUrl(kind, editingItem?.image_url)}
+              onChange={setImageDataUrl}
+              label={t("admin.dictionaries.chooseFile")}
+            />
+            <Text type="secondary" className="mt-2 block text-xs">
+              {t("admin.dictionaries.moderationHint")}
+            </Text>
           </Form.Item>
 
           {kind === "models" && (
@@ -1171,7 +1680,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   );
 };
 
-const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
+const UsersAndRolesPanel = ({ messageApi, access }: { messageApi: MessageApi; access: AdminAccess }) => {
   const { t, i18n } = useTranslation();
   const locale = getAdminLocale(i18n.language);
   const emptyValue = t("admin.empty");
@@ -1182,33 +1691,55 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const [accessSection, setAccessSection] = useState<AccessSection>("users");
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<AdminRole | null>(null);
-  const [roleForm] = Form.useForm<{ role_name: string; description: string | null }>();
+  const [availablePermissions, setAvailablePermissions] = useState<{ key: string; label: string }[]>([]);
+  const [sanctionUser, setSanctionUser] = useState<AdminUser | null>(null);
+  const [sanctions, setSanctions] = useState<any[]>([]);
+  const [sanctionsLoading, setSanctionsLoading] = useState(false);
+  const [roleForm] = Form.useForm<{ role_name: string; description: string | null; permissions: string[] }>();
+  const canManageUsers = access.permissions.includes("users.manage");
+  const canManageRoles = access.permissions.includes("roles.manage");
+  const masterRoleNames = ["master_admin", "owner", "super_admin", "главный админ", "мастер админ"];
+  const isMasterRole = (roleId: number, roleName?: string | null) => (
+    roleId === 4 || masterRoleNames.includes((roleName || "").toLowerCase())
+  );
+  const currentUserIsMaster = isMasterRole(access.role_id, access.role_name);
+  const canChangeUserRole = (record: AdminUser) => (
+    record.user_id !== access.user_id && (currentUserIsMaster || !isMasterRole(record.role_id, record.role_name))
+  );
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const [loadedUsers, loadedRoles] = await Promise.all([
-        getAdminUsers(search),
-        getAdminRoles(),
+        canManageUsers ? getAdminUsers(search) : Promise.resolve([]),
+        (canManageUsers || canManageRoles) ? getAdminRoles() : Promise.resolve([]),
       ]);
       setUsers(loadedUsers);
       setRoles(loadedRoles);
+      setAvailablePermissions(access.available_permissions || []);
     } catch {
       messageApi.error(t("admin.users.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [messageApi, search, t]);
+  }, [access.available_permissions, canManageRoles, canManageUsers, messageApi, search, t]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!canManageUsers && canManageRoles) {
+      setAccessSection("roles");
+    }
+  }, [canManageRoles, canManageUsers]);
 
   const openRoleModal = (role: AdminRole | null) => {
     setEditingRole(role);
     roleForm.setFieldsValue({
       role_name: role?.role_name || "",
       description: role?.description || "",
+      permissions: role?.permissions || [],
     });
     setRoleModalOpen(true);
   };
@@ -1260,6 +1791,19 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
     }
   };
 
+  const openSanctions = async (user: AdminUser) => {
+    setSanctionUser(user);
+    setSanctionsLoading(true);
+    try {
+      setSanctions(await getUserSanctions(user.user_id));
+    } catch {
+      setSanctions([]);
+      messageApi.error(t("admin.users.loadSanctionsFailed"));
+    } finally {
+      setSanctionsLoading(false);
+    }
+  };
+
   return (
     <Flex vertical gap={16}>
       <PanelShell className="!p-3">
@@ -1267,13 +1811,13 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           <Segmented
             value={accessSection}
             options={[
-              { label: t("admin.users.users"), value: "users" },
-              { label: t("admin.users.roles"), value: "roles" },
+              ...(canManageUsers ? [{ label: t("admin.users.users"), value: "users" }] : []),
+              ...(canManageRoles ? [{ label: t("admin.users.roles"), value: "roles" }] : []),
             ]}
             onChange={(value) => setAccessSection(value as AccessSection)}
           />
           <Flex gap={8} wrap="wrap" justify="flex-end">
-            {accessSection === "roles" && (
+            {canManageRoles && accessSection === "roles" && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => openRoleModal(null)}>
                 {t("admin.users.createRole")}
               </Button>
@@ -1283,7 +1827,7 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
         </Flex>
       </PanelShell>
 
-      {accessSection === "users" && (
+      {canManageUsers && accessSection === "users" && (
         <PanelShell className="!p-3">
           <Flex vertical gap={12}>
             <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
@@ -1337,12 +1881,19 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                   title: t("admin.users.role"),
                   width: 190,
                   render: (_, record: AdminUser) => (
-                    <Select
-                      value={record.role_id}
-                      className="w-full"
-                      options={roles.map((role) => ({ value: role.role_id, label: role.role_name }))}
-                      onChange={(roleId) => handleSetUserRole(record.user_id, roleId)}
-                    />
+                    <Tooltip title={!canChangeUserRole(record) ? t("admin.users.roleChangeBlocked") : undefined}>
+                      <Select
+                        value={record.role_id}
+                        className="w-full"
+                        disabled={!canChangeUserRole(record)}
+                        options={roles.map((role) => ({
+                          value: role.role_id,
+                          label: role.role_name,
+                          disabled: !currentUserIsMaster && isMasterRole(role.role_id, role.role_name),
+                        }))}
+                        onChange={(roleId) => handleSetUserRole(record.user_id, roleId)}
+                      />
+                    </Tooltip>
                   ),
                 },
                 {
@@ -1375,6 +1926,13 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                 { title: t("admin.users.purchases"), dataIndex: "purchases_count", width: 100 },
                 { title: t("admin.users.sales"), dataIndex: "sales_count", width: 100 },
                 { title: t("admin.users.reportsReceived"), dataIndex: "reports_received", width: 130 },
+                {
+                  title: t("admin.users.sanctions"),
+                  width: 120,
+                  render: (_, record: AdminUser) => (
+                    <Button size="small" onClick={() => openSanctions(record)}>{t("admin.users.history")}</Button>
+                  ),
+                },
                 { title: t("admin.users.createdAt"), dataIndex: "created_at", render: (value: string | null) => formatDate(value, locale, emptyValue), width: 170 },
               ]}
             />
@@ -1382,7 +1940,7 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
         </PanelShell>
       )}
 
-      {accessSection === "roles" && (
+      {canManageRoles && accessSection === "roles" && (
         <PanelShell className="!p-3">
           <Flex vertical gap={12}>
             <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
@@ -1399,13 +1957,24 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                 { title: "ID", dataIndex: "role_id", width: 80 },
                 { title: t("admin.users.roleName"), dataIndex: "role_name" },
                 { title: t("admin.users.description"), dataIndex: "description" },
+                {
+                  title: t("admin.users.permissions"),
+                  dataIndex: "permissions",
+                  render: (value: string[]) => <Text>{value?.length || 0}</Text>,
+                  width: 120,
+                },
                 { title: t("admin.users.userCount"), dataIndex: "users_count", width: 130 },
                 {
                   title: t("admin.users.actions"),
                   width: 210,
                   render: (_, record: AdminRole) => (
                     <Flex gap={8}>
-                      <Button size="small" icon={<EditOutlined />} onClick={() => openRoleModal(record)}>
+                      <Button
+                        size="small"
+                        icon={<EditOutlined />}
+                        disabled={!currentUserIsMaster && isMasterRole(record.role_id, record.role_name)}
+                        onClick={() => openRoleModal(record)}
+                      >
                         {t("admin.users.edit")}
                       </Button>
                       <Popconfirm
@@ -1414,7 +1983,11 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                         cancelText={t("admin.cancel")}
                         onConfirm={() => handleDeleteRole(record.role_id)}
                       >
-                        <Button size="small" danger disabled={record.users_count > 0}>
+                        <Button
+                          size="small"
+                          danger
+                          disabled={record.users_count > 0 || (!currentUserIsMaster && isMasterRole(record.role_id, record.role_name))}
+                        >
                           {t("admin.users.delete")}
                         </Button>
                       </Popconfirm>
@@ -1443,7 +2016,37 @@ const UsersAndRolesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           <Form.Item name="description" label={t("admin.users.description")}>
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Form.Item name="permissions" label={t("admin.users.permissions")}>
+            <Checkbox.Group
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+              options={availablePermissions.map((permission) => ({
+                value: permission.key,
+                label: permission.label,
+              }))}
+            />
+          </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(sanctionUser)}
+        title={sanctionUser ? t("admin.users.sanctionsHistoryFor", { user: sanctionUser.username || sanctionUser.user_id }) : t("admin.users.sanctionsHistory")}
+        onCancel={() => setSanctionUser(null)}
+        footer={[<Button key="close" onClick={() => setSanctionUser(null)}>{t("admin.reports.close")}</Button>]}
+      >
+        <Table
+          rowKey="sanction_id"
+          size="small"
+          loading={sanctionsLoading}
+          dataSource={sanctions}
+          pagination={false}
+          columns={[
+            { title: t("admin.users.sanctionAction"), dataIndex: "action" },
+            { title: t("admin.users.sanctionReason"), dataIndex: "reason" },
+            { title: t("admin.users.sanctionModerator"), dataIndex: "moderator_id" },
+            { title: t("admin.users.sanctionDate"), dataIndex: "created_at" },
+          ]}
+        />
       </Modal>
     </Flex>
   );

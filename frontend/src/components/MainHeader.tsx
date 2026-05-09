@@ -22,6 +22,7 @@ import {
   SunOutlined,
   TeamOutlined,
   ThunderboltOutlined,
+  TrophyOutlined,
   UserOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
@@ -493,8 +494,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   const currentRoleName = String(currentUser.role_name || currentUser.role || "").toLowerCase();
   const canOpenAdmin =
-    [2, 3].includes(Number(currentUser.role_id)) ||
-    ["manager", "moderator", "admin", "administrator", "менеджер", "модератор", "администратор"].includes(currentRoleName);
+    [2, 3, 4].includes(Number(currentUser.role_id)) ||
+    ["manager", "moderator", "admin", "administrator", "master_admin", "owner", "super_admin", "менеджер", "модератор", "администратор"].includes(currentRoleName);
 
   const dropdownItems: MenuProps["items"] = [
     {
@@ -505,7 +506,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     },
     ...(canOpenAdmin ? [{
       key: "admin",
-      label: "Админ-панель",
+      label: t("header.admin"),
       icon: <ControlOutlined />,
       onClick: () => navigate("/admin"),
     }] : []),
@@ -577,6 +578,14 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           icon: <GiftOutlined />,
           color: "var(--accent-150)",
           background: "rgba(168, 185, 255, 0.16)",
+        };
+      case "achievement_unlocked":
+        return {
+          title: item.payload?.title || (isRuLanguage ? "Достижение получено" : "Achievement unlocked"),
+          description: item.payload?.description || (isRuLanguage ? "Новый бейдж появился в профиле." : "A new badge appeared on your profile."),
+          icon: <TrophyOutlined />,
+          color: "#f5b301",
+          background: "rgba(245, 179, 1, 0.16)",
         };
       case "listing_cancelled":
         return {

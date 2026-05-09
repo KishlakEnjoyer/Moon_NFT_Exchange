@@ -4,12 +4,31 @@ import re
 import uuid
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from core.models import Album, AlbumPresent, CurrentOwner, Listing, ListingStatuses, Present, Transaction, User
+from core.models import (
+    Achievement,
+    Album,
+    AlbumPresent,
+    CurrentOwner,
+    Listing,
+    ListingStatuses,
+    Present,
+    Transaction,
+    TransactionHistory,
+    User,
+    UserAchievement,
+    UserFollow,
+)
+from services.admin_platform_service import (
+    create_moderation_item,
+    ensure_admin_platform_schema,
+    get_profile_badge_achievement_id,
+)
 from services.blockchain.token_service import get_token_balance
 from services.blockchain.wallet_service import get_native_balance_eth
+from services.achievement_service import achievement_to_dict
 from services.profile_content_moderation_service import validate_profile_content
 
 
@@ -201,7 +220,37 @@ def _visible_social_value(value, visibility: int, can_view_private: bool):
     return None
 
 
+def _get_top_spender_rank(db: Session, user_id: int, limit: int = 10) -> int | None:
+    spender_id = case(
+        (TransactionHistory.transaction_type == "purchase", TransactionHistory.seller_id),
+        else_=TransactionHistory.buyer_id,
+    ).label("spender_id")
+
+    rows = (
+        db.query(
+            spender_id,
+            func.coalesce(func.sum(TransactionHistory.transaction_price), 0).label("spent_ton"),
+            func.count(TransactionHistory.transaction_id).label("transactions_count"),
+        )
+        .filter(TransactionHistory.transaction_status == "confirmed")
+        .group_by(spender_id)
+        .order_by(
+            func.sum(TransactionHistory.transaction_price).desc(),
+            func.count(TransactionHistory.transaction_id).desc(),
+            spender_id.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    for index, row in enumerate(rows, start=1):
+        if row[0] == user_id:
+            return index
+    return None
+
+
 def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id: int | None = None) -> dict:
+    ensure_admin_platform_schema()
     user = db.scalar(
         select(User)
         .where(User.username == username)
@@ -252,6 +301,55 @@ def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id
         .options(joinedload(Album.album_presents))
     ).unique().all()
 
+    followers_count = db.scalar(
+        select(func.count()).select_from(UserFollow).where(UserFollow.following_id == user.user_id)
+    ) or 0
+    following_count = db.scalar(
+        select(func.count()).select_from(UserFollow).where(UserFollow.follower_id == user.user_id)
+    ) or 0
+    is_following = False
+    if viewer_user_id and viewer_user_id != user.user_id:
+        is_following = db.get(
+            UserFollow,
+            {"follower_id": viewer_user_id, "following_id": user.user_id},
+        ) is not None
+
+    user_achievements = db.execute(
+        select(UserAchievement, Achievement)
+        .join(Achievement, Achievement.achievement_id == UserAchievement.achievement_id)
+        .where(
+            UserAchievement.user_id == user.user_id,
+            Achievement.is_active == 1,
+        )
+        .order_by(UserAchievement.awarded_at.desc())
+    ).all()
+    achievements_total_count = int(
+        db.scalar(select(func.count()).select_from(Achievement).where(Achievement.is_active == 1)) or 0
+    )
+    achievements_earned_count = len(user_achievements)
+    achievements_visible_count = sum(
+        1 for user_achievement, _ in user_achievements if int(user_achievement.is_visible) == 1
+    )
+    achievements = [
+        achievement_to_dict(db, achievement) | {
+            "is_visible": user_achievement.is_visible,
+            "awarded_at": user_achievement.awarded_at.isoformat() if user_achievement.awarded_at else None,
+        }
+        for user_achievement, achievement in user_achievements
+        if can_view_private_socials or user_achievement.is_visible == 1
+    ]
+    profile_badge_achievement_id = get_profile_badge_achievement_id(db, user.user_id)
+    profile_badge_achievement = None
+    if profile_badge_achievement_id:
+        for user_achievement, achievement in user_achievements:
+            if achievement.achievement_id == profile_badge_achievement_id:
+                if can_view_private_socials or user_achievement.is_visible == 1:
+                    profile_badge_achievement = achievement_to_dict(db, achievement) | {
+                        "is_visible": user_achievement.is_visible,
+                        "awarded_at": user_achievement.awarded_at.isoformat() if user_achievement.awarded_at else None,
+                    }
+                break
+
     return {
         "user_id": user.user_id,
         "user_tg_id": _visible_social_value(user.user_tg_id, user.tg_visibility, can_view_private_socials),
@@ -266,6 +364,16 @@ def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id
         "is_active": user.is_active,
         "role": user.role.role_name if user.role else None,
         "token_balance": token_balance,
+        "top_spender_rank": _get_top_spender_rank(db, user.user_id),
+        "followers_count": int(followers_count),
+        "following_count": int(following_count),
+        "is_following": is_following,
+        "achievements_total_count": achievements_total_count,
+        "achievements_earned_count": achievements_earned_count,
+        "achievements_visible_count": achievements_visible_count,
+        "achievements": achievements,
+        "profile_badge_achievement_id": profile_badge_achievement_id,
+        "profile_badge_achievement": profile_badge_achievement,
         "albums": [
             {
                 "album_id": album.album_id,
@@ -332,7 +440,20 @@ def update_user_profile(
     user.vk_visibility = vk_visibility
 
     if profile_pic_data_url:
-        user.profile_pic_url = _save_profile_picture(profile_pic_data_url, user.profile_pic_url)
+        create_moderation_item(
+            db=db,
+            item_type="profile_photo",
+            action="update",
+            target_kind="users",
+            target_id=user.user_id,
+            submitted_by=user.user_id,
+            image_data_url=profile_pic_data_url,
+            payload={
+                "user_id": user.user_id,
+                "username": user.username,
+                "current_image": user.profile_pic_url,
+            },
+        )
 
     db.commit()
     db.refresh(user)

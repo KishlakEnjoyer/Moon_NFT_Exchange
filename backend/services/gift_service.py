@@ -37,6 +37,7 @@ from services.notification_service import (
     create_notification,
     notification_to_dict,
 )
+from services.achievement_service import evaluate_user_achievements
 from utils.tg_bot import send_tg_message, send_tg_message_sync
 from utils.websocket_manager import ws_manager
 import asyncio
@@ -289,6 +290,14 @@ def purchase_and_send_gift(
                 print(f"[DEBUG 7.1] WebSocket send failed (non-critical): {ws_err}")
 
         db.commit()
+
+        try:
+            evaluate_user_achievements(db, receiver_id, notify=True)
+            evaluate_user_achievements(db, sender_id, notify=True)
+            db.commit()
+        except Exception as achievement_error:
+            db.rollback()
+            print(f"[DEBUG] Achievement evaluation failed: {achievement_error}")
 
         send_tg_message_sync(receiver.user_tg_id, receiver_msg)
         send_tg_message_sync(sender.user_tg_id, sender_msg)

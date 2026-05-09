@@ -19,6 +19,7 @@ from services.blockchain.token_service import (
 )
 from services.generation_image_service import generate_present_art
 from services.notification_service import create_notification, manager, notification_to_dict
+from services.achievement_service import evaluate_user_achievements
 from utils.websocket_manager import ws_manager
 
 
@@ -171,6 +172,11 @@ def upgrade_present(db: Session, user_id: int, present_id: int) -> dict:
 
         send_upgrade_notification(db, user_id, present.present_id)
         db.commit()
+        try:
+            evaluate_user_achievements(db, user_id, notify=True)
+            db.commit()
+        except Exception:
+            db.rollback()
         db.refresh(present)
     except Exception as exc:
         db.rollback()

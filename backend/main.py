@@ -18,6 +18,7 @@ from routers.transactions_router import transactions_router
 from routers.presents_router import presents_router
 from routers.generation_image_router import image_generator_router  
 from routers.admin_router import admin_router
+from routers.social_router import social_router
 from dotenv import load_dotenv
 import os
 
@@ -33,6 +34,7 @@ def _split_env_list(value: str | None) -> list[str]:
 
 origins = []
 for origin in [
+    "http://localhost:3000",
     os.getenv("REACT_APP_FRONT_URL"),
     os.getenv("REACT_APP_FRONT_URL2"),
     os.getenv("FRONT_URL_DOCKER"),
@@ -71,3 +73,4 @@ app.include_router(image_generator_router)
 app.include_router(nsfw_detector_router)
 app.include_router(price_estimate_router)
 app.include_router(admin_router)
+app.include_router(social_router)

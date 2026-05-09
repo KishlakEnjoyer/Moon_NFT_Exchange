@@ -36,6 +36,7 @@ from services.notification_service import (
     manager,
     notification_to_dict,
 )
+from services.achievement_service import evaluate_user_achievements
 from utils.websocket_manager import ws_manager
 
 
@@ -280,6 +281,12 @@ def buy_listing(db: Session, buyer: User, listing_id: int) -> dict:
         send_notification_safely(db, buyer.user_id, NOTIFICATION_TYPE_PURCHASE, present.present_id)
         send_notification_safely(db, seller.user_id, NOTIFICATION_TYPE_LISTING_SOLD, present.present_id)
         db.commit()
+        try:
+            evaluate_user_achievements(db, buyer.user_id, notify=True)
+            evaluate_user_achievements(db, seller.user_id, notify=True)
+            db.commit()
+        except Exception:
+            db.rollback()
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Blockchain TX OK but DB save failed: {str(exc)}") from exc
