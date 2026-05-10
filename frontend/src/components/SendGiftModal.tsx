@@ -3,6 +3,7 @@ import { Avatar, Button, Flex, Image, Input, Modal, Tag, message, Typography } f
 import { useEffect, useState } from "react";
 import { authFetch } from "../services/auth";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -22,6 +23,9 @@ interface UserOption {
   username: string;
   profile_pic_url: string | null;
   is_active: number;
+  profile_badge_achievement_id: number | null;
+  profile_badge_image_url: string | null;
+  profile_badge_title: string | null;
 }
 
 interface SendGiftModalProps {
@@ -212,7 +216,14 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                         icon={isBlocked || !user.profile_pic_url ? <UserOutlined /> : undefined}
                       />
                       <Flex vertical className="min-w-0">
-                        <Text strong ellipsis={{ tooltip: user.username }}>{user.username}</Text>
+                        <UserNameWithBadge
+                          username={user.username}
+                          badgeId={user.profile_badge_achievement_id}
+                          badgeImageUrl={user.profile_badge_image_url}
+                          badgeTitle={user.profile_badge_title}
+                          strong
+                          className="max-w-full"
+                        />
                         {isSelf && (
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {t("sendGift.giftYourself")}
@@ -243,7 +254,13 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                       src={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${selectedUser.profile_pic_url}`}
                       icon={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? <UserOutlined /> : undefined}
                     />
-                    <Text>{selectedUser?.username || t("common.userFallback", { id: selectedUserId })}</Text>
+                    <UserNameWithBadge
+                      username={selectedUser?.username}
+                      fallback={t("common.userFallback", { id: selectedUserId })}
+                      badgeId={selectedUser?.profile_badge_achievement_id}
+                      badgeImageUrl={selectedUser?.profile_badge_image_url}
+                      badgeTitle={selectedUser?.profile_badge_title}
+                    />
                     {selectedUserBlocked && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
                   </Flex>
                 </div>

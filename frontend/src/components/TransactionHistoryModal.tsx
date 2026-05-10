@@ -9,6 +9,7 @@ import {
 } from "../services/transactionService";
 import TransactionDetailModal, { TransactionViewKind } from "./TransactionDetailModal";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text, Title } = Typography;
 
@@ -127,6 +128,21 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
     return tx.buyer_id === userId ? tx.seller_username : tx.buyer_username;
   };
 
+  const getCounterpartyBadge = (tx: Transaction) => {
+    const otherUsername = getCounterpartyUsername(tx);
+    return otherUsername === tx.buyer_username
+      ? {
+          id: tx.buyer_profile_badge_achievement_id,
+          imageUrl: tx.buyer_profile_badge_image_url,
+          title: tx.buyer_profile_badge_title,
+        }
+      : {
+          id: tx.seller_profile_badge_achievement_id,
+          imageUrl: tx.seller_profile_badge_image_url,
+          title: tx.seller_profile_badge_title,
+        };
+  };
+
   const columns = [
     {
       title: t("transactions.type"),
@@ -157,19 +173,23 @@ const TransactionHistoryModal = ({ open, onClose, userId, currentUsername }: Tra
           otherUsername === tx.buyer_username
             ? tx.buyer_profile_pic_url
             : tx.seller_profile_pic_url;
+        const otherBadge = getCounterpartyBadge(tx);
 
         return (
           <Flex align="center" gap={6}>
             <Avatar size={24} src={getProfileAvatarUrl(otherProfilePicUrl)} />
-            <Text
-              className="cursor-pointer hover:opacity-75"
+            <UserNameWithBadge
+              username={otherUsername}
+              fallback={t("common.unknown")}
+              badgeId={otherBadge.id}
+              badgeImageUrl={otherBadge.imageUrl}
+              badgeTitle={otherBadge.title}
+              badgeSize={16}
               onClick={(event) => {
                 event.stopPropagation();
                 handleUserClick(otherUsername);
               }}
-            >
-              {otherUsername || t("common.unknown")}
-            </Text>
+            />
           </Flex>
         );
       },

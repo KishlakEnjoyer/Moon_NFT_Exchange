@@ -17,7 +17,6 @@ from core.models import (
     AuditLog,
     CartItem,
     Collections,
-    FeaturedCollection,
     Listing,
     ListingStatuses,
     ModerationQueueItem,
@@ -46,8 +45,7 @@ from services.admin_platform_service import (
     MASTER_ROLE_NAMES,
     audit_to_dict,
     create_moderation_item,
-    ensure_admin_platform_schema,
-    featured_to_dict,
+    get_visible_profile_badges,
     log_audit,
     moderation_to_dict,
     parse_payload_json,
@@ -135,10 +133,6 @@ class ModerationDecisionPayload(BaseModel):
     reason: str | None = Field(default=None, max_length=255)
 
 
-class FeaturedCollectionPayload(BaseModel):
-    collection_ids: list[int] = Field(default_factory=list)
-
-
 def get_role_name(user: User) -> str:
     if user.role and user.role.role_name:
         return user.role.role_name.lower()
@@ -162,7 +156,6 @@ def role_name_is_master(role_name: str | None) -> bool:
 
 
 def require_manager(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-    ensure_admin_platform_schema()
     seed_master_role(db)
     db.commit()
     if not (user_is_manager(current_user) or bool(user_permissions(db, current_user))):
@@ -171,7 +164,6 @@ def require_manager(current_user: User = Depends(get_current_user), db: Session 
 
 
 def require_admin(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-    ensure_admin_platform_schema()
     seed_master_role(db)
     db.commit()
     if not user_is_admin(current_user):
@@ -180,7 +172,6 @@ def require_admin(current_user: User = Depends(get_current_user), db: Session = 
 
 
 def require_admin_permission(permission: str, current_user: User, db: Session) -> None:
-    ensure_admin_platform_schema()
     seed_master_role(db)
     db.commit()
     require_permission(db, current_user, permission)
@@ -304,13 +295,27 @@ def user_label(user: User | None) -> str | None:
     return user.username or user.tg_username or user.vk_username or f"user_{user.user_id}"
 
 
-def serialize_report(report: Report) -> dict:
+def _badge_fields(prefix: str, badge: dict | None) -> dict:
+    return {
+        f"{prefix}_profile_badge_achievement_id": badge["achievement_id"] if badge else None,
+        f"{prefix}_profile_badge_image_url": badge["image_url"] if badge else None,
+        f"{prefix}_profile_badge_title": badge["title"] if badge else None,
+    }
+
+
+def serialize_report(report: Report, profile_badges: dict[int, dict] | None = None) -> dict:
+    profile_badges = profile_badges or {}
+    sender_badge = profile_badges.get(report.sender_id)
+    receiver_badge = profile_badges.get(report.receiver_id)
+    moderator_badge = profile_badges.get(report.moderator_id) if report.moderator_id else None
     return {
         "report_id": report.report_id,
         "sender_id": report.sender_id,
         "sender_username": user_label(report.sender),
+        **_badge_fields("sender", sender_badge),
         "receiver_id": report.receiver_id,
         "receiver_username": user_label(report.receiver),
+        **_badge_fields("receiver", receiver_badge),
         "receiver_is_active": report.receiver.is_active if report.receiver else None,
         "report_type_id": report.report_type_id,
         "report_type_title": report.report_type.report_type_title if report.report_type else None,
@@ -318,6 +323,7 @@ def serialize_report(report: Report) -> dict:
         "report_status_name": report.report_status.report_status_name if report.report_status else "pending",
         "moderator_id": report.moderator_id,
         "moderator_username": user_label(report.moderator),
+        **_badge_fields("moderator", moderator_badge),
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "closed_at": report.closed_at.isoformat() if report.closed_at else None,
     }
@@ -369,7 +375,6 @@ def check_dictionary_kind(kind: str) -> str:
 
 @admin_router.get("/me")
 def get_admin_access(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    ensure_admin_platform_schema()
     seed_master_role(db)
     db.commit()
     permissions = user_permissions(db, current_user)
@@ -572,8 +577,17 @@ def list_reports(
     reports = db.scalars(
         query.order_by(Report.created_at.desc()).offset(offset).limit(limit)
     ).all()
+    profile_badges = get_visible_profile_badges(
+        db,
+        {
+            user_id
+            for report in reports
+            for user_id in (report.sender_id, report.receiver_id, report.moderator_id)
+            if user_id
+        },
+    )
 
-    return [serialize_report(report) for report in reports]
+    return [serialize_report(report, profile_badges) for report in reports]
 
 
 @admin_router.patch("/reports/{report_id}/decision")
@@ -614,7 +628,11 @@ def decide_report(
         )
     )
 
-    return serialize_report(report)
+    profile_badges = get_visible_profile_badges(
+        db,
+        {user_id for user_id in (report.sender_id, report.receiver_id, report.moderator_id) if user_id},
+    )
+    return serialize_report(report, profile_badges)
 
 
 @admin_router.post("/reports/{report_id}/warning")
@@ -1235,43 +1253,11 @@ def list_user_sanctions(
     return [sanction_to_dict(row) for row in rows]
 
 
-@admin_router.get("/featured-collections")
-def list_featured_collections(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    require_admin_permission("featured.manage", current_user, db)
-    rows = (
-        db.query(FeaturedCollection, Collections.collection_name, Collections.collection_image_url)
-        .join(Collections, Collections.collection_id == FeaturedCollection.collection_id)
-        .order_by(FeaturedCollection.display_order.asc(), Collections.collection_name.asc())
-        .all()
-    )
-    return [featured_to_dict(row, name, image_url) for row, name, image_url in rows]
-
-
-@admin_router.put("/featured-collections")
-def set_featured_collections(
-    payload: FeaturedCollectionPayload,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    require_admin_permission("featured.manage", current_user, db)
-    db.query(FeaturedCollection).delete(synchronize_session=False)
-    for index, collection_id in enumerate(dict.fromkeys(payload.collection_ids)):
-        if db.get(Collections, collection_id):
-            db.add(FeaturedCollection(collection_id=collection_id, display_order=index))
-    log_audit(db, current_user.user_id, "featured.update", "collection", None, {"collection_ids": payload.collection_ids})
-    db.commit()
-    return {"ok": True}
-
-
 @admin_router.get("/roles")
 def list_roles(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
     seed_master_role(db)
     db.commit()
     if not (

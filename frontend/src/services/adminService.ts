@@ -85,20 +85,6 @@ export async function getUserSanctions(userId: number): Promise<UserSanction[]> 
   return parseResponse<UserSanction[]>(response, "Failed to load sanction history");
 }
 
-export async function getFeaturedCollections(): Promise<FeaturedCollection[]> {
-  const response = await authFetch(`${API_URL}/admin/featured-collections`);
-  return parseResponse<FeaturedCollection[]>(response, "Failed to load featured collections");
-}
-
-export async function setFeaturedCollections(collectionIds: number[]): Promise<{ ok: boolean }> {
-  const response = await authFetch(`${API_URL}/admin/featured-collections`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ collection_ids: collectionIds }),
-  });
-  return parseResponse<{ ok: boolean }>(response, "Failed to save featured collections");
-}
-
 export interface AdminNotification {
   notification_id: number;
   type: string;
@@ -146,8 +132,14 @@ export interface AdminReport {
   report_id: number;
   sender_id: number;
   sender_username: string | null;
+  sender_profile_badge_achievement_id?: number | null;
+  sender_profile_badge_image_url?: string | null;
+  sender_profile_badge_title?: string | null;
   receiver_id: number;
   receiver_username: string | null;
+  receiver_profile_badge_achievement_id?: number | null;
+  receiver_profile_badge_image_url?: string | null;
+  receiver_profile_badge_title?: string | null;
   receiver_is_active: number | null;
   report_type_id: number;
   report_type_title: string | null;
@@ -155,6 +147,9 @@ export interface AdminReport {
   report_status_name: string;
   moderator_id: number | null;
   moderator_username: string | null;
+  moderator_profile_badge_achievement_id?: number | null;
+  moderator_profile_badge_image_url?: string | null;
+  moderator_profile_badge_title?: string | null;
   created_at: string | null;
   closed_at: string | null;
 }
@@ -275,14 +270,6 @@ export interface UserSanction {
   action: string;
   reason: string | null;
   report_id: number | null;
-  created_at: string | null;
-}
-
-export interface FeaturedCollection {
-  collection_id: number;
-  collection_name: string | null;
-  collection_image_url: string | null;
-  display_order: number;
   created_at: string | null;
 }
 

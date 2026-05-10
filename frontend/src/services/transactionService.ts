@@ -13,9 +13,15 @@ export interface Transaction {
   buyer_id: number;
   buyer_username: string | null;
   buyer_profile_pic_url: string | null;
+  buyer_profile_badge_achievement_id: number | null;
+  buyer_profile_badge_image_url: string | null;
+  buyer_profile_badge_title: string | null;
   seller_id: number;
   seller_username: string | null;
   seller_profile_pic_url: string | null;
+  seller_profile_badge_achievement_id: number | null;
+  seller_profile_badge_image_url: string | null;
+  seller_profile_badge_title: string | null;
   blockchain_tx_hash: string | null;
 }
 

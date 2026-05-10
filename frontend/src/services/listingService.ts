@@ -14,6 +14,9 @@ export interface ApiListing {
   seller_id: number;
   seller_username: string | null;
   seller_profile_pic_url: string | null;
+  seller_profile_badge_achievement_id: number | null;
+  seller_profile_badge_image_url: string | null;
+  seller_profile_badge_title: string | null;
   seller_wallet: string | null;
   views: number;
 }
@@ -29,6 +32,9 @@ export interface CartItem {
   model_name: string | null;
   seller_id: number;
   seller_username: string | null;
+  seller_profile_badge_achievement_id: number | null;
+  seller_profile_badge_image_url: string | null;
+  seller_profile_badge_title: string | null;
 }
 
 export interface Cart {
@@ -67,6 +73,9 @@ export interface TopSpender {
   user_id: number;
   username: string | null;
   profile_pic_url: string | null;
+  profile_badge_achievement_id: number | null;
+  profile_badge_image_url: string | null;
+  profile_badge_title: string | null;
   spent_ton: string;
   transactions_count: number;
 }

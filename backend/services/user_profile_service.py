@@ -23,20 +23,23 @@ from core.models import (
 )
 from services.admin_platform_service import (
     create_moderation_item,
-    ensure_admin_platform_schema,
     get_profile_badge_achievement_id,
 )
 from services.blockchain.token_service import get_token_balance
 from services.blockchain.wallet_service import get_native_balance_eth
-from services.achievement_service import achievement_to_dict
+from services.achievement_service import achievement_progress_to_dict, achievement_to_dict
 from services.profile_content_moderation_service import validate_profile_content
 
 
 USERNAME_REGEX = re.compile("^[A-Za-z\u0400-\u04FF0-9_]{3,32}$")
-PROFILE_IMAGE_DATA_URL_REGEX = re.compile(r"^data:(image/(png|jpeg|webp));base64,(.+)$", re.DOTALL)
+PROFILE_IMAGE_DATA_URL_REGEX = re.compile(
+    r"^data:(image/(png|jpe?g|webp));base64,([A-Za-z0-9+/=\s]+)$",
+    re.IGNORECASE,
+)
 PROFILE_IMAGE_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
     "image/webp": ".webp",
 }
 PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -119,7 +122,7 @@ def _save_profile_picture(data_url: str, current_filename: str | None) -> str:
     if not match:
         raise ValueError("Profile image must be a PNG, JPG, or WEBP file")
 
-    mime_type = match.group(1)
+    mime_type = match.group(1).lower()
     image_data = match.group(3)
     file_extension = PROFILE_IMAGE_EXTENSIONS[mime_type]
 
@@ -222,8 +225,9 @@ def _visible_social_value(value, visibility: int, can_view_private: bool):
 
 def _get_top_spender_rank(db: Session, user_id: int, limit: int = 10) -> int | None:
     spender_id = case(
+        (TransactionHistory.buyer_id.isnot(None), TransactionHistory.buyer_id),
         (TransactionHistory.transaction_type == "purchase", TransactionHistory.seller_id),
-        else_=TransactionHistory.buyer_id,
+        else_=None,
     ).label("spender_id")
 
     rows = (
@@ -233,6 +237,7 @@ def _get_top_spender_rank(db: Session, user_id: int, limit: int = 10) -> int | N
             func.count(TransactionHistory.transaction_id).label("transactions_count"),
         )
         .filter(TransactionHistory.transaction_status == "confirmed")
+        .filter(spender_id.isnot(None))
         .group_by(spender_id)
         .order_by(
             func.sum(TransactionHistory.transaction_price).desc(),
@@ -250,7 +255,6 @@ def _get_top_spender_rank(db: Session, user_id: int, limit: int = 10) -> int | N
 
 
 def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id: int | None = None) -> dict:
-    ensure_admin_platform_schema()
     user = db.scalar(
         select(User)
         .where(User.username == username)
@@ -330,14 +334,45 @@ def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id
     achievements_visible_count = sum(
         1 for user_achievement, _ in user_achievements if int(user_achievement.is_visible) == 1
     )
-    achievements = [
-        achievement_to_dict(db, achievement) | {
-            "is_visible": user_achievement.is_visible,
-            "awarded_at": user_achievement.awarded_at.isoformat() if user_achievement.awarded_at else None,
-        }
+    earned_by_achievement_id = {
+        achievement.achievement_id: user_achievement
         for user_achievement, achievement in user_achievements
-        if can_view_private_socials or user_achievement.is_visible == 1
-    ]
+    }
+    all_active_achievements = db.scalars(
+        select(Achievement)
+        .where(Achievement.is_active == 1)
+        .order_by(Achievement.created_at.desc(), Achievement.achievement_id.desc())
+    ).all()
+    achievements = []
+    for achievement in all_active_achievements:
+        user_achievement = earned_by_achievement_id.get(achievement.achievement_id)
+        is_visible_to_viewer = bool(
+            user_achievement
+            and (
+                can_view_private_socials
+                or user_achievement.is_visible == 1
+            )
+        )
+        progress = achievement_progress_to_dict(db, user.user_id, achievement) if (
+            can_view_private_socials or is_visible_to_viewer
+        ) else {}
+        achievements.append(
+            achievement_to_dict(db, achievement) | progress | {
+                "is_unlocked": is_visible_to_viewer,
+                "is_visible": (
+                    user_achievement.is_visible
+                    if user_achievement and can_view_private_socials
+                    else (1 if user_achievement and user_achievement.is_visible == 1 else 0)
+                ),
+                "awarded_at": (
+                    user_achievement.awarded_at.isoformat()
+                    if user_achievement
+                    and is_visible_to_viewer
+                    and user_achievement.awarded_at
+                    else None
+                ),
+            }
+        )
     profile_badge_achievement_id = get_profile_badge_achievement_id(db, user.user_id)
     profile_badge_achievement = None
     if profile_badge_achievement_id:
@@ -440,20 +475,12 @@ def update_user_profile(
     user.vk_visibility = vk_visibility
 
     if profile_pic_data_url:
-        create_moderation_item(
-            db=db,
-            item_type="profile_photo",
-            action="update",
-            target_kind="users",
-            target_id=user.user_id,
-            submitted_by=user.user_id,
-            image_data_url=profile_pic_data_url,
-            payload={
-                "user_id": user.user_id,
-                "username": user.username,
-                "current_image": user.profile_pic_url,
-            },
+        new_profile_pic_filename = _save_profile_picture(
+            profile_pic_data_url,
+            current_filename=user.profile_pic_url,
         )
+
+        user.profile_pic_url = new_profile_pic_filename
 
     db.commit()
     db.refresh(user)

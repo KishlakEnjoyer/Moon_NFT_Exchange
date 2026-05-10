@@ -365,8 +365,7 @@
       "usersRoles": "Roles and Access",
       "achievements": "Achievements",
       "moderation": "Moderation",
-      "audit": "Audit",
-      "featured": "Featured"
+      "audit": "Audit"
     },
     "dictionary": {
       "collections": "Collections",
@@ -494,7 +493,17 @@
       "enterTitle": "Enter a title",
       "enterDescription": "Enter a description",
       "ruleValue": "Rule value",
-      "backfillExisting": "Immediately award users who already qualify"
+      "backfillExisting": "Immediately award users who already qualify",
+      "rules": {
+        "manual": "Manual only",
+        "gifts_owned_at_least": "Own at least N gifts",
+        "purchases_count_at_least": "Make at least N purchases",
+        "sales_count_at_least": "Make at least N sales",
+        "unique_collections_at_least": "Own gifts from at least N collections",
+        "complete_collection": "Own every minted gift in at least one collection",
+        "early_collector": "Be among first N registered users",
+        "top_spender_rank": "Be in top N spenders"
+      }
     },
     "moderation": {
       "loadFailed": "Failed to load moderation queue",
@@ -507,13 +516,6 @@
       "preview": "Preview",
       "status": "Status",
       "actions": "Actions"
-    },
-    "featured": {
-      "loadFailed": "Failed to load featured collections",
-      "saved": "Featured collections saved",
-      "saveFailed": "Failed to save collection picks",
-      "description": "Select collections to manually pin as recommended.",
-      "placeholder": "Choose collections"
     },
     "audit": {
       "loadFailed": "Failed to load audit log",

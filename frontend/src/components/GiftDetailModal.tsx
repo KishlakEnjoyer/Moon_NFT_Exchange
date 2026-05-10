@@ -15,6 +15,7 @@ import {
 import { authFetch } from "../services/auth";
 import { buyListing, recordListingView } from "../services/listingService";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text, Title } = Typography;
 
@@ -283,7 +284,14 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           onClick={handleOwnerClick}
         >
           <Avatar size={24} src={ownerAvatarUrl} icon={!ownerAvatarUrl ? <UserOutlined /> : undefined} />
-          <Text className="!text-[var(--accent-150)]">{detail?.owner_username || t("common.unknown")}</Text>
+          <UserNameWithBadge
+            username={detail?.owner_username}
+            fallback={t("common.unknown")}
+            badgeId={detail?.owner_profile_badge_achievement_id}
+            badgeImageUrl={detail?.owner_profile_badge_image_url}
+            badgeTitle={detail?.owner_profile_badge_title}
+            textColorClassName="!text-[var(--accent-150)]"
+          />
         </Flex>
       ),
     },
@@ -297,7 +305,13 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           onClick={handleSenderClick}
         >
           <Avatar size={24} src={senderAvatarUrl} icon={!senderAvatarUrl ? <UserOutlined /> : undefined} />
-          <Text className="!text-[var(--accent-150)]">{detail.original_sender_username}</Text>
+          <UserNameWithBadge
+            username={detail.original_sender_username}
+            badgeId={detail.original_sender_profile_badge_achievement_id}
+            badgeImageUrl={detail.original_sender_profile_badge_image_url}
+            badgeTitle={detail.original_sender_profile_badge_title}
+            textColorClassName="!text-[var(--accent-150)]"
+          />
         </Flex>
       ),
     }] : []),

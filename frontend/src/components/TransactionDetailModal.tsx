@@ -2,6 +2,7 @@ import { Avatar, Descriptions, Flex, Modal, Tag, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { Transaction, getProfileAvatarUrl } from "../services/transactionService";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text, Title } = Typography;
 
@@ -92,6 +93,9 @@ const formatAmount = (amount: string) => `${parseFloat(amount).toFixed(2)} TON`;
 const renderUserValue = (
   username: string | null,
   profilePicUrl: string | null,
+  badgeId: number | null,
+  badgeImageUrl: string | null,
+  badgeTitle: string | null,
   fallbackId: number,
   navigate: ReturnType<typeof useNavigate>,
   onClose: () => void,
@@ -114,7 +118,13 @@ const renderUserValue = (
       }}
     >
       <Avatar size={24} src={getProfileAvatarUrl(profilePicUrl)} />
-      <Text>{label}</Text>
+      <UserNameWithBadge
+        username={username}
+        fallback={label}
+        badgeId={badgeId}
+        badgeImageUrl={badgeImageUrl}
+        badgeTitle={badgeTitle}
+      />
     </Flex>
   );
 };
@@ -143,6 +153,9 @@ const TransactionDetailModal = ({
           children: renderUserValue(
             transaction.seller_username,
             transaction.seller_profile_pic_url,
+            transaction.seller_profile_badge_achievement_id,
+            transaction.seller_profile_badge_image_url,
+            transaction.seller_profile_badge_title,
             transaction.seller_id,
             navigate,
             onClose,
@@ -155,6 +168,9 @@ const TransactionDetailModal = ({
           children: renderUserValue(
             transaction.buyer_username,
             transaction.buyer_profile_pic_url,
+            transaction.buyer_profile_badge_achievement_id,
+            transaction.buyer_profile_badge_image_url,
+            transaction.buyer_profile_badge_title,
             transaction.buyer_id,
             navigate,
             onClose,
@@ -169,6 +185,9 @@ const TransactionDetailModal = ({
           children: renderUserValue(
             transaction.buyer_username,
             transaction.buyer_profile_pic_url,
+            transaction.buyer_profile_badge_achievement_id,
+            transaction.buyer_profile_badge_image_url,
+            transaction.buyer_profile_badge_title,
             transaction.buyer_id,
             navigate,
             onClose,
@@ -181,6 +200,9 @@ const TransactionDetailModal = ({
           children: renderUserValue(
             transaction.seller_username,
             transaction.seller_profile_pic_url,
+            transaction.seller_profile_badge_achievement_id,
+            transaction.seller_profile_badge_image_url,
+            transaction.seller_profile_badge_title,
             transaction.seller_id,
             navigate,
             onClose,

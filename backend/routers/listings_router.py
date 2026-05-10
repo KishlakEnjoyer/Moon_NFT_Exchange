@@ -21,6 +21,7 @@ from core.models import (
 from services.listing_purchase_service import buy_listing as buy_listing_service
 from services.recommendation_service import get_recommended_listing_ids
 from services.smart_search_service import SmartSearchItem, smart_search_service
+from services.admin_platform_service import get_visible_profile_badges
 
 listings_router = APIRouter(prefix="/listings", tags=["listings"])
 MAX_LISTING_PRICE = Decimal("100000")
@@ -40,6 +41,9 @@ class ListingResponse(BaseModel):
     seller_id: int
     seller_username: str | None
     seller_profile_pic_url: str | None
+    seller_profile_badge_achievement_id: int | None = None
+    seller_profile_badge_image_url: str | None = None
+    seller_profile_badge_title: str | None = None
     seller_wallet: str | None
     views: int = 0
 
@@ -193,6 +197,7 @@ def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> l
     listing_ids = [l.listing_id for l in listings]
     present_num_by_id = {}
     seller_profile_pic_by_id = {}
+    seller_profile_badge_by_id = {}
     views_by_listing_id = {}
 
     if present_ids:
@@ -213,6 +218,7 @@ def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> l
                 .all()
             )
         }
+        seller_profile_badge_by_id = get_visible_profile_badges(db, set(seller_ids))
     views_by_listing_id = get_listing_view_counts(db, listing_ids)
 
     return [
@@ -230,6 +236,9 @@ def make_listing_responses(db: Session, listings: list[ActiveListingsView]) -> l
             seller_id=l.seller_id,
             seller_username=l.seller_username,
             seller_profile_pic_url=seller_profile_pic_by_id.get(l.seller_id),
+            seller_profile_badge_achievement_id=seller_profile_badge_by_id.get(l.seller_id, {}).get("achievement_id"),
+            seller_profile_badge_image_url=seller_profile_badge_by_id.get(l.seller_id, {}).get("image_url"),
+            seller_profile_badge_title=seller_profile_badge_by_id.get(l.seller_id, {}).get("title"),
             seller_wallet=l.seller_wallet,
             views=views_by_listing_id.get(l.listing_id, 0),
         )

@@ -7,6 +7,7 @@ import {
   Input,
   Layout,
   Modal,
+  Progress,
   Segmented,
   Spin,
   Tag,
@@ -43,6 +44,7 @@ import ReportModal from "../components/ReportModal";
 import SendGiftModal from "../components/SendGiftModal";
 import TransactionHistoryModal from "../components/TransactionHistoryModal";
 import SpoilerSpan from "../components/SpoilerSpan";
+import UserNameWithBadge from "../components/UserNameWithBadge";
 import { createAlbum, deleteAlbum, renameAlbum } from "../services/albumService";
 import { authFetch } from "../services/auth";
 import { getPresentDisplayImageUrl } from "../services/presentService";
@@ -112,8 +114,13 @@ interface ProfileAchievement {
   description: string;
   image_url: string | null;
   users_percent: number;
+  is_unlocked: boolean;
   is_visible: number;
   awarded_at: string | null;
+  progress_current?: number | null;
+  progress_target?: number | null;
+  progress_percent?: number | null;
+  progress_label?: string | null;
 }
 
 const ALL_TAB = "All";
@@ -712,9 +719,16 @@ const AccountView = () => {
                     <Avatar
                       shape="square"
                       size={32}
-                      src={achievementImageUrl(user.profile_badge_achievement.image_url)}
+                      src={achievementImageUrl(user.profile_badge_achievement.image_url) ? (
+                        <img
+                          src={achievementImageUrl(user.profile_badge_achievement.image_url)}
+                          alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                        />
+                      ) : undefined}
                       icon={!user.profile_badge_achievement.image_url ? <TrophyOutlined /> : undefined}
-                      className="border border-amber-300 bg-amber-100"
+                      className="bg-transparent"
+                      style={{ border: 0 }}
                     />
                   </Tooltip>
                 )}
@@ -1006,16 +1020,16 @@ const AccountView = () => {
                           navigate(`/account/${socialUser.username}`);
                         }}
                       >
-                        <span className="truncate">{socialUser.username || `#${socialUser.user_id}`}</span>
-                      </Button>
-                      {socialUser.profile_badge_image_url && (
-                        <Avatar
-                          shape="square"
-                          size={24}
-                          src={achievementImageUrl(socialUser.profile_badge_image_url)}
-                          icon={!socialUser.profile_badge_image_url ? <TrophyOutlined /> : undefined}
+                        <UserNameWithBadge
+                          username={socialUser.username}
+                          fallback={`#${socialUser.user_id}`}
+                          badgeId={socialUser.profile_badge_achievement_id}
+                          badgeImageUrl={socialUser.profile_badge_image_url}
+                          badgeTitle={socialUser.profile_badge_title}
+                          strong
+                          className="max-w-full"
                         />
-                      )}
+                      </Button>
                     </Flex>
                     {socialUser.is_following && <Tag>{t("profile.following")}</Tag>}
                   </Flex>
@@ -1063,57 +1077,82 @@ const AccountView = () => {
             </Flex>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {user.achievements.map((achievement) => (
-                <div
-                  key={achievement.achievement_id}
-                  className="rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg-secondary)] p-3"
-                >
-                  <Flex gap={12} align="flex-start">
-                    <Avatar
-                      shape="square"
-                      size={64}
-                      src={achievementImageUrl(achievement.image_url)}
-                      icon={!achievement.image_url ? <TrophyOutlined /> : undefined}
-                      className="shrink-0"
-                    />
-                    <Flex vertical className="min-w-0 flex-1">
-                      <Flex justify="space-between" gap={8} align="start">
-                        <Text strong className="break-words">{achievement.title}</Text>
-                        {isOwn && (
-                          <Tooltip title={achievement.is_visible ? t("profile.hideAchievement") : t("profile.showAchievement")}>
-                            <Button
+              {user.achievements.map((achievement) => {
+                const isUnlocked = Boolean(achievement.is_unlocked);
+
+                return (
+                  <div
+                    key={achievement.achievement_id}
+                    className={`rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg-secondary)] p-3 transition-opacity ${
+                      isUnlocked ? "" : "opacity-55 grayscale"
+                    }`}
+                  >
+                    <Flex gap={12} align="flex-start">
+                      <Avatar
+                        shape="square"
+                        size={64}
+                        src={achievementImageUrl(achievement.image_url)}
+                        icon={!achievement.image_url ? <TrophyOutlined /> : undefined}
+                        className="shrink-0"
+                      />
+                      <Flex vertical className="min-w-0 flex-1">
+                        <Flex justify="space-between" gap={8} align="start">
+                          <Text strong className="break-words">{achievement.title}</Text>
+                          {isOwn && isUnlocked && (
+                            <Tooltip title={achievement.is_visible ? t("profile.hideAchievement") : t("profile.showAchievement")}>
+                              <Button
+                                size="small"
+                                type="text"
+                                icon={achievement.is_visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                                onClick={() => handleToggleAchievementVisibility(
+                                  achievement.achievement_id,
+                                  achievement.is_visible ? 0 : 1,
+                                )}
+                              />
+                            </Tooltip>
+                          )}
+                        </Flex>
+                        <Text type="secondary" className="text-sm leading-5">{achievement.description}</Text>
+                        {achievement.progress_target && (
+                          <div className="mt-2">
+                            <Flex justify="space-between" align="center" gap={8}>
+                              <Text type="secondary" className="text-xs">
+                                {achievement.progress_label || `${achievement.progress_current || 0}/${achievement.progress_target}`}
+                              </Text>
+                              <Text type="secondary" className="text-xs">
+                                {achievement.progress_percent || 0}%
+                              </Text>
+                            </Flex>
+                            <Progress
+                              percent={achievement.progress_percent || 0}
+                              showInfo={false}
                               size="small"
-                              type="text"
-                              icon={achievement.is_visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                              onClick={() => handleToggleAchievementVisibility(
-                                achievement.achievement_id,
-                                achievement.is_visible ? 0 : 1,
-                              )}
+                              strokeColor={isUnlocked ? "#f5b301" : "#8c8c8c"}
+                              trailColor="rgba(255,255,255,0.12)"
                             />
-                          </Tooltip>
+                          </div>
+                        )}
+                        <Tag color={isUnlocked ? "gold" : "default"} className="mt-2 w-fit">
+                          {t("profile.achievementUsersPercent", { percent: achievement.users_percent })}
+                        </Tag>
+                        {isOwn && isUnlocked && achievement.is_visible === 1 && (
+                          <Button
+                            size="small"
+                            className="mt-2 w-fit"
+                            loading={badgeSaving}
+                            disabled={user.profile_badge_achievement_id === achievement.achievement_id}
+                            onClick={() => handleSetProfileBadge(achievement)}
+                          >
+                            {user.profile_badge_achievement_id === achievement.achievement_id
+                              ? t("profile.currentBadge")
+                              : t("profile.setAsBadge")}
+                          </Button>
                         )}
                       </Flex>
-                      <Text type="secondary" className="text-sm leading-5">{achievement.description}</Text>
-                      <Tag color="gold" className="mt-2 w-fit">
-                        {t("profile.achievementUsersPercent", { percent: achievement.users_percent })}
-                      </Tag>
-                      {isOwn && achievement.is_visible === 1 && (
-                        <Button
-                          size="small"
-                          className="mt-2 w-fit"
-                          loading={badgeSaving}
-                          disabled={user.profile_badge_achievement_id === achievement.achievement_id}
-                          onClick={() => handleSetProfileBadge(achievement)}
-                        >
-                          {user.profile_badge_achievement_id === achievement.achievement_id
-                            ? t("profile.currentBadge")
-                            : t("profile.setAsBadge")}
-                        </Button>
-                      )}
                     </Flex>
-                  </Flex>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Modal>

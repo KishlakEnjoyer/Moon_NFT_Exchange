@@ -8,6 +8,7 @@ from core.auth import get_current_user
 from core.database import get_db
 from core.models import TransactionHistory, User
 from core.request_models import TransactionResponse
+from services.admin_platform_service import get_visible_profile_badges
 
 transactions_router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -16,6 +17,9 @@ class TopSpenderResponse(BaseModel):
     user_id: int
     username: str | None
     profile_pic_url: str | None
+    profile_badge_achievement_id: int | None = None
+    profile_badge_image_url: str | None = None
+    profile_badge_title: str | None = None
     spent_ton: str
     transactions_count: int
 
@@ -26,17 +30,19 @@ def get_top_spenders(
     db: Session = Depends(get_db),
 ):
     spender_id = case(
+        (TransactionHistory.buyer_id.isnot(None), TransactionHistory.buyer_id),
         (TransactionHistory.transaction_type == "purchase", TransactionHistory.seller_id),
-        else_=TransactionHistory.buyer_id,
+        else_=None,
     ).label("spender_id")
 
     totals = (
         db.query(
             spender_id,
-            func.sum(TransactionHistory.transaction_price).label("spent_ton"),
+            func.coalesce(func.sum(TransactionHistory.transaction_price), 0).label("spent_ton"),
             func.count(TransactionHistory.transaction_id).label("transactions_count"),
         )
         .filter(TransactionHistory.transaction_status == "confirmed")
+        .filter(spender_id.isnot(None))
         .group_by(spender_id)
         .subquery()
     )
@@ -60,11 +66,16 @@ def get_top_spenders(
         .all()
     )
 
+    profile_badges = get_visible_profile_badges(db, {row.user_id for row in rows})
+
     return [
         TopSpenderResponse(
             user_id=row.user_id,
             username=row.username,
             profile_pic_url=row.profile_pic_url,
+            profile_badge_achievement_id=profile_badges.get(row.user_id, {}).get("achievement_id"),
+            profile_badge_image_url=profile_badges.get(row.user_id, {}).get("image_url"),
+            profile_badge_title=profile_badges.get(row.user_id, {}).get("title"),
             spent_ton=str(row.spent_ton or 0),
             transactions_count=int(row.transactions_count or 0),
         )
@@ -113,6 +124,7 @@ def get_user_transactions(
 
     user_ids = {t.buyer_id for t in transactions} | {t.seller_id for t in transactions}
     profile_pic_by_user_id = {}
+    profile_badge_by_user_id = {}
 
     if user_ids:
         profile_pic_by_user_id = {
@@ -123,6 +135,7 @@ def get_user_transactions(
                 .all()
             )
         }
+        profile_badge_by_user_id = get_visible_profile_badges(db, user_ids)
 
     return [
         TransactionResponse(
@@ -138,9 +151,15 @@ def get_user_transactions(
             buyer_id=t.buyer_id,
             buyer_username=t.buyer_username,
             buyer_profile_pic_url=profile_pic_by_user_id.get(t.buyer_id),
+            buyer_profile_badge_achievement_id=profile_badge_by_user_id.get(t.buyer_id, {}).get("achievement_id"),
+            buyer_profile_badge_image_url=profile_badge_by_user_id.get(t.buyer_id, {}).get("image_url"),
+            buyer_profile_badge_title=profile_badge_by_user_id.get(t.buyer_id, {}).get("title"),
             seller_id=t.seller_id,
             seller_username=t.seller_username,
             seller_profile_pic_url=profile_pic_by_user_id.get(t.seller_id),
+            seller_profile_badge_achievement_id=profile_badge_by_user_id.get(t.seller_id, {}).get("achievement_id"),
+            seller_profile_badge_image_url=profile_badge_by_user_id.get(t.seller_id, {}).get("image_url"),
+            seller_profile_badge_title=profile_badge_by_user_id.get(t.seller_id, {}).get("title"),
             blockchain_tx_hash=t.blockchain_tx_hash,
         )
         for t in transactions

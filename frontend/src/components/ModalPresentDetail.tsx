@@ -13,6 +13,7 @@ import { ShoppingCartOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { getPriceEstimate } from "../services/presentService";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Title, Text } = Typography;
 const MARKET_TOLERANCE = 0.05;
@@ -135,9 +136,15 @@ const ModalPresentDetail: React.FC<ModalPresentDetailProps> = ({
             src={getSellerAvatarUrl(item.seller_profile_pic_url)}
             className="shrink-0 border border-solid border-[var(--black-transparent)]"
           />
-          <Text className="!text-[var(--accent-150)] max-w-[150px]" ellipsis={{ tooltip: item.seller_username || t("common.unknown") }}>
-            {item.seller_username || t("common.unknown")}
-          </Text>
+          <UserNameWithBadge
+            username={item.seller_username}
+            fallback={t("common.unknown")}
+            badgeId={item.seller_profile_badge_achievement_id}
+            badgeImageUrl={item.seller_profile_badge_image_url}
+            badgeTitle={item.seller_profile_badge_title}
+            textColorClassName="!text-[var(--accent-150)]"
+            className="max-w-[150px]"
+          />
         </Flex>
       ),
     },

@@ -14,6 +14,7 @@ export interface SocialUser {
   profile_pic_url: string | null;
   profile_badge_achievement_id: number | null;
   profile_badge_image_url: string | null;
+  profile_badge_title: string | null;
   is_following: boolean;
 }
 

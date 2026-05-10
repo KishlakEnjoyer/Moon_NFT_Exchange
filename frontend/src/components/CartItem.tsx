@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import TONIcon from "./icons/TONIcon";
 import { CartItem as CartItemType, getPresentImageUrl } from "../services/listingService";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text } = Typography;
 
@@ -47,18 +48,23 @@ const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onBuy, buying, disa
           >
             {item.collection_name} # {item.present_num}
           </Text>
-          <Text
-            type="secondary"
-            className="cursor-pointer hover:underline text-[var(--size-sm)]"
+          <UserNameWithBadge
+            username={item.seller_username}
+            fallback={t("common.unknown")}
+            badgeId={item.seller_profile_badge_achievement_id}
+            badgeImageUrl={item.seller_profile_badge_image_url}
+            badgeTitle={item.seller_profile_badge_title}
+            badgeSize={16}
+            textColorClassName="!text-gray-400"
+            textClassName="text-[var(--size-sm)]"
+            className="hover:underline"
             onClick={() => {
-                onClose?.();  
-                if (item.seller_username) {
-                  navigate(`/account/${item.seller_username}`);
-                }
+              onClose?.();
+              if (item.seller_username) {
+                navigate(`/account/${item.seller_username}`);
+              }
             }}
-          >
-            {item.seller_username || t("common.unknown")}
-          </Text>
+          />
         </Flex>
       </Flex>
 

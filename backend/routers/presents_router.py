@@ -15,6 +15,7 @@ from services.blockchain.client import get_web3
 from web3 import Web3
 from eth_account import Account
 from services.upgrade_service import upgrade_present
+from services.admin_platform_service import get_visible_profile_badges
 
 presents_router = APIRouter(prefix="/presents", tags=["presents"])
 
@@ -44,6 +45,9 @@ class PresentDetailResponse(BaseModel):
     owner_username: str | None
     owner_id: int | None
     owner_profile_pic_url: str | None
+    owner_profile_badge_achievement_id: int | None = None
+    owner_profile_badge_image_url: str | None = None
+    owner_profile_badge_title: str | None = None
     is_on_sale: bool
     active_listing_id: int | None
     active_listing_price: str | None
@@ -52,6 +56,9 @@ class PresentDetailResponse(BaseModel):
     has_models: bool
     original_sender_username: str | None
     original_sender_profile_pic_url: str | None
+    original_sender_profile_badge_achievement_id: int | None = None
+    original_sender_profile_badge_image_url: str | None = None
+    original_sender_profile_badge_title: str | None = None
 
 
 @presents_router.get("/{present_id}/detail", response_model=PresentDetailResponse)
@@ -88,6 +95,19 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
     original_sender = None
     if present.original_sender_id:
         original_sender = db.scalar(select(User).where(User.user_id == present.original_sender_id))
+    profile_badges = get_visible_profile_badges(
+        db,
+        {
+            user_id
+            for user_id in [
+                owner_record.owner_id if owner_record else None,
+                present.original_sender_id,
+            ]
+            if user_id
+        },
+    )
+    owner_badge = profile_badges.get(owner_record.owner_id) if owner_record else None
+    original_sender_badge = profile_badges.get(present.original_sender_id) if present.original_sender_id else None
 
     active_listing = db.scalar(
         select(Listing)
@@ -141,6 +161,9 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         owner_username=owner_user.username if owner_user else None,
         owner_id=owner_record.owner_id if owner_record else None,
         owner_profile_pic_url=owner_user.profile_pic_url if owner_user and owner_user.is_active else None,
+        owner_profile_badge_achievement_id=owner_badge["achievement_id"] if owner_badge else None,
+        owner_profile_badge_image_url=owner_badge["image_url"] if owner_badge else None,
+        owner_profile_badge_title=owner_badge["title"] if owner_badge else None,
         is_on_sale=active_listing is not None,
         active_listing_id=active_listing.listing_id if active_listing else None,
         active_listing_price=str(active_listing.price) if active_listing else None,
@@ -149,6 +172,9 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         has_models=has_models > 0,
         original_sender_username=original_sender.username if original_sender else None,
         original_sender_profile_pic_url=original_sender.profile_pic_url if original_sender and original_sender.is_active else None,
+        original_sender_profile_badge_achievement_id=original_sender_badge["achievement_id"] if original_sender_badge else None,
+        original_sender_profile_badge_image_url=original_sender_badge["image_url"] if original_sender_badge else None,
+        original_sender_profile_badge_title=original_sender_badge["title"] if original_sender_badge else None,
     )
 
 

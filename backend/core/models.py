@@ -35,7 +35,7 @@ class User(Base):
     tg_visibility: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     vk_visibility: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     username: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
-    profile_pic_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    profile_pic_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     wallet_address: Mapped[str | None] = mapped_column(String(42), unique=True, nullable=True)
     wallet_private_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -139,7 +139,7 @@ class Symbols(Base):
 
     symbol_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     symbol_name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    symbol_image_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    symbol_image_url: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
 
     presents: Mapped[list[Present]] = relationship("Present", back_populates="symbol")
@@ -803,13 +803,3 @@ class ModerationQueueItem(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
 
 
-class FeaturedCollection(Base):
-    __tablename__ = "featured_collections"
-
-    collection_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("collections.collection_id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)

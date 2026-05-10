@@ -7,6 +7,7 @@ from core.auth import get_current_user
 from core.database import get_db
 from core.models import ActiveListingsView, CartItem, Present, User
 from services.listing_purchase_service import buy_cart_listings
+from services.admin_platform_service import get_visible_profile_badges
 
 cart_router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -27,6 +28,9 @@ class CartItemResponse(BaseModel):
     model_name: str | None
     seller_id: int
     seller_username: str | None
+    seller_profile_badge_achievement_id: int | None = None
+    seller_profile_badge_image_url: str | None = None
+    seller_profile_badge_title: str | None = None
 
 
 class CartResponse(BaseModel):
@@ -79,6 +83,7 @@ def get_cart(
         .all()
     )
     listing_by_id = {listing.listing_id: listing for listing in listings}
+    profile_badges = get_visible_profile_badges(db, {listing.seller_id for listing in listings})
     present_ids = [listing.present_id for listing in listings]
     present_num_by_id = {}
     if present_ids:
@@ -107,6 +112,9 @@ def get_cart(
                 model_name=listing.model_name,
                 seller_id=listing.seller_id,
                 seller_username=listing.seller_username,
+                seller_profile_badge_achievement_id=profile_badges.get(listing.seller_id, {}).get("achievement_id"),
+                seller_profile_badge_image_url=profile_badges.get(listing.seller_id, {}).get("image_url"),
+                seller_profile_badge_title=profile_badges.get(listing.seller_id, {}).get("title"),
             ))
             total += float(listing.price)
 
@@ -148,6 +156,7 @@ def add_to_cart(
     db.add(cart_item)
     db.commit()
     db.refresh(cart_item)
+    profile_badge = get_visible_profile_badges(db, {listing.seller_id}).get(listing.seller_id)
 
     return CartItemResponse(
         cart_item_id=cart_item.cart_item_id,
@@ -165,6 +174,9 @@ def add_to_cart(
         model_name=listing.model_name,
         seller_id=listing.seller_id,
         seller_username=listing.seller_username,
+        seller_profile_badge_achievement_id=profile_badge["achievement_id"] if profile_badge else None,
+        seller_profile_badge_image_url=profile_badge["image_url"] if profile_badge else None,
+        seller_profile_badge_title=profile_badge["title"] if profile_badge else None,
     )
 
 

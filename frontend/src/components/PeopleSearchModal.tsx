@@ -3,6 +3,7 @@ import { Avatar, Flex, Input, Modal, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "./UserNameWithBadge";
 
 const { Text, Title } = Typography;
 
@@ -11,6 +12,9 @@ interface UserOption {
   username: string;
   profile_pic_url: string | null;
   is_active: number;
+  profile_badge_achievement_id: number | null;
+  profile_badge_image_url: string | null;
+  profile_badge_title: string | null;
 }
 
 interface PeopleSearchModalProps {
@@ -86,7 +90,14 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
                 icon={user.is_active === 0 || !user.profile_pic_url ? <UserOutlined /> : undefined}
               />
               <Flex vertical className="min-w-0">
-                <Text strong ellipsis={{ tooltip: user.username }} className="min-w-0">{user.username}</Text>
+                <UserNameWithBadge
+                  username={user.username}
+                  badgeId={user.profile_badge_achievement_id}
+                  badgeImageUrl={user.profile_badge_image_url}
+                  badgeTitle={user.profile_badge_title}
+                  strong
+                  className="max-w-full"
+                />
                 {user.is_active === 0 && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
               </Flex>
             </Flex>

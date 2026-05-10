@@ -9,17 +9,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+import uuid
 
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from core.database import engine
 from core.models import (
     AuditLog,
-    FeaturedCollection,
     ModerationQueueItem,
     Role,
     RolePermission,
@@ -34,7 +34,6 @@ PERMISSION_KEYS = [
     "dictionaries.manage",
     "moderation.manage",
     "achievements.manage",
-    "featured.manage",
     "users.manage",
     "roles.manage",
     "audit.view",
@@ -46,7 +45,6 @@ PERMISSION_LABELS = {
     "dictionaries.manage": "Collections, models, backgrounds, symbols",
     "moderation.manage": "Moderation queue",
     "achievements.manage": "Achievements",
-    "featured.manage": "Featured collections",
     "users.manage": "Users and sanctions",
     "roles.manage": "Roles and permissions",
     "audit.view": "Audit log",
@@ -71,152 +69,10 @@ IMAGE_EXTENSIONS = {
 SCHEMA_READY = False
 
 
-def ensure_admin_platform_schema() -> None:
-    global SCHEMA_READY
-    if SCHEMA_READY:
-        return
 
-    statements = [
-        """
-        CREATE TABLE IF NOT EXISTS role_permissions (
-            role_id SMALLINT NOT NULL,
-            permission_key VARCHAR(100) NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (role_id, permission_key),
-            CONSTRAINT fk_role_permissions_role FOREIGN KEY (role_id)
-                REFERENCES roles(role_id) ON DELETE CASCADE
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS user_follows (
-            follower_id BIGINT NOT NULL,
-            following_id BIGINT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (follower_id, following_id),
-            INDEX idx_user_follows_following (following_id),
-            CONSTRAINT fk_user_follows_follower FOREIGN KEY (follower_id)
-                REFERENCES users(user_id) ON DELETE CASCADE,
-            CONSTRAINT fk_user_follows_following FOREIGN KEY (following_id)
-                REFERENCES users(user_id) ON DELETE CASCADE
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS achievements (
-            achievement_id BIGINT NOT NULL AUTO_INCREMENT,
-            title VARCHAR(120) NOT NULL,
-            description VARCHAR(500) NOT NULL,
-            image_url VARCHAR(255) NULL,
-            rule_key VARCHAR(64) NULL,
-            rule_value INT NULL,
-            is_active SMALLINT NOT NULL DEFAULT 1,
-            created_by BIGINT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (achievement_id),
-            INDEX idx_achievements_rule (rule_key),
-            CONSTRAINT fk_achievements_created_by FOREIGN KEY (created_by)
-                REFERENCES users(user_id) ON DELETE SET NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS user_achievements (
-            user_id BIGINT NOT NULL,
-            achievement_id BIGINT NOT NULL,
-            is_visible SMALLINT NOT NULL DEFAULT 1,
-            awarded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, achievement_id),
-            CONSTRAINT fk_user_achievements_user FOREIGN KEY (user_id)
-                REFERENCES users(user_id) ON DELETE CASCADE,
-            CONSTRAINT fk_user_achievements_achievement FOREIGN KEY (achievement_id)
-                REFERENCES achievements(achievement_id) ON DELETE CASCADE
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            audit_id BIGINT NOT NULL AUTO_INCREMENT,
-            actor_user_id BIGINT NULL,
-            action VARCHAR(100) NOT NULL,
-            entity_type VARCHAR(80) NULL,
-            entity_id VARCHAR(80) NULL,
-            payload_json TEXT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (audit_id),
-            INDEX idx_audit_actor (actor_user_id),
-            INDEX idx_audit_created (created_at),
-            CONSTRAINT fk_audit_actor FOREIGN KEY (actor_user_id)
-                REFERENCES users(user_id) ON DELETE SET NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS user_sanctions (
-            sanction_id BIGINT NOT NULL AUTO_INCREMENT,
-            user_id BIGINT NOT NULL,
-            moderator_id BIGINT NULL,
-            action VARCHAR(50) NOT NULL,
-            reason VARCHAR(255) NULL,
-            report_id BIGINT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (sanction_id),
-            INDEX idx_sanctions_user (user_id),
-            CONSTRAINT fk_sanctions_user FOREIGN KEY (user_id)
-                REFERENCES users(user_id) ON DELETE CASCADE,
-            CONSTRAINT fk_sanctions_moderator FOREIGN KEY (moderator_id)
-                REFERENCES users(user_id) ON DELETE SET NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS moderation_queue (
-            moderation_id BIGINT NOT NULL AUTO_INCREMENT,
-            item_type VARCHAR(50) NOT NULL,
-            action VARCHAR(50) NOT NULL,
-            target_kind VARCHAR(50) NULL,
-            target_id BIGINT NULL,
-            submitted_by BIGINT NULL,
-            reviewed_by BIGINT NULL,
-            status VARCHAR(30) NOT NULL DEFAULT 'pending',
-            image_data_url MEDIUMTEXT NULL,
-            payload_json TEXT NULL,
-            reason VARCHAR(255) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            reviewed_at DATETIME NULL,
-            PRIMARY KEY (moderation_id),
-            INDEX idx_moderation_status (status),
-            INDEX idx_moderation_item_type (item_type),
-            CONSTRAINT fk_moderation_submitter FOREIGN KEY (submitted_by)
-                REFERENCES users(user_id) ON DELETE SET NULL,
-            CONSTRAINT fk_moderation_reviewer FOREIGN KEY (reviewed_by)
-                REFERENCES users(user_id) ON DELETE SET NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS featured_collections (
-            collection_id BIGINT NOT NULL,
-            display_order INT NOT NULL DEFAULT 0,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (collection_id),
-            CONSTRAINT fk_featured_collection FOREIGN KEY (collection_id)
-                REFERENCES collections(collection_id) ON DELETE CASCADE
-        )
-        """,
-    ]
-
-    with engine.begin() as connection:
-        for statement in statements:
-            connection.execute(text(statement))
-
-    try:
-        with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE users ADD COLUMN profile_badge_achievement_id BIGINT NULL"))
-    except OperationalError as exc:
-        message = str(exc.orig).lower()
-        if "duplicate column" not in message and "1060" not in message:
-            raise
-
-    SCHEMA_READY = True
 
 
 def seed_master_role(db: Session) -> None:
-    ensure_admin_platform_schema()
     role = db.get(Role, MASTER_ROLE_ID)
     if not role:
         role = Role(role_id=MASTER_ROLE_ID, role_name="master_admin", description="Full platform owner access")
@@ -260,7 +116,6 @@ def user_is_manager(user: User) -> bool:
 
 
 def get_role_permissions(db: Session, role_id: int) -> list[str]:
-    ensure_admin_platform_schema()
     return [
         row.permission_key
         for row in db.scalars(
@@ -270,7 +125,6 @@ def get_role_permissions(db: Session, role_id: int) -> list[str]:
 
 
 def set_role_permissions(db: Session, role_id: int, permissions: list[str]) -> None:
-    ensure_admin_platform_schema()
     valid_permissions = [permission for permission in permissions if permission in PERMISSION_KEYS]
     db.query(RolePermission).filter(RolePermission.role_id == role_id).delete(synchronize_session=False)
     for permission in valid_permissions:
@@ -305,7 +159,6 @@ def log_audit(
     entity_id: str | int | None = None,
     payload: dict[str, Any] | None = None,
 ) -> AuditLog:
-    ensure_admin_platform_schema()
     item = AuditLog(
         actor_user_id=actor_user_id,
         action=action,
@@ -326,7 +179,6 @@ def record_sanction(
     reason: str | None = None,
     report_id: int | None = None,
 ) -> UserSanction:
-    ensure_admin_platform_schema()
     sanction = UserSanction(
         user_id=user_id,
         moderator_id=moderator_id,
@@ -350,7 +202,6 @@ def parse_payload_json(value: str | None) -> dict[str, Any]:
 
 
 def get_profile_badge_achievement_id(db: Session, user_id: int) -> int | None:
-    ensure_admin_platform_schema()
     value = db.scalar(
         text("SELECT profile_badge_achievement_id FROM users WHERE user_id = :user_id"),
         {"user_id": user_id},
@@ -359,7 +210,6 @@ def get_profile_badge_achievement_id(db: Session, user_id: int) -> int | None:
 
 
 def set_profile_badge_achievement_id(db: Session, user_id: int, achievement_id: int | None) -> None:
-    ensure_admin_platform_schema()
     db.execute(
         text("""
             UPDATE users
@@ -368,6 +218,43 @@ def set_profile_badge_achievement_id(db: Session, user_id: int, achievement_id: 
         """),
         {"achievement_id": achievement_id, "user_id": user_id},
     )
+
+
+def get_visible_profile_badges(db: Session, user_ids: list[int] | set[int]) -> dict[int, dict[str, Any]]:
+    normalized_user_ids = sorted({int(user_id) for user_id in user_ids if user_id})
+    if not normalized_user_ids:
+        return {}
+
+    rows = db.execute(
+        text("""
+            SELECT
+                u.user_id,
+                u.profile_badge_achievement_id AS achievement_id,
+                a.title,
+                a.image_url
+            FROM users u
+            JOIN user_achievements ua
+                ON ua.user_id = u.user_id
+                AND ua.achievement_id = u.profile_badge_achievement_id
+                AND ua.is_visible = 1
+            JOIN achievements a
+                ON a.achievement_id = u.profile_badge_achievement_id
+                AND a.is_active = 1
+            WHERE u.user_id IN :user_ids
+                AND u.is_active = 1
+                AND u.profile_badge_achievement_id IS NOT NULL
+        """).bindparams(bindparam("user_ids", expanding=True)),
+        {"user_ids": normalized_user_ids},
+    ).mappings().all()
+
+    return {
+        int(row["user_id"]): {
+            "achievement_id": int(row["achievement_id"]),
+            "title": row["title"],
+            "image_url": row["image_url"],
+        }
+        for row in rows
+    }
 
 
 def images_root() -> Path:
@@ -380,18 +267,46 @@ def images_root() -> Path:
 
 
 def decode_image_data_url(data_url: str) -> tuple[bytes, str]:
-    match = IMAGE_DATA_URL_REGEX.fullmatch(data_url.strip())
+    if not data_url:
+        raise HTTPException(status_code=400, detail="Image is required")
+
+    data_url = data_url.strip()
+
+    match = IMAGE_DATA_URL_REGEX.fullmatch(data_url)
     if not match:
         raise HTTPException(status_code=400, detail="Image must be PNG, JPG, or WEBP")
 
-    mime_type = match.group(1).replace("image/jpg", "image/jpeg")
-    try:
-        image_bytes = base64.b64decode(match.group(2), validate=True)
-    except (ValueError, binascii.Error) as exc:
-        raise HTTPException(status_code=400, detail="Image is not valid base64 data") from exc
+    mime_type = match.group(1).lower().replace("image/jpg", "image/jpeg")
+    image_data = match.group(3).strip()
+
+    candidates = [
+        image_data,
+        re.sub(r"[\r\n]+", "", image_data).replace(" ", "+").replace("\t", "+"),
+        re.sub(r"\s+", "", image_data),
+    ]
+
+    image_bytes = None
+    last_error: Exception | None = None
+
+    for candidate in dict.fromkeys(candidates):
+        candidate = candidate.strip()
+        candidate = candidate + ("=" * (-len(candidate) % 4))
+
+        try:
+            image_bytes = base64.b64decode(candidate, validate=True)
+            break
+        except (ValueError, binascii.Error) as exc:
+            last_error = exc
+
+    if image_bytes is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Image is not valid base64 data",
+        ) from last_error
 
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Image cannot be empty")
+
     if len(image_bytes) > IMAGE_MAX_BYTES:
         raise HTTPException(status_code=400, detail="Image must be 5 MB or smaller")
 
@@ -400,7 +315,7 @@ def decode_image_data_url(data_url: str) -> tuple[bytes, str]:
 
         with Image.open(BytesIO(image_bytes)) as image:
             image.verify()
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
         raise HTTPException(status_code=400, detail="Image file is invalid") from exc
 
     return image_bytes, IMAGE_EXTENSIONS[mime_type]
@@ -434,6 +349,19 @@ def moderation_to_dict(item: ModerationQueueItem) -> dict[str, Any]:
     }
 
 
+def _get_profile_picture_dir() -> Path:
+    backend_images_dir = Path(__file__).resolve().parents[1] / "images" / "pfps"
+    repo_images_dir = Path(__file__).resolve().parents[2] / "images" / "pfps"
+
+    for candidate in (backend_images_dir, repo_images_dir):
+        if candidate.exists():
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate
+
+    repo_images_dir.mkdir(parents=True, exist_ok=True)
+    return repo_images_dir
+
+
 def create_moderation_item(
     db: Session,
     item_type: str,
@@ -444,9 +372,15 @@ def create_moderation_item(
     target_kind: str | None = None,
     target_id: int | None = None,
 ) -> ModerationQueueItem:
-    ensure_admin_platform_schema()
+    saved_image_filename = None
+
     if image_data_url:
-        decode_image_data_url(image_data_url)
+        image_bytes, extension = decode_image_data_url(image_data_url)
+
+        image_dir = _get_profile_picture_dir()
+        saved_image_filename = f"{uuid.uuid4().hex}{extension}"
+        image_path = image_dir / saved_image_filename
+        image_path.write_bytes(image_bytes)
 
     item = ModerationQueueItem(
         item_type=item_type,
@@ -455,9 +389,17 @@ def create_moderation_item(
         target_id=target_id,
         submitted_by=submitted_by,
         status="pending",
-        image_data_url=image_data_url,
-        payload_json=json.dumps(payload, ensure_ascii=False, default=str),
+        image_data_url=saved_image_filename,
+        payload_json=json.dumps(
+            {
+                **payload,
+                **({"new_image": saved_image_filename} if saved_image_filename else {}),
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
     )
+
     db.add(item)
     db.flush()
     return item
@@ -486,12 +428,3 @@ def sanction_to_dict(item: UserSanction) -> dict[str, Any]:
         "created_at": item.created_at.isoformat() if item.created_at else None,
     }
 
-
-def featured_to_dict(row: FeaturedCollection, collection_name: str | None, image_url: str | None) -> dict[str, Any]:
-    return {
-        "collection_id": row.collection_id,
-        "collection_name": collection_name,
-        "collection_image_url": image_url,
-        "display_order": row.display_order,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
-    }

@@ -12,6 +12,8 @@ from utils.jwt import generate_jwt
 from utils.redis_client import redis_client
 from services.user_wallet_service import ensure_user_wallet
 from services.user_wallet_service import get_user_wallet_balances
+from services.admin_platform_service import get_visible_profile_badges
+from services.achievement_service import evaluate_user_achievements
 
 from fastapi import WebSocket, WebSocketDisconnect
 from utils.websocket_manager import ws_manager
@@ -20,7 +22,7 @@ from utils.websocket_manager import ws_manager
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def serialize_auth_user(user: User, balance=0) -> dict:
+def serialize_auth_user(user: User, balance=0, profile_badge: dict | None = None) -> dict:
     return {
         "user_id": user.user_id,
         "role_id": user.role_id,
@@ -37,6 +39,9 @@ def serialize_auth_user(user: User, balance=0) -> dict:
         "is_active": user.is_active,
         "about_me": user.about_me,
         "balance": balance,
+        "profile_badge_achievement_id": profile_badge["achievement_id"] if profile_badge else None,
+        "profile_badge_image_url": profile_badge["image_url"] if profile_badge else None,
+        "profile_badge_title": profile_badge["title"] if profile_badge else None,
     }
 
 
@@ -111,7 +116,8 @@ def auth_me(current_user: User = Depends(get_current_user_any), db: Session = De
         except Exception:
             balance = 0
 
-    return serialize_auth_user(current_user, balance=balance)
+    profile_badge = get_visible_profile_badges(db, {current_user.user_id}).get(current_user.user_id)
+    return serialize_auth_user(current_user, balance=balance, profile_badge=profile_badge)
 
 
 @auth_router.post("/link/tg/init")
@@ -210,15 +216,20 @@ def auth_confirm(payload: ConfirmAuthRequest, db: Session = Depends(get_db)):
 
     if user.is_active:
         user = ensure_user_wallet(db, user)
+        evaluate_user_achievements(db, user.user_id)
+        db.commit()
+        db.refresh(user)
+
     access_token = generate_jwt(user.user_id, user.role_id)
 
+    profile_badge = get_visible_profile_badges(db, {user.user_id}).get(user.user_id)
     redis_payload = {
         "status": "confirmed",
         "user_id": user.user_id,
         "tg_id": user.user_tg_id,
         "access_token": access_token,
         "token_type": "Bearer",
-        "user": serialize_auth_user(user)
+        "user": serialize_auth_user(user, profile_badge=profile_badge)
     }
 
     redis_client.setex(key, 600, json.dumps(redis_payload))
@@ -298,15 +309,20 @@ def auth_confirm_vk(payload: ConfirmVkAuthRequest, db: Session = Depends(get_db)
 
     if user.is_active:
         user = ensure_user_wallet(db, user)
+        evaluate_user_achievements(db, user.user_id)
+        db.commit()
+        db.refresh(user)
+        
     access_token = generate_jwt(user.user_id, user.role_id)
 
+    profile_badge = get_visible_profile_badges(db, {user.user_id}).get(user.user_id)
     redis_payload = {
         "status": "confirmed",
         "user_id": user.user_id,
         "vk_id": user.user_vk_id,
         "access_token": access_token,
         "token_type": "Bearer",
-        "user": serialize_auth_user(user)
+        "user": serialize_auth_user(user, profile_badge=profile_badge)
     }
 
     redis_client.setex(key, 600, json.dumps(redis_payload))
@@ -403,9 +419,10 @@ def auth_status(state: str, db: Session = Depends(get_db)):
     if user.is_active and user.user_tg_id:
         balance = get_user_wallet_balances(db, user.user_tg_id)['token_balance']
 
+    profile_badge = get_visible_profile_badges(db, {user.user_id}).get(user.user_id)
     return {
         "status": "confirmed",
         "access_token": access_token,
         "token_type": token_type,
-        "user": serialize_auth_user(user, balance=balance)
+        "user": serialize_auth_user(user, balance=balance, profile_badge=profile_badge)
     }

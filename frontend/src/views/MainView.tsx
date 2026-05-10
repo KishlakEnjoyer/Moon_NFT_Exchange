@@ -24,6 +24,7 @@ import {
 import ModalPresentDetail from "../components/ModalPresentDetail";
 import { message } from "antd";
 import { useTranslation } from "react-i18next";
+import UserNameWithBadge from "../components/UserNameWithBadge";
 
 const { Text } = Typography;
 type MainTabKey = "all" | "for_you" | "most_viewed" | "top_users";
@@ -305,10 +306,22 @@ const MainView = () => {
           const avatarUrl = user.profile_pic_url ? getSellerAvatarUrl(user.profile_pic_url) : undefined;
           const name = user.username ? (
             <Link className="moon-top-user-link" to={`/account/${encodeURIComponent(user.username)}`}>
-              {username}
+              <UserNameWithBadge
+                username={username}
+                badgeId={user.profile_badge_achievement_id}
+                badgeImageUrl={user.profile_badge_image_url}
+                badgeTitle={user.profile_badge_title}
+                strong
+              />
             </Link>
           ) : (
-            <Text strong>{username}</Text>
+            <UserNameWithBadge
+              username={username}
+              badgeId={user.profile_badge_achievement_id}
+              badgeImageUrl={user.profile_badge_image_url}
+              badgeTitle={user.profile_badge_title}
+              strong
+            />
           );
 
           return (

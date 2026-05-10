@@ -17,8 +17,9 @@ from core.models import (
     TransactionHistory,
     User,
     UserAchievement,
+    UserFollow,
 )
-from services.admin_platform_service import ensure_admin_platform_schema, save_image_data_url
+from services.admin_platform_service import save_image_data_url
 from services.notification_service import create_notification, manager, notification_to_dict
 from utils.tg_bot import send_tg_message_sync
 
@@ -34,6 +35,9 @@ ACHIEVEMENT_RULES = {
     "complete_collection": "Own every minted gift in at least one collection",
     "early_collector": "Be among first N registered users",
     "top_spender_rank": "Be in top N spenders",
+    "followers_count_at_least": "Get at least N followers",
+    "telegram_connected": "Connect Telegram account",
+    "vk_connected": "Connect VK account",
 }
 
 
@@ -43,7 +47,6 @@ def achievement_to_dict(
     awarded_count: int | None = None,
     total_users: int | None = None,
 ) -> dict[str, Any]:
-    ensure_admin_platform_schema()
     if awarded_count is None:
         awarded_count = int(
             db.scalar(
@@ -127,6 +130,17 @@ def _count_user_transactions(db: Session, user_id: int, kind: str) -> int:
     return int(db.scalar(query) or 0)
 
 
+def _count_user_followers(db: Session, user_id: int) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(UserFollow)
+            .where(UserFollow.following_id == user_id)
+        )
+        or 0
+    )
+
+
 def _has_complete_collection(db: Session, user_id: int) -> bool:
     rows = (
         db.query(
@@ -141,6 +155,33 @@ def _has_complete_collection(db: Session, user_id: int) -> bool:
         .all()
     )
     return any(int(owned_count or 0) >= int(limit or 0) and int(limit or 0) > 0 for _, limit, owned_count in rows)
+
+
+def _complete_collection_progress(db: Session, user_id: int) -> tuple[int, int] | None:
+    rows = (
+        db.query(
+            Collections.collection_id,
+            Collections.collection_limit,
+            func.count(CurrentOwner.present_id),
+        )
+        .join(Present, Present.collection_id == Collections.collection_id)
+        .join(
+            CurrentOwner,
+            (CurrentOwner.present_id == Present.present_id) & (CurrentOwner.owner_id == user_id),
+            isouter=True,
+        )
+        .filter(Present.is_burned == 0)
+        .group_by(Collections.collection_id, Collections.collection_limit)
+        .all()
+    )
+    options = [
+        (int(owned_count or 0), int(limit or 0))
+        for _, limit, owned_count in rows
+        if int(limit or 0) > 0
+    ]
+    if not options:
+        return None
+    return max(options, key=lambda item: (item[0] / item[1], item[0]))
 
 
 def _is_early_collector(db: Session, user_id: int, rank_limit: int) -> bool:
@@ -168,6 +209,55 @@ def _top_spender_ids(db: Session, rank_limit: int) -> set[int]:
     return {int(row[0]) for row in rows if row[0] is not None}
 
 
+def achievement_progress_to_dict(db: Session, user_id: int, achievement: Achievement) -> dict[str, Any]:
+    rule_key = achievement.rule_key or "manual"
+    rule_value = max(int(achievement.rule_value or 1), 1)
+    current: int | None = None
+    target: int | None = None
+
+    if not achievement.is_active:
+        return {}
+
+    if rule_key == "gifts_owned_at_least":
+        current, target = _count_owned_gifts(db, user_id), rule_value
+    elif rule_key == "purchases_count_at_least":
+        current, target = _count_user_transactions(db, user_id, "purchase"), rule_value
+    elif rule_key == "sales_count_at_least":
+        current, target = _count_user_transactions(db, user_id, "sale"), rule_value
+    elif rule_key == "unique_collections_at_least":
+        current, target = _count_unique_owned_collections(db, user_id), rule_value
+    elif rule_key == "complete_collection":
+        progress = _complete_collection_progress(db, user_id)
+        if progress:
+            current, target = progress
+    elif rule_key == "early_collector":
+        current, target = (1 if _is_early_collector(db, user_id, rule_value) else 0), 1
+    elif rule_key == "top_spender_rank":
+        current, target = (1 if user_id in _top_spender_ids(db, rule_value) else 0), 1
+    elif rule_key == "followers_count_at_least":
+        current, target = _count_user_followers(db, user_id), rule_value
+    elif rule_key == "telegram_connected":
+        current, target = (1 if _has_telegram_connected(db, user_id) else 0), 1
+    elif rule_key == "vk_connected":
+        current, target = (1 if _has_vk_connected(db, user_id) else 0), 1
+
+    if current is None or target is None or target <= 0:
+        return {
+            "progress_current": None,
+            "progress_target": None,
+            "progress_percent": None,
+            "progress_label": None,
+        }
+
+    percent = min(100, int((current / target) * 100))
+    return {
+        "progress_current": current,
+        "progress_target": target,
+        "progress_percent": percent,
+        "progress_label": f"{min(current, target)}/{target}",
+    }
+
+
 def user_matches_achievement(db: Session, user_id: int, achievement: Achievement) -> bool:
     rule_key = achievement.rule_key or "manual"
     rule_value = int(achievement.rule_value or 1)
@@ -189,6 +279,12 @@ def user_matches_achievement(db: Session, user_id: int, achievement: Achievement
         return _is_early_collector(db, user_id, rule_value)
     if rule_key == "top_spender_rank":
         return user_id in _top_spender_ids(db, rule_value)
+    if rule_key == "followers_count_at_least":
+        return _count_user_followers(db, user_id) >= rule_value
+    if rule_key == "telegram_connected":
+        return _has_telegram_connected(db, user_id)
+    if rule_key == "vk_connected":
+        return _has_vk_connected(db, user_id)
 
     return False
 
@@ -229,7 +325,6 @@ def award_achievement(
     achievement: Achievement,
     notify: bool = True,
 ) -> bool:
-    ensure_admin_platform_schema()
     existing = db.get(UserAchievement, {"user_id": user.user_id, "achievement_id": achievement.achievement_id})
     if existing:
         return False
@@ -249,7 +344,6 @@ def award_achievement(
 
 
 def evaluate_user_achievements(db: Session, user_id: int, notify: bool = True) -> int:
-    ensure_admin_platform_schema()
     user = db.get(User, user_id)
     if not user or not user.is_active:
         return 0
@@ -268,7 +362,6 @@ def evaluate_user_achievements(db: Session, user_id: int, notify: bool = True) -
 
 
 def backfill_achievement(db: Session, achievement: Achievement, notify: bool = True) -> int:
-    ensure_admin_platform_schema()
     if not achievement.is_active or not achievement.rule_key or achievement.rule_key == "manual":
         return 0
 
@@ -283,9 +376,24 @@ def backfill_achievement(db: Session, achievement: Achievement, notify: bool = T
 
 
 def backfill_all_achievements(db: Session, notify: bool = True) -> int:
-    ensure_admin_platform_schema()
     total = 0
     achievements = db.scalars(select(Achievement).where(Achievement.is_active == 1)).all()
     for achievement in achievements:
         total += backfill_achievement(db, achievement, notify=notify)
     return total
+
+
+def _has_telegram_connected(db: Session, user_id: int) -> bool:
+    user = db.get(User, user_id)
+    if not user:
+        return False
+
+    return bool(user.user_tg_id or user.tg_username)
+
+
+def _has_vk_connected(db: Session, user_id: int) -> bool:
+    user = db.get(User, user_id)
+    if not user:
+        return False
+
+    return bool(user.user_vk_id or user.vk_username)

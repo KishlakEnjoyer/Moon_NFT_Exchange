@@ -21,6 +21,9 @@ export interface PresentDetail {
   owner_username: string | null;
   owner_id: number | null;
   owner_profile_pic_url: string | null;
+  owner_profile_badge_achievement_id: number | null;
+  owner_profile_badge_image_url: string | null;
+  owner_profile_badge_title: string | null;
   is_on_sale: boolean;
   active_listing_id: number | null;
   active_listing_price: string | null;
@@ -30,6 +33,9 @@ export interface PresentDetail {
   has_models: boolean;
   original_sender_username: string | null;
   original_sender_profile_pic_url: string | null;
+  original_sender_profile_badge_achievement_id: number | null;
+  original_sender_profile_badge_image_url: string | null;
+  original_sender_profile_badge_title: string | null;
 }
 
 export interface UpgradePresentResponse {

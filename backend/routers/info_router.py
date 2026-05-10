@@ -12,6 +12,7 @@ from services.user_profile_service import (
     get_user_profile_stats_by_tg_id,
     update_user_profile,
 )
+from services.admin_platform_service import get_visible_profile_badges
 
 
 user_info_router = APIRouter(
@@ -37,12 +38,16 @@ def search_users(
             )
         )
     users = query.limit(limit).all()
+    profile_badges = get_visible_profile_badges(db, {u.user_id for u in users})
     return [
         {
             "user_id": u.user_id,
             "username": u.username,
             "profile_pic_url": u.profile_pic_url if u.is_active else None,
             "is_active": u.is_active,
+            "profile_badge_achievement_id": profile_badges.get(u.user_id, {}).get("achievement_id"),
+            "profile_badge_image_url": profile_badges.get(u.user_id, {}).get("image_url"),
+            "profile_badge_title": profile_badges.get(u.user_id, {}).get("title"),
         }
         for u in users
     ]
@@ -90,6 +95,9 @@ def update_user_profile_endpoint(
         if user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Cannot update another user's profile")
 
+        print("PATCH PROFILE CALLED", flush=True)
+        print("IMAGE START:", repr((payload.profile_pic_data_url or "")[:150]), flush=True)
+
         return update_user_profile(
             db=db,
             user_id=current_user.user_id,
@@ -99,14 +107,24 @@ def update_user_profile_endpoint(
             vk_visibility=payload.vk_visibility,
             profile_pic_data_url=payload.profile_pic_data_url,
         )
-    except HTTPException:
+
+    except HTTPException as e:
+        print("PROFILE UPDATE HTTP EXCEPTION:", e.status_code, repr(e.detail), flush=True)
         raise
+
     except ValueError as e:
+        print("PROFILE UPDATE VALUE ERROR:", repr(str(e)), flush=True)
+
         detail = str(e)
         if detail == "User not found":
             raise HTTPException(status_code=404, detail=detail)
         if detail == "Username is already taken":
             raise HTTPException(status_code=409, detail=detail)
+
         raise HTTPException(status_code=400, detail=detail)
+
     except Exception as e:
+        import traceback
+        print("PROFILE UPDATE UNEXPECTED ERROR:", repr(e), flush=True)
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

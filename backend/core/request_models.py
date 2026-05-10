@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 from decimal import Decimal
 
 
@@ -101,6 +102,11 @@ class RenameAlbumRequest(BaseModel):
     new_title: str
 
 
+PROFILE_IMAGE_DATA_URL_REGEX = re.compile(
+    r"^data:(image/(png|jpe?g|webp));base64,",
+    re.IGNORECASE,
+)
+
 class UpdateProfileRequest(BaseModel):
     username: str
     about_me: str | None = None
@@ -154,9 +160,15 @@ class TransactionResponse(BaseModel):
     buyer_id: int
     buyer_username: str | None
     buyer_profile_pic_url: str | None
+    buyer_profile_badge_achievement_id: int | None = None
+    buyer_profile_badge_image_url: str | None = None
+    buyer_profile_badge_title: str | None = None
     seller_id: int
     seller_username: str | None
     seller_profile_pic_url: str | None
+    seller_profile_badge_achievement_id: int | None = None
+    seller_profile_badge_image_url: str | None = None
+    seller_profile_badge_title: str | None = None
     blockchain_tx_hash: str | None
 
     class Config:

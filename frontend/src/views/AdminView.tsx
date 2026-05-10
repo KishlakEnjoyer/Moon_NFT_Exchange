@@ -36,7 +36,6 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
-  StarOutlined,
   StopOutlined,
   TeamOutlined,
   TrophyOutlined,
@@ -54,11 +53,11 @@ import { Content } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
 
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import UserNameWithBadge from "../components/UserNameWithBadge";
 import {
   AdminAccess,
   AdminAchievement,
   AuditLog,
-  FeaturedCollection,
   AdminReport,
   AdminRole,
   AdminSummary,
@@ -81,7 +80,6 @@ import {
   getAdminAccess,
   getAdminAchievements,
   getAuditLogs,
-  getFeaturedCollections,
   getAdminReports,
   getAdminRoles,
   getAdminSummary,
@@ -94,7 +92,6 @@ import {
   setAdminUserActive,
   setAdminUserRole,
   setDictionaryItemArchived,
-  setFeaturedCollections,
   updateAdminRole,
   updateAchievement,
   updateDictionaryItem,
@@ -120,14 +117,58 @@ const dictionaryFolderByKind: Record<DictionaryKind, string> = {
   symbols: "symbols",
 };
 
+const dictionaryDefaultExtensionByKind: Record<DictionaryKind, string> = {
+  collections: "webp",
+  models: "webp",
+  backgrounds: "png",
+  symbols: "webp",
+};
+
 const achievementImageUrl = (imageUrl: string | null | undefined) => (
   imageUrl ? `${IMAGES_URL}/achievements/${imageUrl}` : undefined
 );
 
+const hasFileExtension = (value: string) => /\.[a-z0-9]+(?:[?#].*)?$/i.test(value);
+const withDefaultExtension = (value: string, extension: string) => (
+  hasFileExtension(value) ? value : `${value}.${extension}`
+);
+const isAbsoluteAssetUrl = (value: string) => (
+  /^(https?:)?\/\//i.test(value) || value.startsWith("/") || value.startsWith("data:")
+);
+
+const moderationImageUrl = (record: ModerationItem) => {
+  const imageUrl = record.image_data_url;
+
+  if (!imageUrl) return undefined;
+  if (isAbsoluteAssetUrl(imageUrl)) return imageUrl;
+
+  if (record.target_kind === "collections" || record.payload?.collection_id !== undefined) {
+    return `${IMAGES_URL}/collections/${withDefaultExtension(imageUrl, "webp")}`;
+  }
+
+  if (record.target_kind === "models" || record.payload?.model_id !== undefined) {
+    return `${IMAGES_URL}/models/${withDefaultExtension(imageUrl, "webp")}`;
+  }
+
+  if (record.target_kind === "backgrounds" || record.payload?.background_id !== undefined) {
+    return `${IMAGES_URL}/bgs/${withDefaultExtension(imageUrl, "png")}`;
+  }
+
+  if (record.target_kind === "symbols" || record.payload?.symbol_id !== undefined) {
+    return `${IMAGES_URL}/symbols/${withDefaultExtension(imageUrl, "webp")}`;
+  }
+
+  if (record.item_type === "profile_photo") {
+    return `${IMAGES_URL}/pfps/${imageUrl}`;
+  }
+
+  return `${IMAGES_URL}/pfps/${imageUrl}`;
+};
+
 const dictionaryImageUrl = (kind: DictionaryKind, imageUrl: string | null | undefined) => {
   if (!imageUrl) return undefined;
-  if (/^(https?:)?\/\//i.test(imageUrl) || imageUrl.startsWith("/")) return imageUrl;
-  return `${IMAGES_URL}/${dictionaryFolderByKind[kind]}/${imageUrl}`;
+  if (isAbsoluteAssetUrl(imageUrl)) return imageUrl;
+  return `${IMAGES_URL}/${dictionaryFolderByKind[kind]}/${withDefaultExtension(imageUrl, dictionaryDefaultExtensionByKind[kind])}`;
 };
 
 const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
@@ -184,6 +225,10 @@ const getStatusLabel = (t: TFunction, value: string) => {
   return translate(t, `admin.status.${key}`, value);
 };
 
+const getAchievementRuleLabel = (t: TFunction, ruleKey: string, fallback: string) => (
+  translate(t, `admin.achievements.rules.${ruleKey}`, fallback)
+);
+
 const reportCanBeHandled = (report: AdminReport) => (
   !report.closed_at
   && (
@@ -237,6 +282,23 @@ const renderSocialAdminCell = (
     </Flex>
   );
 };
+
+const renderAdminUserNameWithBadge = (
+  username: string | null,
+  fallback: string,
+  badgeId?: number | null,
+  badgeImageUrl?: string | null,
+  badgeTitle?: string | null,
+) => (
+  <UserNameWithBadge
+    username={username}
+    fallback={fallback}
+    badgeId={badgeId}
+    badgeImageUrl={badgeImageUrl}
+    badgeTitle={badgeTitle}
+    strong
+  />
+);
 
 const PanelShell = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
   <div className={`rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-3 sm:p-5 ${className}`.trim()}>
@@ -425,14 +487,6 @@ const AdminView = () => {
         label: t("admin.tabs.moderation"),
         icon: <FileSearchOutlined />,
         children: <ModerationPanel messageApi={messageApi} />,
-      });
-    }
-    if (hasPermission("featured.manage")) {
-      adminItems.push({
-        key: "featured",
-        label: t("admin.tabs.featured"),
-        icon: <StarOutlined />,
-        children: <FeaturedCollectionsPanel messageApi={messageApi} />,
       });
     }
     if (access && (hasPermission("users.manage") || hasPermission("roles.manage"))) {
@@ -817,13 +871,25 @@ const ReportsPanel = ({
               { title: "ID", dataIndex: "report_id", width: 80 },
               {
                 title: t("admin.reports.sender"),
-                render: (_, record: AdminReport) => record.sender_username || `#${record.sender_id}`,
+                render: (_, record: AdminReport) => renderAdminUserNameWithBadge(
+                  record.sender_username,
+                  `#${record.sender_id}`,
+                  record.sender_profile_badge_achievement_id,
+                  record.sender_profile_badge_image_url,
+                  record.sender_profile_badge_title,
+                ),
               },
               {
                 title: t("admin.reports.receiver"),
                 render: (_, record: AdminReport) => (
                   <Flex vertical gap={4}>
-                    <Text>{record.receiver_username || `#${record.receiver_id}`}</Text>
+                    {renderAdminUserNameWithBadge(
+                      record.receiver_username,
+                      `#${record.receiver_id}`,
+                      record.receiver_profile_badge_achievement_id,
+                      record.receiver_profile_badge_image_url,
+                      record.receiver_profile_badge_title,
+                    )}
                     {renderUserStatus(record.receiver_is_active)}
                   </Flex>
                 ),
@@ -842,7 +908,13 @@ const ReportsPanel = ({
               { title: t("admin.reports.createdAt"), dataIndex: "created_at", render: (value: string | null) => formatDate(value, locale, emptyValue), width: 170 },
               {
                 title: t("admin.reports.moderator"),
-                render: (_, record: AdminReport) => record.moderator_username || emptyValue,
+                render: (_, record: AdminReport) => renderAdminUserNameWithBadge(
+                  record.moderator_username,
+                  emptyValue,
+                  record.moderator_profile_badge_achievement_id,
+                  record.moderator_profile_badge_image_url,
+                  record.moderator_profile_badge_title,
+                ),
               },
               {
                 title: t("admin.reports.decision"),
@@ -952,14 +1024,26 @@ const ReportsPanel = ({
             <div className="rounded-lg border border-[var(--black-transparent)] p-3">
               <Flex vertical gap={8}>
                 <Text type="secondary">{t("admin.reports.complainant")}</Text>
-                <Text strong>{selectedReport.sender_username || `#${selectedReport.sender_id}`}</Text>
+                {renderAdminUserNameWithBadge(
+                  selectedReport.sender_username,
+                  `#${selectedReport.sender_id}`,
+                  selectedReport.sender_profile_badge_achievement_id,
+                  selectedReport.sender_profile_badge_image_url,
+                  selectedReport.sender_profile_badge_title,
+                )}
               </Flex>
             </div>
             <div className="rounded-lg border border-[var(--black-transparent)] p-3">
               <Flex vertical gap={8}>
                 <Text type="secondary">{t("admin.reports.target")}</Text>
                 <Flex align="center" gap={8} wrap="wrap">
-                  <Text strong>{selectedReport.receiver_username || `#${selectedReport.receiver_id}`}</Text>
+                  {renderAdminUserNameWithBadge(
+                    selectedReport.receiver_username,
+                    `#${selectedReport.receiver_id}`,
+                    selectedReport.receiver_profile_badge_achievement_id,
+                    selectedReport.receiver_profile_badge_image_url,
+                    selectedReport.receiver_profile_badge_title,
+                  )}
                   {renderUserStatus(selectedReport.receiver_is_active)}
                 </Flex>
               </Flex>
@@ -1114,6 +1198,12 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<AchievementPayload>();
 
+  const getRuleLabel = useCallback((ruleKey: string | null | undefined) => {
+    if (!ruleKey) return t("admin.empty");
+    const rule = rules.find((item) => item.key === ruleKey);
+    return getAchievementRuleLabel(t, ruleKey, rule?.label || ruleKey);
+  }, [rules, t]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -1203,7 +1293,7 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             },
             { title: t("admin.achievements.title"), dataIndex: "title" },
             { title: t("admin.achievements.details"), dataIndex: "description", ellipsis: true },
-            { title: t("admin.achievements.rule"), dataIndex: "rule_key", width: 180 },
+            { title: t("admin.achievements.rule"), dataIndex: "rule_key", render: getRuleLabel, width: 220 },
             { title: t("admin.achievements.awarded"), dataIndex: "awarded_count", width: 100 },
             {
               title: t("admin.achievements.usersPercent"),
@@ -1261,7 +1351,7 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             />
           </Form.Item>
           <Form.Item name="rule_key" label={t("admin.achievements.rule")}>
-            <Select options={rules.map((rule) => ({ value: rule.key, label: rule.label }))} />
+            <Select options={rules.map((rule) => ({ value: rule.key, label: getRuleLabel(rule.key) }))} />
           </Form.Item>
           <Form.Item name="rule_value" label={t("admin.achievements.ruleValue")}>
             <InputNumber min={1} className="w-full" />
@@ -1338,7 +1428,18 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             {
               title: t("admin.moderation.preview"),
               width: 120,
-              render: (_, record) => record.image_data_url ? <Image src={record.image_data_url} width={72} height={72} style={{ objectFit: "cover", borderRadius: 8 }} /> : null,
+              render: (_, record) => {
+                const src = moderationImageUrl(record);
+
+                return src ? (
+                  <Image
+                    src={src}
+                    width={72}
+                    height={72}
+                    style={{ objectFit: "cover", borderRadius: 8 }}
+                  />
+                ) : null;
+              },
             },
             { title: "Payload", render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
             {
@@ -1360,63 +1461,6 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             },
           ]}
         />
-      </Flex>
-    </PanelShell>
-  );
-};
-
-const FeaturedCollectionsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
-  const { t } = useTranslation();
-  const [collections, setCollections] = useState<DictionaryItem[]>([]);
-  const [featured, setFeatured] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [loadedCollections, loadedFeatured] = await Promise.all([
-        getDictionaryItems("collections"),
-        getFeaturedCollections(),
-      ]);
-      setCollections(loadedCollections);
-      setFeatured(loadedFeatured.map((item: FeaturedCollection) => item.collection_id));
-    } catch {
-      messageApi.error(t("admin.featured.loadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [messageApi, t]);
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
-
-  const handleSave = async () => {
-    try {
-      await setFeaturedCollections(featured);
-      messageApi.success(t("admin.featured.saved"));
-    } catch {
-      messageApi.error(t("admin.featured.saveFailed"));
-    }
-  };
-
-  return (
-    <PanelShell>
-      <Flex vertical gap={16}>
-        <Text type="secondary">{t("admin.featured.description")}</Text>
-        <Select
-          mode="multiple"
-          loading={loading}
-          value={featured}
-          onChange={setFeatured}
-          options={collections.map((collection) => ({ value: collection.id, label: collection.name }))}
-          className="w-full"
-          placeholder={t("admin.featured.placeholder")}
-        />
-        <Flex justify="flex-end" gap={8}>
-          <Button icon={<ReloadOutlined />} onClick={loadAll}>{t("admin.refresh")}</Button>
-          <Button type="primary" onClick={handleSave}>{t("admin.save")}</Button>
-        </Flex>
       </Flex>
     </PanelShell>
   );

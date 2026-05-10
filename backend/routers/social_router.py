@@ -6,12 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from services.achievement_service import evaluate_user_achievements
 from core.auth import get_current_user
 from core.database import get_db
 from core.models import Achievement, User, UserAchievement, UserFollow
 from services.admin_platform_service import (
-    ensure_admin_platform_schema,
     get_profile_badge_achievement_id,
+    get_visible_profile_badges,
     set_profile_badge_achievement_id,
 )
 
@@ -48,6 +49,7 @@ class SocialUserResponse(BaseModel):
     profile_pic_url: str | None
     profile_badge_achievement_id: int | None
     profile_badge_image_url: str | None
+    profile_badge_title: str | None
     is_following: bool
 
 
@@ -75,27 +77,15 @@ def _serialize_social_user(db: Session, user: User, viewer_id: int) -> SocialUse
             {"follower_id": viewer_id, "following_id": user.user_id},
         ) is not None
 
-    badge_image_url = None
-    profile_badge_achievement_id = get_profile_badge_achievement_id(db, user.user_id)
-    if profile_badge_achievement_id:
-        row = db.execute(
-            select(Achievement.image_url)
-            .join(UserAchievement, UserAchievement.achievement_id == Achievement.achievement_id)
-            .where(
-                UserAchievement.user_id == user.user_id,
-                UserAchievement.achievement_id == profile_badge_achievement_id,
-                UserAchievement.is_visible == 1,
-                Achievement.is_active == 1,
-            )
-        ).first()
-        badge_image_url = row[0] if row else None
+    profile_badge = get_visible_profile_badges(db, {user.user_id}).get(user.user_id)
 
     return SocialUserResponse(
         user_id=user.user_id,
         username=user.username,
         profile_pic_url=user.profile_pic_url if user.is_active else None,
-        profile_badge_achievement_id=profile_badge_achievement_id if badge_image_url else None,
-        profile_badge_image_url=badge_image_url,
+        profile_badge_achievement_id=profile_badge["achievement_id"] if profile_badge else None,
+        profile_badge_image_url=profile_badge["image_url"] if profile_badge else None,
+        profile_badge_title=profile_badge["title"] if profile_badge else None,
         is_following=is_following,
     )
 
@@ -106,7 +96,7 @@ def follow_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+
     if user_id == current_user.user_id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
 
@@ -114,15 +104,31 @@ def follow_user(
     if not target or not target.is_active:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing = db.get(UserFollow, {"follower_id": current_user.user_id, "following_id": user_id})
+    existing = db.get(
+        UserFollow,
+        {"follower_id": current_user.user_id, "following_id": user_id},
+    )
+
     if not existing:
-        db.add(UserFollow(follower_id=current_user.user_id, following_id=user_id))
+        db.add(UserFollow(
+            follower_id=current_user.user_id,
+            following_id=user_id,
+        ))
+
         try:
+            db.flush()
+
+            evaluate_user_achievements(db, user_id)
+
             db.commit()
         except IntegrityError:
             db.rollback()
+        except Exception:
+            db.rollback()
+            raise
 
     followers_count, following_count = _follow_counts(db, user_id)
+
     return FollowResponse(
         following=True,
         followers_count=followers_count,
@@ -136,7 +142,7 @@ def unfollow_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+    
     follow = db.get(UserFollow, {"follower_id": current_user.user_id, "following_id": user_id})
     if follow:
         db.delete(follow)
@@ -158,7 +164,7 @@ def list_followers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+    
     target = db.get(User, user_id)
     if not target or not target.is_active:
         raise HTTPException(status_code=404, detail="User not found")
@@ -182,7 +188,7 @@ def list_following(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+    
     target = db.get(User, user_id)
     if not target or not target.is_active:
         raise HTTPException(status_code=404, detail="User not found")
@@ -205,7 +211,7 @@ def set_achievement_visibility(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+    
     user_achievement = db.get(
         UserAchievement,
         {"user_id": current_user.user_id, "achievement_id": achievement_id},
@@ -229,7 +235,7 @@ def set_profile_badge(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ensure_admin_platform_schema()
+    
     if payload.achievement_id is None:
         set_profile_badge_achievement_id(db, current_user.user_id, None)
         db.commit()
