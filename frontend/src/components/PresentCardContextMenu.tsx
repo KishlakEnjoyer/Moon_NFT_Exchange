@@ -1,6 +1,6 @@
 import { Dropdown, MenuProps, message, Spin } from "antd";
 import { useEffect, useState } from "react";
-import { CheckOutlined, EyeOutlined, EyeInvisibleOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { CheckOutlined, EyeOutlined, EyeInvisibleOutlined, FolderOpenOutlined, PushpinOutlined } from "@ant-design/icons";
 import { togglePresentVisibility } from "../services/presentService";
 import { addPresentToAlbum, removePresentFromAlbum, Album } from "../services/albumService";
 import { authFetch } from "../services/auth";
@@ -11,13 +11,14 @@ interface PresentCardContextMenuProps {
   userId: number;
   isOwner: boolean;
   isVisible: boolean;
+  isPinned?: boolean;
   albums: Album[];
   activeAlbumId: number | null;
   onRefresh: () => void;
   children: React.ReactNode;
 }
 
-const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums, activeAlbumId, onRefresh, children }: PresentCardContextMenuProps) => {
+const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, isPinned, albums, activeAlbumId, onRefresh, children }: PresentCardContextMenuProps) => {
   const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [presentAlbumIds, setPresentAlbumIds] = useState<number[]>([]);
@@ -63,6 +64,26 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       setRefreshKey(k => k + 1);
     } catch (e: any) {
       messageApi.error(e.message || t("presentMenu.failed"));
+    }
+  };
+
+  const handleTogglePin = async () => {
+    try {
+      const res = await authFetch(
+        `${process.env.REACT_APP_API_URL}/presents/${presentId}/toggle-pin`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(error?.detail || "Failed to pin gift");
+      }
+
+      onRefresh();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Failed to pin gift");
     }
   };
 
@@ -124,6 +145,12 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, albums,
       ),
       onClick: handleToggleVisibility,
     },
+    {
+      key: "pin",
+      label: isPinned ? t("common.unpin") : t("common.pin"),
+      icon: isPinned ? <EyeInvisibleOutlined /> : <PushpinOutlined />,
+      onClick: handleTogglePin,
+    }
   ];
 
   if (!isOwner) return <>{children}</>;

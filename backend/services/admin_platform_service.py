@@ -361,6 +361,24 @@ def _get_profile_picture_dir() -> Path:
     repo_images_dir.mkdir(parents=True, exist_ok=True)
     return repo_images_dir
 
+def _get_moderation_image_dir(item_type: str, target_kind: str | None) -> Path:
+    folder_by_target_kind = {
+        "collections": "collections",
+        "models": "models",
+        "backgrounds": "bgs",
+        "symbols": "symbols",
+        "users": "pfps",
+    }
+
+    if item_type == "profile_photo":
+        folder = "pfps"
+    else:
+        folder = folder_by_target_kind.get(target_kind or "", "moderation")
+
+    image_dir = images_root() / folder
+    image_dir.mkdir(parents=True, exist_ok=True)
+    return image_dir
+
 
 def create_moderation_item(
     db: Session,
@@ -377,10 +395,13 @@ def create_moderation_item(
     if image_data_url:
         image_bytes, extension = decode_image_data_url(image_data_url)
 
-        image_dir = _get_profile_picture_dir()
+        image_dir = _get_moderation_image_dir(item_type, target_kind)
         saved_image_filename = f"{uuid.uuid4().hex}{extension}"
         image_path = image_dir / saved_image_filename
+
+        print("SAVING MODERATION IMAGE TO:", image_path, flush=True)
         image_path.write_bytes(image_bytes)
+        print("IMAGE EXISTS AFTER SAVE:", image_path.exists(), image_path.stat().st_size, flush=True)
 
     item = ModerationQueueItem(
         item_type=item_type,

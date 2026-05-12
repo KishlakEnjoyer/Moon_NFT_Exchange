@@ -426,6 +426,8 @@ def get_user_profile_info_by_username(db: Session, username: str, viewer_user_id
                 "generated_at": p.generated_at,
                 "model_id": p.model_id,
                 "is_visible": p.is_visible,
+                "is_pinned": p.is_pinned,
+                "pinned_at": p.pinned_at.isoformat() if p.pinned_at else None,
                 "is_on_sale": p.present_id in active_listing_by_present_id,
                 "active_listing_price": (
                     str(active_listing_by_present_id[p.present_id].price)
@@ -452,6 +454,7 @@ def update_user_profile(
     tg_visibility: int,
     vk_visibility: int,
     profile_pic_data_url: str | None = None,
+    remove_profile_pic: bool = False,
 ) -> dict:
     user = db.scalar(select(User).where(User.user_id == user_id))
     if not user:
@@ -474,7 +477,11 @@ def update_user_profile(
     user.tg_visibility = tg_visibility
     user.vk_visibility = vk_visibility
 
-    if profile_pic_data_url:
+    if remove_profile_pic:
+        _delete_old_profile_picture(user.profile_pic_url)
+        user.profile_pic_url = "example_user.png"
+
+    elif profile_pic_data_url:
         new_profile_pic_filename = _save_profile_picture(
             profile_pic_data_url,
             current_filename=user.profile_pic_url,

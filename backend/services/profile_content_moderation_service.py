@@ -430,3 +430,26 @@ def _moderate_with_huggingface(username: str, about_me: str | None) -> None:
 def validate_profile_content(username: str, about_me: str | None) -> None:
     _validate_local_profile_content(username, about_me)
     _moderate_with_huggingface(username, about_me)
+
+
+def warmup_profile_content_moderation() -> None:
+    if not _env_flag("PROFILE_CONTENT_HF_ENABLED", True):
+        return
+
+    for model_name in _get_hf_model_names():
+        _score_with_hf_model(model_name, "warmup")
+
+def preload_profile_content_moderation() -> None:
+    if not _env_flag("PROFILE_CONTENT_HF_ENABLED", True):
+        return
+
+    model_names = _get_hf_model_names()
+    if not model_names:
+        return
+
+    logger.info("Preloading profile content moderation models: %s", ", ".join(model_names))
+
+    for model_name in model_names:
+        _load_hf_model(model_name)
+
+    logger.info("Profile content moderation models loaded")

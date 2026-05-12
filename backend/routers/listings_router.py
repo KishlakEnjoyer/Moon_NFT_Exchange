@@ -320,7 +320,15 @@ def get_active_listings(
         ]
 
         try:
-            results = smart_search_service.search(search_text, search_items, top_k=top_k)
+            print("SMART START", len(search_items), search, top_k, flush=True)
+
+            results = smart_search_service.search(
+                query=search_text,
+                items=search_items,
+                top_k=top_k,
+            )
+
+            print("SMART END", len(results), flush=True)
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"Smart search unavailable: {exc}") from exc
 

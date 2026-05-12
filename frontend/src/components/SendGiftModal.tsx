@@ -36,7 +36,13 @@ interface SendGiftModalProps {
   initialReceiverId?: number | null;
 }
 
-const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: SendGiftModalProps) => {
+const SendGiftModal = ({
+  open,
+  senderId,
+  onClose,
+  onSent,
+  initialReceiverId,
+}: SendGiftModalProps) => {
   const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -47,6 +53,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -64,6 +71,7 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
 
     setSelectedCollectionId(null);
     setDescription("");
+    setCollectionSearchQuery("");
   }, [open, initialReceiverId, messageApi]);
 
   const loadUsers = (query: string) => {
@@ -150,35 +158,56 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
   const selectedCollection = collections.find((c) => c.id === selectedCollectionId);
   const selectedUserBlocked = selectedUser?.is_active === 0;
 
+  const filteredCollections = collections.filter((collection) =>
+    collection.name.toLowerCase().includes(collectionSearchQuery.trim().toLowerCase()),
+  );
+
   const collectionImage = (url: string | null | undefined) => {
     if (!url) return `${process.env.REACT_APP_IMAGES_URL}/collections/placeholder.png`;
+
+    if (/\.[a-z0-9]+$/i.test(url)) {
+      return `${process.env.REACT_APP_IMAGES_URL}/collections/${url}`;
+    }
+
     return `${process.env.REACT_APP_IMAGES_URL}/collections/${url}.webp`;
+  };
+
+  const handleBack = () => {
+    if (step === "collection" && selectedCollectionId) {
+      setSelectedCollectionId(null);
+      return;
+    }
+
+    if (step === "collection") {
+      setStep("user");
+    }
   };
 
   return (
     <>
       {contextHolder}
+
       <Modal
         open={open}
         onCancel={onClose}
         footer={
           <Flex justify="space-between" gap={8} wrap="wrap">
             {step === "collection" && (
-              <Button onClick={() => setStep("user")} className="!bg-[var(--liquid-glass-bg)]">
+              <Button onClick={handleBack} className="!bg-[var(--liquid-glass-bg)]">
                 {t("common.back")}
               </Button>
             )}
+
             <Flex justify="flex-end" gap={8} className="flex-1" wrap="wrap">
               <Button onClick={onClose} className="!bg-[var(--liquid-glass-bg)]">
                 {t("common.cancel")}
               </Button>
+
               {step === "collection" && selectedCollectionId && !selectedUserBlocked && (
-                <Button
-                  type="primary"
-                  onClick={handleSend}
-                  loading={isSending}
-                >
-                  {selectedCollection ? t("sendGift.sendGiftPrice", { price: selectedCollection.base_price }) : t("sendGift.sendGift")}
+                <Button type="primary" onClick={handleSend} loading={isSending}>
+                  {selectedCollection
+                    ? t("sendGift.sendGiftPrice", { price: selectedCollection.base_price })
+                    : t("sendGift.sendGift")}
                 </Button>
               )}
             </Flex>
@@ -190,7 +219,10 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
         <Flex vertical gap={16} className="mt-4">
           {step === "user" && (
             <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-              <Text strong className="block mb-3">{t("sendGift.selectUser")}</Text>
+              <Text strong className="block mb-3">
+                {t("sendGift.selectUser")}
+              </Text>
+
               <Input.Search
                 placeholder={t("sendGift.searchUsers")}
                 value={searchQuery}
@@ -198,23 +230,38 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                 className="mb-4"
                 allowClear
               />
+
               <Flex vertical gap={8} className="max-h-64 overflow-y-auto moon-mobile-scroll">
                 {users.map((user) => {
                   const isSelf = user.user_id === senderId;
                   const isBlocked = user.is_active === 0;
+
                   return (
                     <Flex
                       key={user.user_id}
                       align="center"
                       gap={12}
-                      className={`min-w-0 rounded-[var(--size-smm)] p-3 transition-colors ${isBlocked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${isSelf ? 'bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]' : isBlocked ? '' : 'hover:bg-[var(--black-transparent-05)]'}`}
+                      className={`min-w-0 rounded-[var(--size-smm)] p-3 transition-colors ${
+                        isBlocked ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                      } ${
+                        isSelf
+                          ? "bg-[var(--black-transparent-05)] border border-[var(--black-transparent)]"
+                          : isBlocked
+                            ? ""
+                            : "hover:bg-[var(--black-transparent-05)]"
+                      }`}
                       onClick={() => handleUserSelect(user.user_id)}
                     >
                       <Avatar
                         size={40}
-                        src={isBlocked || !user.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`}
+                        src={
+                          isBlocked || !user.profile_pic_url
+                            ? undefined
+                            : `${process.env.REACT_APP_IMAGES_URL}/pfps/${user.profile_pic_url}`
+                        }
                         icon={isBlocked || !user.profile_pic_url ? <UserOutlined /> : undefined}
                       />
+
                       <Flex vertical className="min-w-0">
                         <UserNameWithBadge
                           username={user.username}
@@ -224,16 +271,23 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                           strong
                           className="max-w-full"
                         />
+
                         {isSelf && (
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {t("sendGift.giftYourself")}
                           </Text>
                         )}
-                        {isBlocked && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
+
+                        {isBlocked && (
+                          <Tag color="red" className="w-fit">
+                            Аккаунт заблокирован
+                          </Tag>
+                        )}
                       </Flex>
                     </Flex>
                   );
                 })}
+
                 {users.length === 0 && (
                   <Text type="secondary" className="text-center py-4">
                     {t("sendGift.noUsers")}
@@ -247,13 +301,25 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
             <>
               {selectedUserId && (
                 <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-                  <Text strong className="block mb-2">{t("sendGift.recipient")}</Text>
+                  <Text strong className="block mb-2">
+                    {t("sendGift.recipient")}
+                  </Text>
+
                   <Flex align="center" gap={12}>
                     <Avatar
                       size={32}
-                      src={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? undefined : `${process.env.REACT_APP_IMAGES_URL}/pfps/${selectedUser.profile_pic_url}`}
-                      icon={selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url ? <UserOutlined /> : undefined}
+                      src={
+                        selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url
+                          ? undefined
+                          : `${process.env.REACT_APP_IMAGES_URL}/pfps/${selectedUser.profile_pic_url}`
+                      }
+                      icon={
+                        selectedUser?.is_active === 0 || !selectedUser?.profile_pic_url
+                          ? <UserOutlined />
+                          : undefined
+                      }
                     />
+
                     <UserNameWithBadge
                       username={selectedUser?.username}
                       fallback={t("common.userFallback", { id: selectedUserId })}
@@ -261,16 +327,32 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                       badgeImageUrl={selectedUser?.profile_badge_image_url}
                       badgeTitle={selectedUser?.profile_badge_title}
                     />
-                    {selectedUserBlocked && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
+
+                    {selectedUserBlocked && (
+                      <Tag color="red" className="w-fit">
+                        Аккаунт заблокирован
+                      </Tag>
+                    )}
                   </Flex>
                 </div>
               )}
 
               {!selectedCollectionId ? (
                 <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">
-                  <Text strong className="block mb-3">{t("sendGift.selectCollection")}</Text>
+                  <Text strong className="block mb-3">
+                    {t("sendGift.selectCollection")}
+                  </Text>
+
+                  <Input.Search
+                    placeholder="Поиск коллекций"
+                    value={collectionSearchQuery}
+                    onChange={(e) => setCollectionSearchQuery(e.target.value)}
+                    className="mb-4"
+                    allowClear
+                  />
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-80 overflow-y-auto pr-1 moon-mobile-scroll">
-                    {collections.map((col) => (
+                    {filteredCollections.map((col) => (
                       <div
                         key={col.id}
                         className="group cursor-pointer rounded-lg border border-[var(--black-transparent)] bg-[var(--black-transparent-03)] overflow-hidden hover:border-[var(--liquid-glass-fg)] transition-all duration-200"
@@ -284,10 +366,12 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                             className="w-full h-10 object-contain"
                           />
                         </div>
+
                         <div className="px-1.5 py-1 text-center">
                           <Text className="block text-[10px] truncate leading-tight text-[var(--liquid-glass-fg)]">
                             {col.name}
                           </Text>
+
                           <Text strong className="block text-[11px] text-[var(--liquid-glass-fg)] mt-0.5">
                             {col.base_price || "0"} TON
                           </Text>
@@ -295,9 +379,16 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                       </div>
                     ))}
                   </div>
+
                   {collections.length === 0 && (
                     <Text type="secondary" className="text-center py-4 block">
                       {t("sendGift.noCollections")}
+                    </Text>
+                  )}
+
+                  {collections.length > 0 && filteredCollections.length === 0 && (
+                    <Text type="secondary" className="text-center py-4 block">
+                      Ничего не найдено
                     </Text>
                   )}
                 </div>
@@ -315,28 +406,34 @@ const SendGiftModal = ({ open, senderId, onClose, onSent, initialReceiverId }: S
                           style={{ objectFit: "contain" }}
                         />
                       </div>
+
                       <Flex vertical className="flex-1">
                         <Text strong>{selectedCollection?.name}</Text>
+
                         <Text className="text-sm text-[var(--liquid-glass-fg)]">
                           {selectedCollection?.base_price || "0"} TON
                         </Text>
                       </Flex>
+
                       <div
                         className="mt-1 pt-1 border-t border-[var(--black-transparent)] cursor-pointer text-center"
                         onClick={() => setSelectedCollectionId(null)}
                       >
-                      <Text type="secondary" className="text-xs hover:text-[var(--liquid-glass-fg)] transition-colors">
-                        {t("sendGift.changeCollection")}
-                      </Text>
-                    </div>
+                        <Text type="secondary" className="text-xs hover:text-[var(--liquid-glass-fg)] transition-colors">
+                          {t("sendGift.changeCollection")}
+                        </Text>
+                      </div>
                     </Flex>
                   </div>
 
                   <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-6">
-                    <Text strong className="block mb-2">{t("sendGift.messageOptional")}</Text>
+                    <Text strong className="block mb-2">
+                      {t("sendGift.messageOptional")}
+                    </Text>
+
                     <TextArea
                       value={description}
-                      maxLength={100}
+                      maxLength={MAX_DESCRIPTION_LENGTH}
                       showCount={{
                         formatter: ({ count }) => `${count} / ${MAX_DESCRIPTION_LENGTH}`,
                       }}

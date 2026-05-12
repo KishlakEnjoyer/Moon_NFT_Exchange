@@ -167,6 +167,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
   const [tgVisible, setTgVisible] = useState(true);
   const [vkVisible, setVkVisible] = useState(true);
   const [profilePicDataUrl, setProfilePicDataUrl] = useState<string | null>(null);
+  const [removeProfilePic, setRemoveProfilePic] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingProfilePhoto, setIsCheckingProfilePhoto] = useState(false);
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -199,6 +200,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     setTgVisible(Number(profile.tg_visibility) === 1);
     setVkVisible(Number(profile.vk_visibility) === 1);
     setProfilePicDataUrl(null);
+    setRemoveProfilePic(false);
     setCropModalOpen(false);
     setCropImageSrc(null);
     setCropImageSize(null);
@@ -280,6 +282,10 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
   }, [cropImageSize, cropModalOpen, cropStageSize]);
 
   const previewSrc = useMemo(() => {
+    if (removeProfilePic) {
+      return `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
+    }
+
     if (profilePicDataUrl) {
       return profilePicDataUrl;
     }
@@ -289,12 +295,13 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     }
 
     return `${process.env.REACT_APP_IMAGES_URL}/pfps/example_user.png`;
-  }, [profile, profilePicDataUrl]);
+  }, [profile, profilePicDataUrl, removeProfilePic]);
 
   const cropMinScale = useMemo(
     () => getMinCropScale(cropImageSize, cropStageSize),
     [cropImageSize, cropStageSize],
   );
+
   const cropMaxScale = useMemo(
     () => Math.max(cropMinScale * AVATAR_CROP_MAX_ZOOM_MULTIPLIER, cropMinScale + 0.1),
     [cropMinScale],
@@ -605,7 +612,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         messageApi.error(t("editProfile.moderationFailed"));
         return;
       }
-
+      setRemoveProfilePic(false);
       setProfilePicDataUrl(croppedDataUrl);
       closeCropModal();
     } catch (error) {
@@ -648,7 +655,8 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         about_me: trimmedAboutMe || null,
         tg_visibility: tgVisible ? 1 : 0,
         vk_visibility: vkVisible ? 1 : 0,
-        profile_pic_data_url: profilePicDataUrl,
+        profile_pic_data_url: removeProfilePic ? null : profilePicDataUrl,
+        remove_profile_pic: removeProfilePic,
       });
 
       messageApi.success(t("editProfile.profileUpdated"));
@@ -744,14 +752,30 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
               </Flex>
             </Flex>
 
-            <Button
-              icon={<CameraOutlined />}
-              onClick={handlePickImage}
-              loading={isCheckingProfilePhoto}
-              className="!bg-[var(--liquid-glass-bg)]"
-            >
-              {t("common.change")}
-            </Button>
+            <Flex gap={8} wrap="wrap">
+              <Button
+                icon={<CameraOutlined />}
+                onClick={handlePickImage}
+                loading={isCheckingProfilePhoto}
+                className="!bg-[var(--liquid-glass-bg)]"
+              >
+                {t("common.change")}
+              </Button>
+
+              {(profile?.profile_pic_url || profilePicDataUrl) && (
+                <Button
+                  danger
+                  onClick={() => {
+                    setProfilePicDataUrl(null);
+                    setRemoveProfilePic(true);
+                  }}
+                  disabled={isCheckingProfilePhoto}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                >
+                  {t("common.delete") || "Удалить"}
+                </Button>
+              )}
+            </Flex>
           </Flex>
 
           <div className="rounded-[var(--size-smm)] border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-4">

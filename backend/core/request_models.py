@@ -113,7 +113,7 @@ class UpdateProfileRequest(BaseModel):
     tg_visibility: int
     vk_visibility: int
     profile_pic_data_url: str | None = None
-
+    remove_profile_pic: bool = False
 
 class UpdateProfileResponse(BaseModel):
     user_id: int
@@ -126,6 +126,7 @@ class UpdateProfileResponse(BaseModel):
     vk_visibility: int
     profile_pic_url: str | None = None
     about_me: str | None = None
+    
 
 
 class AlbumResponse(BaseModel):

@@ -6,6 +6,7 @@ export interface UpdateProfilePayload {
   tg_visibility: number;
   vk_visibility: number;
   profile_pic_data_url?: string | null;
+  remove_profile_pic?: boolean;
 }
 
 export interface UpdateProfileResponse {

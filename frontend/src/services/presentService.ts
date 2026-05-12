@@ -8,6 +8,7 @@ export interface PresentDetail {
   present_num: number;
   image_url: string | null;
   description: string | null;
+  collection_id: number;
   collection_name: string;
   collection_image_url: string | null;
   base_price: string;

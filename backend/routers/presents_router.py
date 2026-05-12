@@ -19,6 +19,62 @@ from services.admin_platform_service import get_visible_profile_badges
 
 presents_router = APIRouter(prefix="/presents", tags=["presents"])
 
+MAX_PINNED_PRESENTS = 7
+
+class TogglePinResponse(BaseModel):
+    present_id: int
+    is_pinned: int
+
+@presents_router.post("/{present_id}/toggle-pin", response_model=TogglePinResponse)
+def toggle_present_pin(
+    present_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    present = db.scalar(select(Present).where(Present.present_id == present_id))
+    if not present:
+        raise HTTPException(status_code=404, detail="Present not found")
+
+    owner = db.scalar(
+        select(CurrentOwner).where(
+            CurrentOwner.present_id == present_id,
+            CurrentOwner.owner_id == current_user.user_id,
+        )
+    )
+    if not owner:
+        raise HTTPException(status_code=403, detail="You do not own this present")
+
+    if present.is_burned:
+        raise HTTPException(status_code=400, detail="Cannot pin burned present")
+
+    if present.is_pinned == 1:
+        present.is_pinned = 0
+        present.pinned_at = None
+    else:
+        pinned_count = db.scalar(
+            select(func.count())
+            .select_from(Present)
+            .join(CurrentOwner, CurrentOwner.present_id == Present.present_id)
+            .where(
+                CurrentOwner.owner_id == current_user.user_id,
+                Present.is_pinned == 1,
+                Present.is_burned == 0,
+            )
+        ) or 0
+
+        if pinned_count >= MAX_PINNED_PRESENTS:
+            raise HTTPException(status_code=400, detail="You can pin up to 7 gifts")
+
+        present.is_pinned = 1
+        present.pinned_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(present)
+
+    return TogglePinResponse(
+        present_id=present.present_id,
+        is_pinned=present.is_pinned,
+    )
 
 def _resolve_current_user_id(requested_user_id: int | None, current_user: User) -> int:
     if requested_user_id is not None and requested_user_id != current_user.user_id:
@@ -32,6 +88,7 @@ class PresentDetailResponse(BaseModel):
     present_num: int
     image_url: str | None
     description: str | None
+    collection_id: int
     collection_name: str
     collection_image_url: str | None
     base_price: str
@@ -148,6 +205,7 @@ def get_present_detail(present_id: int, db: Session = Depends(get_db)):
         present_num=present.present_num,
         image_url=present.image_url,
         description=present.description,
+        collection_id=present.collection_id,
         collection_name=collection.collection_name if collection else "Unknown",
         collection_image_url=collection.collection_image_url if collection else None,
         base_price=str(collection.base_price) if collection else "0",

@@ -1523,6 +1523,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [dictionarySearch, setDictionarySearch] = useState("");
   const [form] = Form.useForm<DictionaryItemPayload>();
 
   const loadItems = useCallback(async () => {
@@ -1535,6 +1536,29 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
       setLoading(false);
     }
   }, [kind, messageApi, t]);
+
+  const filteredItems = useMemo(() => {
+  const query = dictionarySearch.trim().toLowerCase();
+
+  if (!query) {
+    return items;
+  }
+
+  return items.filter((item) => {
+      const values = [
+        item.name,
+        item.collection_name,
+        item.image_url,
+        item.base_price,
+        String(item.collection_limit ?? ""),
+        String(item.purchase_limit ?? ""),
+      ];
+
+      return values.some((value) =>
+        String(value || "").toLowerCase().includes(query),
+      );
+    });
+  }, [items, dictionarySearch]);
 
   const loadCollections = useCallback(async () => {
     try {
@@ -1617,18 +1641,35 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
         <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
           <Segmented<DictionaryKind>
             value={kind}
-            onChange={setKind}
-            options={dictionaryKinds.map((value) => ({ value, label: getDictionaryLabel(t, value) }))}
+            onChange={(value) => {
+              setKind(value);
+              setDictionarySearch("");
+            }}
+            options={dictionaryKinds.map((value) => ({
+              value,
+              label: getDictionaryLabel(t, value),
+            }))}
           />
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            {t("admin.dictionaries.add")}
-          </Button>
+
+          <Flex gap={8} wrap="wrap" justify="flex-end" className="flex-1">
+            <Input.Search
+              allowClear
+              value={dictionarySearch}
+              placeholder={t("common.search")}
+              onChange={(event) => setDictionarySearch(event.target.value)}
+              className="max-w-[320px]"
+            />
+
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              {t("admin.dictionaries.add")}
+            </Button>
+          </Flex>
         </Flex>
 
         <Table
           rowKey="id"
           loading={loading}
-          dataSource={items}
+          dataSource={filteredItems}
           scroll={{ x: 820 }}
           columns={[
             { title: t("admin.dictionaries.name"), dataIndex: "name" },

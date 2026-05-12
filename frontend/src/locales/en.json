@@ -17,7 +17,9 @@
     "language": "Language",
     "english": "English",
     "russian": "Russian",
-    "userFallback": "User #{{id}}"
+    "userFallback": "User #{{id}}",
+    "pin": "Pin",
+    "unpin": "Unpin"
   },
   "header": {
     "profile": "Profile",
@@ -195,7 +197,10 @@
     "failedCreateListing": "Failed to create listing",
     "failedBuyGift": "Failed to buy gift",
     "failedRecommendedPrice": "Failed to load recommended price",
-    "failedRemoveListing": "Failed to remove listing"
+    "failedRemoveListing": "Failed to remove listing",
+    "skip": "Skip",
+    "upgrading": "Upgrading...",
+    "upgraded": "Upgraded!"
   },
   "cart": {
     "title": "Cart",

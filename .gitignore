@@ -54,4 +54,6 @@ backend/contract_info.json
 # Qwen
 .qwen
 
-
+/hf_cache
+/sentence_transformers_cache
+/.vscode

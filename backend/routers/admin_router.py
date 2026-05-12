@@ -961,7 +961,7 @@ def apply_dictionary_moderation(db: Session, item: ModerationQueueItem, reviewer
     if not item.image_data_url:
         raise HTTPException(status_code=400, detail="Moderation item is missing an image")
 
-    filename = save_image_data_url(item.image_data_url, dictionary_image_folder(kind), name)
+    filename = item.image_data_url
 
     if kind == "collections":
         if item.action == "create":

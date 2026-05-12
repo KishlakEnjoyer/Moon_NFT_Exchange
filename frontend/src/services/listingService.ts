@@ -90,6 +90,7 @@ export interface ListingSearchParams {
   price_min?: number;
   price_max?: number;
   sort?: string | null;
+  top_k?: number;
 }
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -137,10 +138,15 @@ const setArrayParam = (searchParams: URLSearchParams, name: string, values?: num
 export const getActiveListings = async (params: ListingSearchParams = {}): Promise<ApiListing[]> => {
   const searchParams = new URLSearchParams();
   const search = params.search?.trim();
+  const smartEnabled = Boolean(search && params.smart);
 
   if (search) {
     searchParams.set("search", search);
-    searchParams.set("smart", String(Boolean(params.smart)));
+    searchParams.set("smart", String(smartEnabled));
+
+    if (smartEnabled) {
+      searchParams.set("top_k", String(params.top_k ?? 5));
+    }
   }
 
   setArrayParam(searchParams, "collection_ids", params.collection_ids);
@@ -162,6 +168,7 @@ export const getActiveListings = async (params: ListingSearchParams = {}): Promi
 
   const query = searchParams.toString();
   const res = await fetch(`${API_URL}/listings/active${query ? `?${query}` : ""}`);
+
   if (!res.ok) {
     const error = await res.json().catch(() => null);
     throw new Error(error?.detail || "Failed to load listings");

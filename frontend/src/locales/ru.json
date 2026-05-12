@@ -17,7 +17,9 @@
     "language": "Язык",
     "english": "English",
     "russian": "Русский",
-    "userFallback": "Пользователь #{{id}}"
+    "userFallback": "Пользователь #{{id}}",
+    "pin": "Закрепить",
+    "unpin": "Открепить"
   },
   "header": {
     "profile": "Профиль",
@@ -195,7 +197,10 @@
     "failedCreateListing": "Не удалось создать лот",
     "failedBuyGift": "Не удалось купить подарок",
     "failedRecommendedPrice": "Не удалось загрузить рекомендуемую цену",
-    "failedRemoveListing": "Не удалось снять лот"
+    "failedRemoveListing": "Не удалось снять лот",
+    "skip": "Пропустить",
+    "upgrading": "Улучшаем...",
+    "upgraded": "Улучшено!"
   },
   "cart": {
     "title": "Корзина",

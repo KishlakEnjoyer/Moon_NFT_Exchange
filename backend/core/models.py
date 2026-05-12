@@ -250,6 +250,8 @@ class Present(Base):
     background: Mapped[Backgrounds | None] = relationship("Backgrounds", back_populates="presents")
     symbol: Mapped[Symbols | None] = relationship("Symbols", back_populates="presents")
     original_sender: Mapped[User | None] = relationship("User", foreign_keys=[original_sender_id])
+    is_pinned: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
 
     listings: Mapped[list[Listing]] = relationship(
         "Listing",

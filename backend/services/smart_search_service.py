@@ -99,6 +99,29 @@ class SmartSearchService:
 
         self._image_cache = {}
 
+    def preload(self) -> None:
+        with self._lock:
+            self._load_clip()
+            self._load_translator()
+
+
+    def warmup_items(self, items: list[SmartSearchItem]) -> None:
+        if not items:
+            return
+
+        with self._lock:
+            self._load_clip()
+
+            item_paths = []
+            for item in items:
+                image_path = image_path_from_url(item.image_url)
+                if image_path is None or not image_path.exists():
+                    continue
+
+                item_paths.append(image_path)
+
+            self._get_image_embeddings(item_paths)
+
     def search(
         self,
         query: str,
@@ -176,6 +199,17 @@ class SmartSearchService:
         self._translator_tokenizer = MarianTokenizer.from_pretrained(self.translator_model_id)
         self._translator_model = MarianMTModel.from_pretrained(self.translator_model_id).to(self._device)
         self._translator_model.eval()
+
+    def preload(self) -> None:
+        with self._lock:
+            print("Loading smart search CLIP model...", flush=True)
+            self._load_clip()
+            print("Smart search CLIP model loaded", flush=True)
+
+            print("Loading smart search translator model...", flush=True)
+            self._load_translator()
+            print("Smart search translator model loaded", flush=True)
+
 
     def _prepare_query(self, query: str) -> str:
         if not has_cyrillic(query):

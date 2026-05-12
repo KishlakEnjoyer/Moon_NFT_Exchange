@@ -26,11 +26,20 @@ class NSFWDetectionRequest(BaseModel):
     image_data_url: str | None = None
 
 
+def warmup_nsfw_detector() -> None:
+    classifier = _get_classifier()
+    image = Image.new("RGB", (224, 224), color=(255, 255, 255))
+    classifier(image)
+
+
 def _get_classifier():
     global classifier_falconsai
     if classifier_falconsai is None:
         classifier_falconsai = pipeline("image-classification", model="Falconsai/nsfw_image_detection")
     return classifier_falconsai
+
+def preload_nsfw_detector() -> None:
+    _get_classifier()
 
 
 def _open_image_from_bytes(image_bytes: bytes) -> Image.Image:

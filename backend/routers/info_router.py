@@ -106,6 +106,7 @@ def update_user_profile_endpoint(
             tg_visibility=payload.tg_visibility,
             vk_visibility=payload.vk_visibility,
             profile_pic_data_url=payload.profile_pic_data_url,
+            remove_profile_pic=payload.remove_profile_pic,
         )
 
     except HTTPException as e:

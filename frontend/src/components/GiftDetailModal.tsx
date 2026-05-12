@@ -1,7 +1,14 @@
 import { Modal, Flex, Typography, Image, Button, Avatar, Tag, message, Popconfirm, InputNumber } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { RightOutlined, CheckOutlined, FireOutlined, TagOutlined, StopOutlined, UserOutlined } from "@ant-design/icons";
+import {
+  RightOutlined,
+  CheckOutlined,
+  FireOutlined,
+  TagOutlined,
+  StopOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import {
   PresentDetail,
   cancelListing,
@@ -20,7 +27,24 @@ import UserNameWithBadge from "./UserNameWithBadge";
 const { Text, Title } = Typography;
 
 const API_URL = process.env.REACT_APP_API_URL;
+const IMAGES_URL = process.env.REACT_APP_IMAGES_URL;
 const MAX_LISTING_PRICE = 100000;
+
+type RouletteOption = {
+  id: number;
+  name: string;
+  image_url?: string | null;
+};
+
+const normalizeRouletteOptions = (items: any[]): RouletteOption[] => (
+  items
+    .map((item) => ({
+      id: Number(item.id ?? item.model_id ?? item.background_id),
+      name: String(item.name ?? item.model_name ?? item.background_name ?? ""),
+      image_url: item.image_url ?? item.model_image_url ?? item.background_image_url ?? null,
+    }))
+    .filter((item) => Number.isFinite(item.id) && item.name)
+);
 
 interface GiftDetailModalProps {
   open: boolean;
@@ -31,7 +55,40 @@ interface GiftDetailModalProps {
   onRefresh: () => void;
 }
 
-const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, onRefresh }: GiftDetailModalProps) => {
+const withExtension = (value: string, extension: string) => (
+  /\.[a-z0-9]+$/i.test(value) ? value : `${value}.${extension}`
+);
+
+const getAssetUrl = (
+  folder: "models" | "bgs",
+  imageUrl?: string | null,
+) => {
+  if (!imageUrl) return undefined;
+
+  if (
+    /^(https?:)?\/\//i.test(imageUrl)
+    || imageUrl.startsWith("/")
+    || imageUrl.startsWith("data:")
+  ) {
+    return imageUrl;
+  }
+
+  const extension = folder === "bgs" ? "png" : "webp";
+  return `${IMAGES_URL}/${folder}/${withExtension(imageUrl, extension)}`;
+};
+
+const pickRandom = <T,>(items: T[]): T | null => (
+  items.length ? items[Math.floor(Math.random() * items.length)] : null
+);
+
+const GiftDetailModal = ({
+  open,
+  presentId,
+  userId,
+  canManage = false,
+  onClose,
+  onRefresh,
+}: GiftDetailModalProps) => {
   const { t } = useTranslation();
   const [messageApi, contextHolder] = message.useMessage();
   const [detail, setDetail] = useState<PresentDetail | null>(null);
@@ -41,21 +98,68 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   const [listingPrice, setListingPrice] = useState<number | null>(null);
   const [recommendedPrice, setRecommendedPrice] = useState<number | null>(null);
   const [priceEstimateLoading, setPriceEstimateLoading] = useState(false);
+
+  const [rouletteOpen, setRouletteOpen] = useState(false);
+  const [rouletteFinished, setRouletteFinished] = useState(false);
+  const [rouletteCanSkip, setRouletteCanSkip] = useState(false);
+  const [rouletteFinalDetail, setRouletteFinalDetail] = useState<PresentDetail | null>(null);
+  const [rouletteUpgradePrice, setRouletteUpgradePrice] = useState<string | null>(null);
+
+  const [modelOptions, setModelOptions] = useState<RouletteOption[]>([]);
+  const [backgroundOptions, setBackgroundOptions] = useState<RouletteOption[]>([]);
+  const [rouletteModel, setRouletteModel] = useState<RouletteOption | null>(null);
+  const [rouletteBackground, setRouletteBackground] = useState<RouletteOption | null>(null);
+
+  const rouletteTimerRef = useRef<number | null>(null);
+  const rouletteSkipTimerRef = useRef<number | null>(null);
+  const rouletteFinishedRef = useRef(false);
+
   const navigate = useNavigate();
+
+  const clearRouletteTimers = useCallback(() => {
+    if (rouletteTimerRef.current) {
+      window.clearTimeout(rouletteTimerRef.current);
+      rouletteTimerRef.current = null;
+    }
+
+    if (rouletteSkipTimerRef.current) {
+      window.clearTimeout(rouletteSkipTimerRef.current);
+      rouletteSkipTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!open || !presentId) return;
+
+    clearRouletteTimers();
+
     setLoading(true);
     setDetail(null);
     setIsListingFormOpen(false);
     setListingPrice(null);
     setRecommendedPrice(null);
     setPriceEstimateLoading(false);
+
+    setRouletteOpen(false);
+    setRouletteFinished(false);
+    setRouletteCanSkip(false);
+    setRouletteFinalDetail(null);
+    setRouletteUpgradePrice(null);
+    setModelOptions([]);
+    setBackgroundOptions([]);
+    setRouletteModel(null);
+    setRouletteBackground(null);
+    rouletteFinishedRef.current = false;
+
     getPresentDetail(presentId)
       .then((data) => setDetail(data))
       .catch(() => setDetail(null))
       .finally(() => setLoading(false));
-  }, [open, presentId]);
+  }, [open, presentId, clearRouletteTimers]);
+
+  useEffect(() => {
+    return () => clearRouletteTimers();
+  }, [clearRouletteTimers]);
 
   useEffect(() => {
     if (!open || canManage || !detail?.active_listing_id) {
@@ -67,10 +171,100 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     });
   }, [open, canManage, detail?.active_listing_id]);
 
+  const finishRoulette = useCallback(() => {
+    if (!rouletteFinalDetail || rouletteFinishedRef.current) return;
+
+    rouletteFinishedRef.current = true;
+    clearRouletteTimers();
+
+    const finalModel = modelOptions.find(
+      (model) => model.name === rouletteFinalDetail.model_name,
+    );
+
+    const finalBackground = backgroundOptions.find(
+      (background) => background.name === rouletteFinalDetail.background_name,
+    );
+
+    if (finalModel) {
+      setRouletteModel(finalModel);
+    }
+
+    if (finalBackground) {
+      setRouletteBackground(finalBackground);
+    }
+
+    setRouletteFinished(true);
+    setRouletteCanSkip(false);
+    setDetail(rouletteFinalDetail);
+    onRefresh();
+
+    messageApi.success(
+      t("giftDetail.upgradedPaid", {
+        amount: parseFloat(rouletteUpgradePrice || "0").toFixed(2),
+      }),
+    );
+  }, [
+    rouletteFinalDetail,
+    clearRouletteTimers,
+    onRefresh,
+    messageApi,
+    t,
+    rouletteUpgradePrice,
+    modelOptions,
+    backgroundOptions,
+  ]);
+
+  useEffect(() => {
+    if (!rouletteOpen || !rouletteFinalDetail || rouletteFinished) return;
+
+    rouletteFinishedRef.current = false;
+
+    const startedAt = Date.now();
+    const durationMs = 5000;
+
+    rouletteSkipTimerRef.current = window.setTimeout(() => {
+      setRouletteCanSkip(true);
+    }, 700);
+
+    const tick = () => {
+      const elapsed = Date.now() - startedAt;
+      const progress = Math.min(elapsed / durationMs, 1);
+
+      if (progress >= 1) {
+        finishRoulette();
+        return;
+      }
+
+      setRouletteModel(pickRandom(modelOptions));
+      setRouletteBackground(pickRandom(backgroundOptions));
+
+      const delay = 55 + Math.floor(progress * progress * 330);
+      rouletteTimerRef.current = window.setTimeout(tick, delay);
+    };
+
+    tick();
+
+    return () => clearRouletteTimers();
+  }, [
+    rouletteOpen,
+    rouletteFinalDetail,
+    rouletteFinished,
+    modelOptions,
+    backgroundOptions,
+    finishRoulette,
+    clearRouletteTimers,
+  ]);
+
   if (!detail && !loading) return null;
+
+  const handleClose = () => {
+    if (rouletteOpen && !rouletteFinished) return;
+    onClose();
+  };
 
   const handleToggleVisibility = async () => {
     if (!detail) return;
+
     try {
       await togglePresentVisibility(detail.present_id, userId);
       setDetail({ ...detail, is_visible: detail.is_visible === 1 ? 0 : 1 });
@@ -82,17 +276,27 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
 
   const handleBurn = async () => {
     if (!detail) return;
+
     setSubmitting(true);
+
     try {
       const res = await authFetch(`${API_URL}/presents/${detail.present_id}/burn?user_id=${userId}`, {
         method: "POST",
       });
+
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || t("giftDetail.burnFailed"));
       }
+
       const data = await res.json();
-      messageApi.success(t("giftDetail.burnedReceived", { amount: parseFloat(data.refund_amount).toFixed(2) }));
+
+      messageApi.success(
+        t("giftDetail.burnedReceived", {
+          amount: parseFloat(data.refund_amount).toFixed(2),
+        }),
+      );
+
       setDetail({ ...detail, is_burned: true });
       onRefresh();
     } catch (e: any) {
@@ -104,15 +308,63 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
 
   const handleUpgrade = async () => {
     if (!detail) return;
+
     setSubmitting(true);
+
     try {
+      const collectionId = Number((detail as any).collection_id);
+
+      if (!collectionId) {
+        throw new Error("У подарка не приходит collection_id, поэтому нельзя загрузить модели для рулетки");
+      }
+
+      const [modelsRes, backgroundsRes] = await Promise.all([
+        fetch(`${API_URL}/api/filters/models?collection_ids=${collectionId}`),
+        fetch(`${API_URL}/api/filters/backgrounds`),
+      ]);
+
+      if (!modelsRes.ok) {
+        throw new Error("Не удалось загрузить модели для рулетки");
+      }
+
+      if (!backgroundsRes.ok) {
+        throw new Error("Не удалось загрузить фоны для рулетки");
+      }
+
+      const [modelsData, backgroundsData] = await Promise.all([
+        modelsRes.json(),
+        backgroundsRes.json(),
+      ]);
+
+      const models = normalizeRouletteOptions(Array.isArray(modelsData) ? modelsData : []);
+      const backgrounds = normalizeRouletteOptions(Array.isArray(backgroundsData) ? backgroundsData : []);
+
+      console.log("ROULETTE MODELS", models);
+      console.log("ROULETTE BACKGROUNDS", backgrounds);
+
+      if (models.length === 0) {
+        throw new Error("Для этой коллекции не найдено моделей");
+      }
+
+      setModelOptions(models);
+      setBackgroundOptions(backgrounds);
+
+      setRouletteModel(pickRandom(models));
+      setRouletteBackground(pickRandom(backgrounds));
+
       const data = await upgradePresent(detail.present_id, userId);
       const refreshed = await getPresentDetail(detail.present_id);
-      setDetail(refreshed);
-      onRefresh();
+
+      setRouletteFinalDetail(refreshed);
+      setRouletteUpgradePrice(data.price);
+      setRouletteFinished(false);
+      setRouletteCanSkip(false);
+      setRouletteOpen(true);
+      rouletteFinishedRef.current = false;
 
       try {
         const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+
         if (currentUser.user_id === userId) {
           localStorage.setItem(
             "currentUser",
@@ -122,8 +374,6 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
         }
       } catch {
       }
-
-      messageApi.success(t("giftDetail.upgradedPaid", { amount: parseFloat(data.price).toFixed(2) }));
     } catch (e: any) {
       messageApi.error(e.message || t("giftDetail.failedUpgrade"));
     } finally {
@@ -133,24 +383,29 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
 
   const handleCreateListing = async () => {
     if (!detail) return;
+
     if (!listingPrice || listingPrice <= 0) {
       messageApi.error(t("giftDetail.enterValidPrice"));
       return;
     }
+
     if (listingPrice > MAX_LISTING_PRICE) {
       messageApi.error(t("giftDetail.maxListingPrice", { price: MAX_LISTING_PRICE }));
       return;
     }
 
     setSubmitting(true);
+
     try {
       const listing = await createListing(detail.present_id, userId, listingPrice.toFixed(2));
+
       setDetail({
         ...detail,
         is_on_sale: true,
         active_listing_id: listing.listing_id,
         active_listing_price: listing.price,
       });
+
       setIsListingFormOpen(false);
       setListingPrice(null);
       onRefresh();
@@ -166,12 +421,14 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     if (!detail?.active_listing_id) return;
 
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+
     if (!currentUser.user_id) {
       messageApi.error(t("giftDetail.loginToBuy"));
       return;
     }
 
     setSubmitting(true);
+
     try {
       const result = await buyListing(detail.active_listing_id);
 
@@ -186,7 +443,12 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
       window.dispatchEvent(new Event("listingsChanged"));
       onRefresh();
       onClose();
-      messageApi.success(t("giftDetail.purchasedFor", { price: parseFloat(result.price).toFixed(2) }));
+
+      messageApi.success(
+        t("giftDetail.purchasedFor", {
+          price: parseFloat(result.price).toFixed(2),
+        }),
+      );
     } catch (e: any) {
       messageApi.error(e.message || t("giftDetail.failedBuyGift"));
     } finally {
@@ -221,14 +483,17 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     if (!detail) return;
 
     setSubmitting(true);
+
     try {
       await cancelListing(detail.present_id);
+
       setDetail({
         ...detail,
         is_on_sale: false,
         active_listing_id: null,
         active_listing_price: null,
       });
+
       onRefresh();
       messageApi.success(t("giftDetail.giftRemoved"));
     } catch (e: any) {
@@ -239,6 +504,8 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   };
 
   const handleOwnerClick = () => {
+    if (rouletteOpen && !rouletteFinished) return;
+
     if (detail?.owner_username) {
       onClose();
       navigate(`/account/${detail.owner_username}`);
@@ -246,6 +513,8 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   };
 
   const handleSenderClick = () => {
+    if (rouletteOpen && !rouletteFinished) return;
+
     if (detail?.original_sender_username) {
       onClose();
       navigate(`/account/${detail.original_sender_username}`);
@@ -255,22 +524,28 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
   const basePrice = parseFloat(detail?.base_price || "0");
   const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
   const currentUserBlocked = currentUser.is_active === 0;
+
   const activeListingPrice = detail?.active_listing_price
     ? parseFloat(detail.active_listing_price)
     : null;
+
   const activeListingPriceLabel = activeListingPrice !== null && Number.isFinite(activeListingPrice)
     ? activeListingPrice.toFixed(2)
     : "0.00";
+
   const burnRefundPercent = parseFloat(process.env.REACT_APP_BURN_REFUND_PERCENT || "75");
   const upgradePercent = parseFloat(process.env.REACT_APP_UPGRADE_PERCENT || "25");
   const burnRefundAmount = (basePrice * burnRefundPercent / 100).toFixed(2);
   const upgradePriceAmount = (basePrice * upgradePercent / 100).toFixed(2);
+
   const ownerAvatarUrl = detail?.owner_profile_pic_url
-    ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.owner_profile_pic_url}`
+    ? `${IMAGES_URL}/pfps/${detail.owner_profile_pic_url}`
     : undefined;
+
   const senderAvatarUrl = detail?.original_sender_profile_pic_url
-    ? `${process.env.REACT_APP_IMAGES_URL}/pfps/${detail.original_sender_profile_pic_url}`
+    ? `${IMAGES_URL}/pfps/${detail.original_sender_profile_pic_url}`
     : undefined;
+
   const giftDescription = detail?.description?.trim();
 
   const attributes = [
@@ -338,16 +613,18 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           {giftDescription}
         </Text>
       ),
-    }] : [])
+    }] : []),
   ];
 
   if (detail?.is_upgraded) {
     if (detail.model_name) {
       attributes.push({ key: t("giftDetail.model"), value: detail.model_name });
     }
+
     if (detail.background_name) {
       attributes.push({ key: t("giftDetail.background"), value: detail.background_name });
     }
+
     if (detail.symbol_name) {
       attributes.push({ key: t("giftDetail.symbol"), value: detail.symbol_name });
     }
@@ -358,40 +635,108 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
     !!detail?.is_upgraded,
   );
 
+  const rouletteFinalImageUrl = rouletteFinalDetail
+    ? getPresentDisplayImageUrl(
+        rouletteFinalDetail.image_url || rouletteFinalDetail.collection_image_url,
+        true,
+      )
+    : null;
+
+  const rouletteBackgroundImageUrl = getAssetUrl("bgs", rouletteBackground?.image_url);
+  const rouletteModelImageUrl = getAssetUrl("models", rouletteModel?.image_url);
+
   const hasModels = detail?.has_models;
   const canListForSale = canManage && !currentUserBlocked && !!detail?.is_upgraded && !detail?.is_on_sale;
   const canRemoveFromSale = canManage && !currentUserBlocked && !!detail?.is_on_sale;
   const canBuyListedGift = !canManage && !currentUserBlocked && !!detail?.active_listing_id;
+  const rouletteRunning = rouletteOpen && !rouletteFinished;
 
   return (
     <>
       {contextHolder}
+
       <Modal
         open={open}
-        onCancel={onClose}
+        onCancel={handleClose}
         footer={null}
         width="min(400px, calc(100vw - 24px))"
         title={null}
+        maskClosable={!rouletteRunning}
+        closable={!rouletteRunning}
       >
         <Flex vertical align="center" gap={16} className="pt-4">
-          <Image
-            src={imageUrl}
-            alt={detail?.collection_name}
-            width="min(180px, 58vw)"
-            preview={false}
-            className="rounded-[var(--size-smm)]"
-          />
+          {rouletteOpen ? (
+            <div className="relative w-[180px] h-[180px] sm:w-[210px] sm:h-[210px] rounded-[var(--size-smm)] overflow-hidden border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)]">
+              {rouletteFinished && rouletteFinalImageUrl ? (
+                <img
+                  src={rouletteFinalImageUrl}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+              ) : (
+                <>
+                  {rouletteBackgroundImageUrl ? (
+                    <img
+                      src={rouletteBackgroundImageUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-[var(--liquid-glass-bg)]" />
+                  )}
+
+                  {rouletteModelImageUrl ? (
+                    <div className="absolute inset-0 flex items-center justify-center p-8">
+                      <img
+                        src={rouletteModelImageUrl}
+                        alt=""
+                        className="block max-h-full max-w-full object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.45)]"
+                        style={{
+                          transform: "scale(1.15)",
+                          transformOrigin: "center",
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <Flex align="center" justify="center" className="absolute inset-0">
+                      <Text type="secondary">...</Text>
+                    </Flex>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 bg-black/50 px-2 py-1.5 text-center">
+                    <Text className="!text-white text-xs">
+                      {rouletteModel?.name || "..."}
+                    </Text>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <Image
+              src={imageUrl}
+              alt={detail?.collection_name}
+              width="min(180px, 58vw)"
+              preview={false}
+              className="rounded-[var(--size-smm)]"
+            />
+          )}
 
           <Flex vertical align="center" gap={4}>
             <Title level={4} className="!mb-0 !text-center break-words">
-              {detail?.collection_name} #{detail?.present_num}
+              {rouletteRunning
+                ? t("giftDetail.upgrading")
+                : rouletteFinished
+                  ? t("giftDetail.upgraded")
+                  : `${detail?.collection_name} #${detail?.present_num}`}
             </Title>
-            <Flex gap={4}>
+
+            <Flex gap={4} wrap="wrap" justify="center">
               {detail?.is_upgraded ? (
                 <Tag color="purple">{t("giftDetail.upgraded")}</Tag>
               ) : (
                 <Tag>{t("giftDetail.basic")}</Tag>
               )}
+
               {detail?.is_on_sale && (
                 <Tag color="blue">{t("giftDetail.onSale")}</Tag>
               )}
@@ -406,11 +751,16 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                 align="center"
                 gap={12}
                 wrap="wrap"
-                className={`px-4 py-3 ${i % 2 === 0 ? "bg-[var(--liquid-glass-bg)]" : ""} ${i !== attributes.length - 1 ? "border-b border-[var(--black-transparent)]" : ""}`}
+                className={`px-4 py-3 ${i % 2 === 0 ? "bg-[var(--liquid-glass-bg)]" : ""} ${
+                  i !== attributes.length - 1 ? "border-b border-[var(--black-transparent)]" : ""
+                }`}
               >
-                <Text type="secondary" className="shrink-0 mr-4">{attr.key}</Text>
+                <Text type="secondary" className="shrink-0 mr-4">
+                  {attr.key}
+                </Text>
+
                 <Flex align="center" gap={8} className="min-w-0">
-                  {typeof attr.value === "string" ? (
+                  {typeof attr.value === "string" || typeof attr.value === "number" ? (
                     <Text className="break-words text-right">{attr.value}</Text>
                   ) : (
                     attr.value
@@ -421,7 +771,30 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
           </div>
 
           <Flex vertical gap={8} className="w-full">
-            {canManage && !currentUserBlocked && (
+            {rouletteRunning && (
+              <Button
+                block
+                disabled={!rouletteCanSkip}
+                onClick={finishRoulette}
+              >
+                Пропустить
+              </Button>
+            )}
+
+            {rouletteFinished && rouletteOpen && (
+              <Button
+                type="primary"
+                block
+                onClick={() => {
+                  setRouletteOpen(false);
+                  setRouletteFinished(false);
+                }}
+              >
+                {t("common.ok")}
+              </Button>
+            )}
+
+            {!rouletteOpen && canManage && !currentUserBlocked && (
               <Flex
                 align="center"
                 justify="space-between"
@@ -433,23 +806,28 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                     ? t("giftDetail.visible")
                     : t("giftDetail.hidden")}
                 </Text>
+
                 <Text
                   className="!text-[var(--accent-150)]"
                   style={{ fontSize: 13 }}
                 >
-                  {detail?.is_visible === 1 ? t("giftDetail.hideFromProfile") : t("giftDetail.show")} <RightOutlined style={{ fontSize: 10 }} />
+                  {detail?.is_visible === 1 ? t("giftDetail.hideFromProfile") : t("giftDetail.show")}{" "}
+                  <RightOutlined style={{ fontSize: 10 }} />
                 </Text>
               </Flex>
             )}
 
-            {canManage && !currentUserBlocked && !detail?.is_on_sale && !detail?.is_upgraded && (
+            {!rouletteOpen && canManage && !currentUserBlocked && !detail?.is_on_sale && !detail?.is_upgraded && (
               <Popconfirm
                 title={t("giftDetail.burnToRedeem")}
                 description={
                   <Flex vertical gap={4}>
                     <Text>
-                      <Text strong style={{ color: "var(--color-primary)" }}>{t("giftDetail.burnRefundDescription", { amount: burnRefundAmount })}</Text>
+                      <Text strong style={{ color: "var(--color-primary)" }}>
+                        {t("giftDetail.burnRefundDescription", { amount: burnRefundAmount })}
+                      </Text>
                     </Text>
+
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {t("giftDetail.burnRefundPercent", { percent: burnRefundPercent })}
                     </Text>
@@ -472,7 +850,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Popconfirm>
             )}
 
-            {canManage && !currentUserBlocked && hasModels && !detail?.is_upgraded && (
+            {!rouletteOpen && canManage && !currentUserBlocked && hasModels && !detail?.is_upgraded && (
               <Button
                 type="primary"
                 size="large"
@@ -485,7 +863,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Button>
             )}
 
-            {canListForSale && !isListingFormOpen && (
+            {!rouletteOpen && canListForSale && !isListingFormOpen && (
               <Button
                 type="primary"
                 size="large"
@@ -497,7 +875,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Button>
             )}
 
-            {canListForSale && isListingFormOpen && (
+            {!rouletteOpen && canListForSale && isListingFormOpen && (
               <Flex vertical gap={8}>
                 <InputNumber
                   min={0.01}
@@ -511,6 +889,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                   size="large"
                   className="w-full"
                 />
+
                 {priceEstimateLoading ? (
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {t("giftDetail.loadingRecommended")}
@@ -524,6 +903,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                     {t("giftDetail.noRecommendation")}
                   </Text>
                 )}
+
                 <Flex gap={8}>
                   <Button
                     type="primary"
@@ -531,10 +911,11 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
                     block
                     icon={<TagOutlined />}
                     loading={submitting}
-                  onClick={handleCreateListing}
-                >
+                    onClick={handleCreateListing}
+                  >
                     {t("common.confirm")}
                   </Button>
+
                   <Button
                     size="large"
                     block
@@ -550,7 +931,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Flex>
             )}
 
-            {canRemoveFromSale && (
+            {!rouletteOpen && canRemoveFromSale && (
               <Button
                 danger
                 size="large"
@@ -563,7 +944,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Button>
             )}
 
-            {canBuyListedGift && (
+            {!rouletteOpen && canBuyListedGift && (
               <Button
                 type="primary"
                 size="large"
@@ -576,7 +957,7 @@ const GiftDetailModal = ({ open, presentId, userId, canManage = false, onClose, 
               </Button>
             )}
 
-            {(!canManage || !hasModels) && !canBuyListedGift && (
+            {!rouletteOpen && (!canManage || !hasModels) && !canBuyListedGift && (
               <Button
                 type="default"
                 size="large"

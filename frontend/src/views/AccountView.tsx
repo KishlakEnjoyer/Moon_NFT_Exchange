@@ -73,6 +73,7 @@ interface Present {
   is_on_sale?: boolean;
   active_listing_price?: string | null;
   is_visible?: number;
+  is_pinned?: number;
 }
 
 interface Album {
@@ -269,11 +270,28 @@ const AccountView = () => {
   }, [activeAlbumId, user]);
 
   const activeAlbum = activeAlbumId === null ? null : findAlbumById(activeAlbumId);
+  const sortPinnedFirst = (presents: Present[]) => (
+    [...presents].sort((a, b) => {
+      const pinnedDiff = Number(b.is_pinned === 1) - Number(a.is_pinned === 1);
+      if (pinnedDiff !== 0) return pinnedDiff;
+
+      return b.present_id - a.present_id;
+    })
+  );
+
   const filteredPresents: Present[] = !user
     ? []
-    : activeAlbum === null
-      ? isOwn ? user.presents : user.presents.filter((p) => p.is_visible !== 0)
-      : user.presents.filter((present) => activeAlbum.present_ids.includes(present.present_id) && (isOwn || present.is_visible !== 0));
+    : sortPinnedFirst(
+        activeAlbum === null
+          ? isOwn
+            ? user.presents
+            : user.presents.filter((p) => p.is_visible !== 0)
+          : user.presents.filter(
+              (present) =>
+                activeAlbum.present_ids.includes(present.present_id) &&
+                (isOwn || present.is_visible !== 0),
+            ),
+      );
 
   useEffect(() => {
     const sentinelNode = sentinelRef.current;
@@ -920,6 +938,7 @@ const AccountView = () => {
                   userId={user.user_id}
                   isOwner={isOwn && !currentUserBlocked}
                   isVisible={item.is_visible !== 0}
+                  isPinned={item.is_pinned === 1}
                   albums={user.albums}
                   activeAlbumId={activeAlbumId}
                   onRefresh={loadUser}
@@ -932,6 +951,7 @@ const AccountView = () => {
                     activeListingPrice={item.active_listing_price}
                     isVisible={item.is_visible !== 0}
                     isUpgraded={item.model_id !== null}
+                    isPinned={item.is_pinned === 1}
                     onClick={() => setSelectedGiftId(item.present_id)}
                   />
                 </PresentCardContextMenu>
