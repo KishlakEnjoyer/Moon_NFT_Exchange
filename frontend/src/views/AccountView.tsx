@@ -30,7 +30,7 @@ import {
 } from "@ant-design/icons";
 import { Content } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "spoilerjs/spoiler-span";
 
@@ -202,7 +202,7 @@ const AccountView = () => {
     setIsRenamingAlbum(false);
   };
 
-  const loadUser = () => {
+  const loadUser = useCallback(() => {
     if (!username) return;
     authFetch(`${process.env.REACT_APP_API_URL}/user-info/web/${username}`)
       .then((res) => {
@@ -217,7 +217,7 @@ const AccountView = () => {
         setUser(null);
         setLoading(false);
       });
-  };
+  }, [username]);
 
   useNotifications(
     isOwn ? getStoredCurrentUser().user_id : null,
@@ -244,7 +244,7 @@ const AccountView = () => {
 
     setLoading(true);
     loadUser();
-  }, [username]);
+  }, [loadUser, username]);
 
   useEffect(() => {
     const checkOwnership = () => {

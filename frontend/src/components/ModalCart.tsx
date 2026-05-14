@@ -81,7 +81,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
   const handleBuyCart = async () => {
     if (!currentUserId || cartItems.length === 0) return;
     if (currentUserBlocked) {
-      messageApi.error("Аккаунт заблокирован");
+      messageApi.error(t("profile.accountBlocked"));
       return;
     }
 
@@ -110,7 +110,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
   const handleBuyItem = async (item: CartItem) => {
     if (!currentUserId) return;
     if (currentUserBlocked) {
-      messageApi.error("Аккаунт заблокирован");
+      messageApi.error(t("profile.accountBlocked"));
       return;
     }
 

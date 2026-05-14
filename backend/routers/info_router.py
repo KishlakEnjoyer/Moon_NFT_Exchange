@@ -10,6 +10,7 @@ from core.request_models import UpdateProfileRequest, UpdateProfileResponse
 from services.user_profile_service import (
     get_user_profile_info_by_username,
     get_user_profile_stats_by_tg_id,
+    get_user_profile_stats_by_vk_id,
     update_user_profile,
 )
 from services.admin_platform_service import get_visible_profile_badges
@@ -25,11 +26,13 @@ user_info_router = APIRouter(
 def search_users(
     q: str = Query(default="", min_length=0, max_length=100),
     limit: int = Query(default=20, ge=1, le=50),
+    include_user_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
 ):
     query = db.query(User)
-    if q.strip():
-        pattern = f"%{q.strip().lower()}%"
+    search = q.strip().lower()
+    if search:
+        pattern = f"%{search}%"
         query = query.filter(
             or_(
                 User.username.ilike(pattern),
@@ -38,6 +41,19 @@ def search_users(
             )
         )
     users = query.limit(limit).all()
+
+    if include_user_id is not None and all(u.user_id != include_user_id for u in users):
+        included_user = db.query(User).filter(User.user_id == include_user_id).first()
+        if included_user:
+            username = (included_user.username or "").lower()
+            tg_username = (included_user.tg_username or "").lower() if included_user.tg_visibility == 1 else ""
+            vk_username = (included_user.vk_username or "").lower() if included_user.vk_visibility == 1 else ""
+            if not search or search in username or search in tg_username or search in vk_username:
+                users = [included_user, *users[: max(0, limit - 1)]]
+
+    if include_user_id is not None:
+        users = sorted(users, key=lambda u: 0 if u.user_id == include_user_id else 1)
+
     profile_badges = get_visible_profile_badges(db, {u.user_id for u in users})
     return [
         {
@@ -57,6 +73,16 @@ def search_users(
 def get_user_info_by_tg_id(tg_id: int, db: Session = Depends(get_db)):
     try:
         return get_user_profile_stats_by_tg_id(db, tg_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@user_info_router.get("/vk/{vk_id}")
+def get_user_info_by_vk_id(vk_id: int, db: Session = Depends(get_db)):
+    try:
+        return get_user_profile_stats_by_vk_id(db, vk_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

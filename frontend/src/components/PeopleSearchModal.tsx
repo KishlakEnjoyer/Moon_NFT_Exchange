@@ -1,6 +1,6 @@
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Flex, Input, Modal, Tag, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import UserNameWithBadge from "./UserNameWithBadge";
@@ -29,7 +29,7 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
-  const loadUsers = (query: string) => {
+  const loadUsers = useCallback((query: string) => {
     fetch(`${process.env.REACT_APP_API_URL}/user-info/search?q=${encodeURIComponent(query)}`)
       .then((res) => {
         if (res.ok) return res.json();
@@ -41,19 +41,19 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
         }
       })
       .catch(() => setUsers([]));
-  };
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!open) return;
     setSearchQuery("");
     loadUsers("");
-  }, [open, currentUserId]);
+  }, [loadUsers, open]);
 
   useEffect(() => {
     if (!open) return;
     const timer = setTimeout(() => loadUsers(searchQuery), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, open, currentUserId]);
+  }, [loadUsers, searchQuery, open]);
 
   const handleUserClick = (username: string) => {
     onClose();
@@ -98,7 +98,7 @@ const PeopleSearchModal = ({ open, onClose, currentUserId }: PeopleSearchModalPr
                   strong
                   className="max-w-full"
                 />
-                {user.is_active === 0 && <Tag color="red" className="w-fit">Аккаунт заблокирован</Tag>}
+                {user.is_active === 0 && <Tag color="red" className="w-fit">{t("profile.accountBlocked")}</Tag>}
               </Flex>
             </Flex>
           ))}

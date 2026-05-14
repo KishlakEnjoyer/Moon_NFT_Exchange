@@ -35,6 +35,24 @@ class TelegramTopUpInvoiceResponse(BaseModel):
     cooldown_minutes: int
 
 
+class YooKassaTopUpPaymentResponse(BaseModel):
+    topup_id: int
+    user_id: int
+    wallet_address: str
+    amount: str
+    rate_rub_per_ton: str
+    rub_amount: str
+    price_kopecks: int
+    currency: str
+    payment_id: str
+    confirmation_url: str
+    cooldown_minutes: int
+
+
+class YooKassaTopUpConfirmRequest(BaseModel):
+    payment_id: str
+
+
 class TelegramTopUpPaidRequest(BaseModel):
     topup_id: int
     currency: str

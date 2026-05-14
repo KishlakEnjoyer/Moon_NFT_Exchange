@@ -1,6 +1,6 @@
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Button, Flex, Image, Input, Modal, Tag, message, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../services/auth";
 import { useTranslation } from "react-i18next";
 import UserNameWithBadge from "./UserNameWithBadge";
@@ -36,6 +36,31 @@ interface SendGiftModalProps {
   initialReceiverId?: number | null;
 }
 
+const getStoredCurrentUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("currentUser") || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const getSelfUserOption = (senderId: number): UserOption | null => {
+  const currentUser = getStoredCurrentUser();
+  if (Number(currentUser.user_id) !== senderId) {
+    return null;
+  }
+
+  return {
+    user_id: senderId,
+    username: currentUser.username || `User #${senderId}`,
+    profile_pic_url: currentUser.profile_pic_url || null,
+    is_active: currentUser.is_active ?? 1,
+    profile_badge_achievement_id: currentUser.profile_badge_achievement_id ?? null,
+    profile_badge_image_url: currentUser.profile_badge_image_url ?? null,
+    profile_badge_title: currentUser.profile_badge_title ?? null,
+  };
+};
+
 const SendGiftModal = ({
   open,
   senderId,
@@ -56,6 +81,38 @@ const SendGiftModal = ({
   const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  const loadUsers = useCallback((query: string) => {
+    const params = new URLSearchParams({
+      q: query,
+      include_user_id: String(senderId),
+    });
+
+    fetch(`${process.env.REACT_APP_API_URL}/user-info/search?${params.toString()}`)
+      .then((res) => {
+        if (res.ok) return res.json();
+        return [];
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const self = data.find((u: any) => u.user_id === senderId)
+            || (!query.trim() ? getSelfUserOption(senderId) : null);
+          const others = data.filter((u: any) => u.user_id !== senderId);
+          setUsers(self ? [self, ...others] : others);
+        }
+      })
+      .catch(() => setUsers([]));
+  }, [senderId]);
+
+  const loadCollections = useCallback(() => {
+    fetch(`${process.env.REACT_APP_API_URL}/api/filters/collections`)
+      .then((res) => res.json())
+      .then((data) => setCollections(Array.isArray(data) ? data : []))
+      .catch(() => {
+        messageApi.error(t("sendGift.failedLoadCollections"));
+        setCollections([]);
+      });
+  }, [messageApi, t]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -72,40 +129,14 @@ const SendGiftModal = ({
     setSelectedCollectionId(null);
     setDescription("");
     setCollectionSearchQuery("");
-  }, [open, initialReceiverId, messageApi]);
-
-  const loadUsers = (query: string) => {
-    fetch(`${process.env.REACT_APP_API_URL}/user-info/search?q=${encodeURIComponent(query)}`)
-      .then((res) => {
-        if (res.ok) return res.json();
-        return [];
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const others = data.filter((u: any) => u.user_id !== senderId);
-          const self = data.find((u: any) => u.user_id === senderId);
-          setUsers(self ? [self, ...others] : others);
-        }
-      })
-      .catch(() => setUsers([]));
-  };
-
-  const loadCollections = () => {
-    fetch(`${process.env.REACT_APP_API_URL}/api/filters/collections`)
-      .then((res) => res.json())
-      .then((data) => setCollections(Array.isArray(data) ? data : []))
-      .catch(() => {
-        messageApi.error(t("sendGift.failedLoadCollections"));
-        setCollections([]);
-      });
-  };
+  }, [loadCollections, loadUsers, open, initialReceiverId]);
 
   useEffect(() => {
     if (step === "user") {
       const timer = setTimeout(() => loadUsers(searchQuery), 300);
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, step, senderId]);
+  }, [loadUsers, searchQuery, step]);
 
   const handleUserSelect = (userId: number) => {
     const user = users.find((item) => item.user_id === userId);
@@ -280,7 +311,7 @@ const SendGiftModal = ({
 
                         {isBlocked && (
                           <Tag color="red" className="w-fit">
-                            Аккаунт заблокирован
+                            {t("profile.accountBlocked")}
                           </Tag>
                         )}
                       </Flex>
@@ -330,7 +361,7 @@ const SendGiftModal = ({
 
                     {selectedUserBlocked && (
                       <Tag color="red" className="w-fit">
-                        Аккаунт заблокирован
+                        {t("profile.accountBlocked")}
                       </Tag>
                     )}
                   </Flex>
@@ -344,7 +375,7 @@ const SendGiftModal = ({
                   </Text>
 
                   <Input.Search
-                    placeholder="Поиск коллекций"
+                    placeholder={t("sendGift.searchCollections")}
                     value={collectionSearchQuery}
                     onChange={(e) => setCollectionSearchQuery(e.target.value)}
                     className="mb-4"
@@ -388,7 +419,7 @@ const SendGiftModal = ({
 
                   {collections.length > 0 && filteredCollections.length === 0 && (
                     <Text type="secondary" className="text-center py-4 block">
-                      Ничего не найдено
+                      {t("sendGift.noCollectionMatches")}
                     </Text>
                   )}
                 </div>

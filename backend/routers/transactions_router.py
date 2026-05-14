@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
 
-from core.auth import get_current_user
+from core.auth import get_current_user, get_optional_current_user_any
 from core.database import get_db
 from core.models import TransactionHistory, User
 from core.request_models import TransactionResponse
@@ -15,6 +15,7 @@ transactions_router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 class TopSpenderResponse(BaseModel):
     user_id: int
+    rank: int
     username: str | None
     profile_pic_url: str | None
     profile_badge_achievement_id: int | None = None
@@ -24,11 +25,7 @@ class TopSpenderResponse(BaseModel):
     transactions_count: int
 
 
-@transactions_router.get("/top-spenders", response_model=List[TopSpenderResponse])
-def get_top_spenders(
-    limit: int = Query(default=10, ge=1, le=10),
-    db: Session = Depends(get_db),
-):
+def _get_ranked_spenders(db: Session):
     spender_id = case(
         (TransactionHistory.buyer_id.isnot(None), TransactionHistory.buyer_id),
         (TransactionHistory.transaction_type == "purchase", TransactionHistory.seller_id),
@@ -47,30 +44,72 @@ def get_top_spenders(
         .subquery()
     )
 
-    rows = (
+    spent_ton = func.coalesce(totals.c.spent_ton, 0)
+    transactions_count = func.coalesce(totals.c.transactions_count, 0)
+
+    return (
         db.query(
-            User.user_id,
-            User.username,
-            User.profile_pic_url,
-            totals.c.spent_ton,
-            totals.c.transactions_count,
+            User.user_id.label("user_id"),
+            User.username.label("username"),
+            User.profile_pic_url.label("profile_pic_url"),
+            spent_ton.label("spent_ton"),
+            transactions_count.label("transactions_count"),
+            func.row_number().over(
+                order_by=[
+                    spent_ton.desc(),
+                    transactions_count.desc(),
+                    User.user_id.asc(),
+                ]
+            ).label("rank_position"),
         )
-        .join(totals, totals.c.spender_id == User.user_id)
+        .outerjoin(totals, totals.c.spender_id == User.user_id)
         .filter(User.is_active == 1)
-        .order_by(
-            totals.c.spent_ton.desc(),
-            totals.c.transactions_count.desc(),
-            User.user_id.asc(),
-        )
+        .subquery()
+    )
+
+
+def _ranked_spenders_query(db: Session, ranked_spenders):
+    return db.query(
+        ranked_spenders.c.user_id,
+        ranked_spenders.c.rank_position,
+        ranked_spenders.c.username,
+        ranked_spenders.c.profile_pic_url,
+        ranked_spenders.c.spent_ton,
+        ranked_spenders.c.transactions_count,
+    )
+
+
+@transactions_router.get("/top-spenders", response_model=List[TopSpenderResponse])
+def get_top_spenders(
+    limit: int = Query(default=10, ge=1, le=10),
+    current_user: User | None = Depends(get_optional_current_user_any),
+    db: Session = Depends(get_db),
+):
+    ranked_spenders = _get_ranked_spenders(db)
+
+    rows = (
+        _ranked_spenders_query(db, ranked_spenders)
+        .filter(ranked_spenders.c.transactions_count > 0)
+        .order_by(ranked_spenders.c.rank_position.asc())
         .limit(limit)
         .all()
     )
+
+    if current_user and current_user.user_id not in {row.user_id for row in rows}:
+        current_user_row = (
+            _ranked_spenders_query(db, ranked_spenders)
+            .filter(ranked_spenders.c.user_id == current_user.user_id)
+            .first()
+        )
+        if current_user_row:
+            rows.append(current_user_row)
 
     profile_badges = get_visible_profile_badges(db, {row.user_id for row in rows})
 
     return [
         TopSpenderResponse(
             user_id=row.user_id,
+            rank=int(row.rank_position),
             username=row.username,
             profile_pic_url=row.profile_pic_url,
             profile_badge_achievement_id=profile_badges.get(row.user_id, {}).get("achievement_id"),

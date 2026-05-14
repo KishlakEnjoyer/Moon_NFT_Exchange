@@ -3,6 +3,8 @@ import {
   CheckCircleOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
+  RotateRightOutlined,
+  UndoOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Flex, Input, Modal, Slider, Switch, Typography, message } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -74,6 +76,24 @@ const loadImageElement = (src: string) =>
     image.src = src;
   });
 
+const rotateImageDataUrl = async (src: string) => {
+  const image = await loadImageElement(src);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalHeight;
+  canvas.height = image.naturalWidth;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Failed to prepare image rotation");
+  }
+
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate(Math.PI / 2);
+  context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+
+  return canvas.toDataURL("image/png");
+};
+
 const getMinCropScale = (imageSize: ImageSize | null, stageSize: number) => {
   if (!imageSize || stageSize <= 0) {
     return 1;
@@ -123,13 +143,9 @@ const createCroppedAvatarDataUrl = async (
     throw new Error("Failed to prepare image crop");
   }
 
-  const sourceX = Math.max(0, -position.x / scale);
-  const sourceY = Math.max(0, -position.y / scale);
-  const sourceSize = Math.min(
-    imageSize.width - sourceX,
-    imageSize.height - sourceY,
-    stageSize / scale,
-  );
+  const sourceSize = Math.min(stageSize / scale, imageSize.width, imageSize.height);
+  const sourceX = Math.min(imageSize.width - sourceSize, Math.max(0, -position.x / scale));
+  const sourceY = Math.min(imageSize.height - sourceSize, Math.max(0, -position.y / scale));
 
   context.drawImage(
     image,
@@ -532,6 +548,43 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
     setCropPosition(clampCropPosition(nextPosition, cropImageSize, nextScale, cropStageSize));
   };
 
+  const resetCropView = () => {
+    if (!cropImageSize) {
+      return;
+    }
+
+    const minScale = getMinCropScale(cropImageSize, cropStageSize);
+    setCropScale(minScale);
+    setCropPosition(
+      clampCropPosition(
+        {
+          x: (cropStageSize - cropImageSize.width * minScale) / 2,
+          y: (cropStageSize - cropImageSize.height * minScale) / 2,
+        },
+        cropImageSize,
+        minScale,
+        cropStageSize,
+      ),
+    );
+  };
+
+  const handleRotateCrop = async () => {
+    if (!cropImageSrc || isCheckingProfilePhoto) {
+      return;
+    }
+
+    try {
+      const rotatedDataUrl = await rotateImageDataUrl(cropImageSrc);
+      setCropImageSrc(rotatedDataUrl);
+      setCropImageSize(null);
+      setCropPosition({ x: 0, y: 0 });
+      setCropScale(1);
+    } catch (error) {
+      console.error("Failed to rotate profile photo:", error);
+      messageApi.error(t("editProfile.failedReadImage"));
+    }
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -749,6 +802,11 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
               <Flex vertical gap={4} className="min-w-0">
                 <Text strong>{t("editProfile.profilePhoto")}</Text>
                 <Text type="secondary" className="break-words">{t("editProfile.photoHint")}</Text>
+                {profilePicDataUrl && !removeProfilePic && (
+                  <Text type="secondary" className="text-xs">
+                    {t("editProfile.previewNotSaved")}
+                  </Text>
+                )}
               </Flex>
             </Flex>
 
@@ -849,12 +907,32 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
                 }}
               />
             )}
-            <div className="moon-avatar-crop-vignette" />
-            <div className="moon-avatar-crop-ring" />
           </div>
 
           <div className="w-full">
-            <Text strong className="block mb-2">{t("editProfile.zoom")}</Text>
+            <Flex align="center" justify="space-between" gap={8} wrap="wrap" className="mb-2">
+              <Text strong>{t("editProfile.zoom")}</Text>
+              <Flex gap={8} wrap="wrap">
+                <Button
+                  size="small"
+                  icon={<UndoOutlined />}
+                  onClick={resetCropView}
+                  disabled={!cropImageSize || isCheckingProfilePhoto}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                >
+                  {t("editProfile.resetCrop")}
+                </Button>
+                <Button
+                  size="small"
+                  icon={<RotateRightOutlined />}
+                  onClick={() => void handleRotateCrop()}
+                  disabled={!cropImageSrc || isCheckingProfilePhoto}
+                  className="!bg-[var(--liquid-glass-bg)]"
+                >
+                  {t("editProfile.rotatePhoto")}
+                </Button>
+              </Flex>
+            </Flex>
             <Slider
               min={cropMinScale}
               max={cropMaxScale}

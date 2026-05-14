@@ -397,6 +397,8 @@ def get_summary(
     days: int = Query(default=14, ge=1, le=90),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    collection_id: int | None = Query(default=None, ge=1),
+    compare: bool = Query(default=False),
     current_user: User = Depends(require_manager),
     db: Session = Depends(get_db),
 ):
@@ -442,49 +444,88 @@ def get_summary(
 
     range_start_dt = datetime.combine(range_start, datetime.min.time())
     range_end_dt = datetime.combine(range_end + timedelta(days=1), datetime.min.time())
+    period_days = (range_end - range_start).days + 1
 
-    sales_by_day_rows = (
-        db.query(
+    if collection_id is not None and not db.get(Collections, collection_id):
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    def filter_transactions_by_collection(query):
+        if collection_id is None:
+            return query
+
+        return (
+            query
+            .join(Present, Present.present_id == Transaction.present_id)
+            .filter(Present.collection_id == collection_id)
+        )
+
+    def get_period_totals(start_dt: datetime, end_dt: datetime) -> dict:
+        totals_query = db.query(
+            func.count(Transaction.transaction_id),
+            func.coalesce(func.sum(Transaction.transaction_price), 0),
+            func.coalesce(func.sum(Transaction.platform_fee), 0),
+        ).filter(
+            Transaction.transaction_date >= start_dt,
+            Transaction.transaction_date < end_dt,
+        )
+        totals_query = filter_transactions_by_collection(totals_query)
+        row = totals_query.one()
+        return {
+            "transactions": int(row[0] or 0),
+            "volume": money(row[1]),
+            "platform_fee": money(row[2]),
+        }
+
+    def get_sales_by_day(start: date, end: date) -> list[dict]:
+        start_dt = datetime.combine(start, datetime.min.time())
+        end_dt = datetime.combine(end + timedelta(days=1), datetime.min.time())
+        rows_query = db.query(
             func.date(Transaction.transaction_date).label("day"),
             func.count(Transaction.transaction_id),
             func.coalesce(func.sum(Transaction.transaction_price), 0),
+        ).filter(
+            Transaction.transaction_date >= start_dt,
+            Transaction.transaction_date < end_dt,
         )
-        .filter(
-            Transaction.transaction_date >= range_start_dt,
-            Transaction.transaction_date < range_end_dt,
+        rows_query = filter_transactions_by_collection(rows_query)
+        rows = (
+            rows_query
+            .group_by(func.date(Transaction.transaction_date))
+            .order_by(func.date(Transaction.transaction_date))
+            .all()
         )
-        .group_by(func.date(Transaction.transaction_date))
-        .order_by(func.date(Transaction.transaction_date))
-        .all()
-    )
 
-    sales_by_day_map = {}
-    for row in sales_by_day_rows:
-        day_value = row[0]
-        if isinstance(day_value, datetime):
-            day_key = day_value.date().isoformat()
-        elif hasattr(day_value, "isoformat"):
-            day_key = day_value.isoformat()
-        else:
-            day_key = str(day_value)
-        sales_by_day_map[day_key] = {
-            "transactions": int(row[1] or 0),
-            "volume": money(row[2]),
-        }
+        by_day = {}
+        for row in rows:
+            day_value = row[0]
+            if isinstance(day_value, datetime):
+                day_key = day_value.date().isoformat()
+            elif hasattr(day_value, "isoformat"):
+                day_key = day_value.isoformat()
+            else:
+                day_key = str(day_value)
+            by_day[day_key] = {
+                "transactions": int(row[1] or 0),
+                "volume": money(row[2]),
+            }
 
-    sales_by_day = []
-    for offset in range((range_end - range_start).days + 1):
-        day = range_start + timedelta(days=offset)
-        day_key = day.isoformat()
-        day_stats = sales_by_day_map.get(day_key, {"transactions": 0, "volume": "0"})
-        sales_by_day.append({
-            "day": day_key,
-            "transactions": day_stats["transactions"],
-            "volume": day_stats["volume"],
-        })
+        result = []
+        for offset in range((end - start).days + 1):
+            day = start + timedelta(days=offset)
+            day_key = day.isoformat()
+            day_stats = by_day.get(day_key, {"transactions": 0, "volume": "0"})
+            result.append({
+                "day": day_key,
+                "transactions": day_stats["transactions"],
+                "volume": day_stats["volume"],
+            })
+        return result
 
-    top_collection_rows = (
+    sales_by_day = get_sales_by_day(range_start, range_end)
+
+    top_collection_query = (
         db.query(
+            Collections.collection_id,
             Collections.collection_name,
             func.count(Transaction.transaction_id),
             func.coalesce(func.sum(Transaction.transaction_price), 0),
@@ -495,11 +536,44 @@ def get_summary(
             Transaction.transaction_date >= range_start_dt,
             Transaction.transaction_date < range_end_dt,
         )
+    )
+    if collection_id is not None:
+        top_collection_query = top_collection_query.filter(Collections.collection_id == collection_id)
+    top_collection_rows = (
+        top_collection_query
         .group_by(Collections.collection_id, Collections.collection_name)
         .order_by(func.sum(Transaction.transaction_price).desc())
         .limit(5)
         .all()
     )
+
+    previous_start = range_start - timedelta(days=period_days)
+    previous_end = range_start - timedelta(days=1)
+    previous_start_dt = datetime.combine(previous_start, datetime.min.time())
+    previous_end_dt = datetime.combine(previous_end + timedelta(days=1), datetime.min.time())
+    current_totals = get_period_totals(range_start_dt, range_end_dt)
+    previous_totals = get_period_totals(previous_start_dt, previous_end_dt) if compare else {
+        "transactions": 0,
+        "volume": "0",
+        "platform_fee": "0",
+    }
+    previous_sales_by_day = get_sales_by_day(previous_start, previous_end) if compare else []
+    comparison_sales_by_day = []
+    for index, current_day in enumerate(sales_by_day):
+        previous_day = previous_sales_by_day[index] if index < len(previous_sales_by_day) else None
+        comparison_sales_by_day.append({
+            **current_day,
+            "previous_day": previous_day["day"] if previous_day else None,
+            "previous_transactions": previous_day["transactions"] if previous_day else 0,
+            "previous_volume": previous_day["volume"] if previous_day else "0",
+        })
+
+    current_volume_number = Decimal(str(current_totals["volume"]))
+    previous_volume_number = Decimal(str(previous_totals["volume"]))
+    volume_delta = current_volume_number - previous_volume_number
+    volume_delta_percent = None
+    if previous_volume_number != 0:
+        volume_delta_percent = float((volume_delta / previous_volume_number) * Decimal("100"))
 
     report_status_rows = (
         db.query(
@@ -529,8 +603,33 @@ def get_summary(
             "pending_reports": pending_report_count,
         },
         "sales_by_day": sales_by_day,
+        "collections": [
+            {"id": row[0], "name": row[1]}
+            for row in db.query(Collections.collection_id, Collections.collection_name)
+            .order_by(Collections.collection_name.asc())
+            .all()
+        ],
+        "comparison": {
+            "enabled": compare,
+            "current": {
+                "start_date": range_start.isoformat(),
+                "end_date": range_end.isoformat(),
+                **current_totals,
+            },
+            "previous": {
+                "start_date": previous_start.isoformat(),
+                "end_date": previous_end.isoformat(),
+                **previous_totals,
+            },
+            "delta": {
+                "transactions": current_totals["transactions"] - previous_totals["transactions"],
+                "volume": money(volume_delta),
+                "volume_percent": volume_delta_percent,
+            },
+            "sales_by_day": comparison_sales_by_day,
+        },
         "top_collections": [
-            {"collection_name": row[0], "transactions": int(row[1] or 0), "volume": money(row[2])}
+            {"collection_id": row[0], "collection_name": row[1], "transactions": int(row[2] or 0), "volume": money(row[3])}
             for row in top_collection_rows
         ],
         "reports_by_status": [

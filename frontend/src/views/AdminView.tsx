@@ -30,6 +30,7 @@ import {
   CheckOutlined,
   CloseOutlined,
   DatabaseOutlined,
+  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   FileSearchOutlined,
@@ -109,6 +110,12 @@ type ModerationStatusFilter = "pending" | "approved" | "rejected" | "all";
 
 const dictionaryKinds: DictionaryKind[] = ["collections", "models", "backgrounds", "symbols"];
 const IMAGES_URL = process.env.REACT_APP_IMAGES_URL || "";
+const ADMIN_TABLE_SCROLL_Y = 420;
+const DASHBOARD_TABLE_SCROLL_Y = 320;
+
+const getAdminTableScroll = (x?: number | string, y = ADMIN_TABLE_SCROLL_Y) => (
+  x === undefined ? { y } : { x, y }
+);
 
 const dictionaryFolderByKind: Record<DictionaryKind, string> = {
   collections: "collections",
@@ -200,7 +207,7 @@ const pendingReportStatusNames = new Set([
 ]);
 
 const getDefaultSalesRange = (): [Dayjs, Dayjs] => [
-  dayjs().subtract(6, "day"),
+  dayjs().subtract(29, "day"),
   dayjs(),
 ];
 
@@ -254,6 +261,24 @@ const formatDate = (value: string | null | undefined, locale: string, emptyValue
   return date.toLocaleString(locale);
 };
 
+const csvEscape = (value: string | number | null | undefined) => {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const downloadCsv = (filename: string, rows: Array<Array<string | number | null | undefined>>) => {
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 const renderSocialAdminCell = (
   t: TFunction,
   provider: "tg" | "vk",
@@ -301,7 +326,7 @@ const renderAdminUserNameWithBadge = (
 );
 
 const PanelShell = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
-  <div className={`rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-3 sm:p-5 ${className}`.trim()}>
+  <div className={`moon-admin-panel min-w-0 overflow-hidden rounded-lg border border-[var(--black-transparent)] bg-[var(--liquid-glass-bg)] p-3 sm:p-5 ${className}`.trim()}>
     {children}
   </div>
 );
@@ -339,6 +364,71 @@ const VerticalBarChart = ({ data }: { data: AdminSummary["sales_by_day"] }) => {
                     className="absolute bottom-0 left-1/2 w-[78%] max-w-[220px] -translate-x-1/2 rounded-t-md"
                     style={{
                       height,
+                      background: "linear-gradient(180deg, #22c55e 0%, #2b4acb 100%)",
+                    }}
+                  />
+                </div>
+                <Text type="secondary" className="block text-center text-xs leading-5 tabular-nums">{day}</Text>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </PanelShell>
+  );
+};
+
+const ComparisonVolumeChart = ({
+  data,
+}: {
+  data: NonNullable<AdminSummary["comparison"]>["sales_by_day"];
+}) => {
+  const { t, i18n } = useTranslation();
+  const locale = getAdminLocale(i18n.language);
+  const values = data.flatMap((item) => [Number(item.volume), Number(item.previous_volume)]);
+  const max = Math.max(1, ...values);
+  const chartHeight = 132;
+
+  return (
+    <PanelShell className="h-full !p-3">
+      <Flex justify="space-between" align="center" gap={12} wrap="wrap" className="!mb-3">
+        <Title level={5} className="!mb-0">{t("admin.dashboard.compareVolumeChart")}</Title>
+        <Flex gap={12} wrap="wrap">
+          <Flex align="center" gap={6}>
+            <span className="h-2.5 w-2.5 rounded-full bg-[#2b4acb]" />
+            <Text type="secondary" className="text-xs">{t("admin.dashboard.currentPeriod")}</Text>
+          </Flex>
+          <Flex align="center" gap={6}>
+            <span className="h-2.5 w-2.5 rounded-full bg-[#94a3b8]" />
+            <Text type="secondary" className="text-xs">{t("admin.dashboard.previousPeriod")}</Text>
+          </Flex>
+        </Flex>
+      </Flex>
+      <div className="overflow-x-auto">
+        <div
+          className="grid h-44 min-w-[560px] gap-2"
+          style={{ gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(56px, 1fr))` }}
+        >
+          {data.map((item) => {
+            const currentValue = Number(item.volume);
+            const previousValue = Number(item.previous_volume);
+            const currentHeight = Math.max(4, Math.round((currentValue / max) * chartHeight));
+            const previousHeight = Math.max(4, Math.round((previousValue / max) * chartHeight));
+            const day = new Date(item.day).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
+
+            return (
+              <div key={item.day} className="grid grid-rows-[1fr_20px]">
+                <div className="flex h-full items-end justify-center gap-1">
+                  <div
+                    title={`${t("admin.dashboard.previousPeriod")}: ${formatTonNumber(previousValue, locale)} TON`}
+                    className="w-[30%] max-w-[34px] rounded-t-md bg-[#94a3b8]/80"
+                    style={{ height: previousHeight }}
+                  />
+                  <div
+                    title={`${t("admin.dashboard.currentPeriod")}: ${formatTonNumber(currentValue, locale)} TON`}
+                    className="w-[30%] max-w-[34px] rounded-t-md"
+                    style={{
+                      height: currentHeight,
                       background: "linear-gradient(180deg, #22c55e 0%, #2b4acb 100%)",
                     }}
                   />
@@ -559,20 +649,27 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const locale = getAdminLocale(i18n.language);
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>("14");
+  const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>("30");
   const [customSalesRange, setCustomSalesRange] = useState<[Dayjs, Dayjs]>(getDefaultSalesRange);
   const [dashboardSection, setDashboardSection] = useState<DashboardSection>("overview");
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
 
   const summaryParams = useMemo<AdminSummaryParams>(() => {
+    const baseParams = {
+      collectionId: selectedCollectionId,
+      compare: true,
+    };
+
     if (salesRangePreset === "custom") {
       return {
+        ...baseParams,
         startDate: customSalesRange[0].format("YYYY-MM-DD"),
         endDate: customSalesRange[1].format("YYYY-MM-DD"),
       };
     }
 
-    return { days: Number(salesRangePreset) };
-  }, [customSalesRange, salesRangePreset]);
+    return { ...baseParams, days: Number(salesRangePreset) };
+  }, [customSalesRange, salesRangePreset, selectedCollectionId]);
 
   const salesRangeLabel = useMemo(() => {
     if (salesRangePreset === "custom") {
@@ -609,6 +706,43 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
     [t("admin.dashboard.activeListings"), summary.cards.active_listings],
     [t("admin.dashboard.pendingReports"), summary.cards.pending_reports],
   ];
+  const selectedCollection = summary.collections.find((item) => item.id === selectedCollectionId);
+  const comparison = summary.comparison;
+  const volumeDelta = Number(comparison?.delta.volume || 0);
+  const volumeDeltaLabel = volumeDelta >= 0
+    ? `+${formatTonNumber(volumeDelta, locale)}`
+    : formatTonNumber(volumeDelta, locale);
+  const volumeDeltaPercentLabel = comparison?.delta.volume_percent === null || comparison?.delta.volume_percent === undefined
+    ? null
+    : `${comparison.delta.volume_percent >= 0 ? "+" : ""}${comparison.delta.volume_percent.toFixed(1)}%`;
+
+  const handleExportCsv = () => {
+    const periodLabel = salesRangePreset === "custom"
+      ? `${summaryParams.startDate}_${summaryParams.endDate}`
+      : `${salesRangePreset}d`;
+    const collectionLabel = selectedCollection
+      ? selectedCollection.name.replace(/[^a-z0-9_-]+/gi, "_")
+      : "all_collections";
+    const comparisonRows = comparison?.sales_by_day || [];
+    downloadCsv(`moon_admin_sales_${periodLabel}_${collectionLabel}.csv`, [
+      [t("admin.dashboard.date"), t("admin.dashboard.deals"), t("admin.dashboard.volume"), t("admin.dashboard.previousDate"), t("admin.dashboard.previousDeals"), t("admin.dashboard.previousVolume")],
+      ...summary.sales_by_day.map((item, index) => {
+        const previous = comparisonRows[index];
+        return [
+          item.day,
+          item.transactions,
+          item.volume,
+          previous?.previous_day || "",
+          previous?.previous_transactions ?? "",
+          previous?.previous_volume ?? "",
+        ];
+      }),
+      [],
+      [t("admin.dashboard.topCollectionsByVolume")],
+      [t("admin.dashboard.collection"), t("admin.dashboard.deals"), t("admin.dashboard.volume")],
+      ...summary.top_collections.map((item) => [item.collection_name, item.transactions, item.volume]),
+    ]);
+  };
 
   return (
     <Flex vertical gap={16}>
@@ -628,9 +762,21 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
         <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
           <Flex vertical gap={2}>
             <Text strong>{t("admin.dashboard.salesPeriod")}</Text>
-            <Text type="secondary" className="text-xs">{salesRangeLabel}</Text>
+            <Text type="secondary" className="text-xs">
+              {selectedCollection ? `${salesRangeLabel} / ${selectedCollection.name}` : salesRangeLabel}
+            </Text>
           </Flex>
           <Flex gap={8} wrap="wrap" justify="flex-end">
+            <Select
+              allowClear
+              showSearch
+              value={selectedCollectionId ?? undefined}
+              placeholder={t("admin.dashboard.allCollections")}
+              optionFilterProp="label"
+              className="min-w-[220px]"
+              options={summary.collections.map((collection) => ({ value: collection.id, label: collection.name }))}
+              onChange={(value) => setSelectedCollectionId(value ?? null)}
+            />
             <Segmented
               value={dashboardSection}
               options={[
@@ -667,22 +813,52 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                 }}
               />
             )}
+            <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>
+              {t("admin.dashboard.exportCsv")}
+            </Button>
             <Button icon={<ReloadOutlined />} onClick={loadSummary}>{t("admin.refresh")}</Button>
           </Flex>
         </Flex>
       </PanelShell>
 
       {dashboardSection === "overview" && (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <StatusChart data={summary.reports_by_status} />
-          <HorizontalBarChart data={summary.top_collections} />
-        </div>
+        <Flex vertical gap={12}>
+          {comparison && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.currentPeriod")}</Text>
+                <Title level={4} className="!mb-0">{formatTonNumber(comparison.current.volume, locale)} TON</Title>
+                <Text type="secondary" className="text-xs">{comparison.current.start_date} - {comparison.current.end_date}</Text>
+              </PanelShell>
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.previousPeriod")}</Text>
+                <Title level={4} className="!mb-0">{formatTonNumber(comparison.previous.volume, locale)} TON</Title>
+                <Text type="secondary" className="text-xs">{comparison.previous.start_date} - {comparison.previous.end_date}</Text>
+              </PanelShell>
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.periodChange")}</Text>
+                <Title level={4} className={`!mb-0 ${volumeDelta >= 0 ? "!text-[var(--green-accept)]" : "!text-[var(--red-fail)]"}`}>
+                  {volumeDeltaLabel} TON
+                </Title>
+                <Text type="secondary" className="text-xs">{volumeDeltaPercentLabel || t("admin.dashboard.noPreviousVolume")}</Text>
+              </PanelShell>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <StatusChart data={summary.reports_by_status} />
+            <HorizontalBarChart data={summary.top_collections} />
+          </div>
+        </Flex>
       )}
 
       {dashboardSection === "charts" && (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           <div className="xl:col-span-2">
-            <VerticalBarChart data={summary.sales_by_day} />
+            {comparison ? (
+              <ComparisonVolumeChart data={comparison.sales_by_day} />
+            ) : (
+              <VerticalBarChart data={summary.sales_by_day} />
+            )}
           </div>
           <HorizontalBarChart data={summary.top_collections} />
         </div>
@@ -696,6 +872,8 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
               rowKey="collection_name"
               size="small"
               pagination={false}
+              sticky
+              scroll={getAdminTableScroll(undefined, DASHBOARD_TABLE_SCROLL_Y)}
               dataSource={summary.top_collections}
               columns={[
                 { title: t("admin.dashboard.collection"), dataIndex: "collection_name" },
@@ -711,6 +889,8 @@ const DashboardPanel = ({ messageApi }: { messageApi: MessageApi }) => {
               rowKey="day"
               size="small"
               pagination={false}
+              sticky
+              scroll={getAdminTableScroll(undefined, DASHBOARD_TABLE_SCROLL_Y)}
               dataSource={summary.sales_by_day}
               columns={[
                 { title: t("admin.dashboard.date"), dataIndex: "day" },
@@ -866,7 +1046,8 @@ const ReportsPanel = ({
             rowKey="report_id"
             loading={loading}
             dataSource={reports}
-            scroll={{ x: 1040 }}
+            sticky
+            scroll={getAdminTableScroll(1040)}
             columns={[
               { title: "ID", dataIndex: "report_id", width: 80 },
               {
@@ -1284,7 +1465,8 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           rowKey="achievement_id"
           loading={loading}
           dataSource={items}
-          scroll={{ x: 980 }}
+          sticky
+          scroll={getAdminTableScroll(980)}
           columns={[
             {
               title: t("admin.achievements.image"),
@@ -1419,7 +1601,8 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           rowKey="moderation_id"
           loading={loading}
           dataSource={items}
-          scroll={{ x: 980 }}
+          sticky
+          scroll={getAdminTableScroll(980)}
           columns={[
             { title: "ID", dataIndex: "moderation_id", width: 80 },
             { title: t("admin.moderation.type"), dataIndex: "item_type", width: 150 },
@@ -1497,7 +1680,8 @@ const AuditPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           rowKey="audit_id"
           loading={loading}
           dataSource={items}
-          scroll={{ x: 900 }}
+          sticky
+          scroll={getAdminTableScroll(900)}
           columns={[
             { title: "ID", dataIndex: "audit_id", width: 80 },
             { title: t("admin.audit.actor"), dataIndex: "actor_user_id", width: 100 },
@@ -1670,7 +1854,8 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           rowKey="id"
           loading={loading}
           dataSource={filteredItems}
-          scroll={{ x: 820 }}
+          sticky
+          scroll={getAdminTableScroll(820)}
           columns={[
             { title: t("admin.dictionaries.name"), dataIndex: "name" },
             ...(kind === "models" ? [{ title: t("admin.dictionaries.collection"), dataIndex: "collection_name" }] : []),
@@ -1931,7 +2116,8 @@ const UsersAndRolesPanel = ({ messageApi, access }: { messageApi: MessageApi; ac
               size="small"
               loading={loading}
               dataSource={users}
-              scroll={{ x: 1370 }}
+              sticky
+              scroll={getAdminTableScroll(1370)}
               pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
               columns={[
                 { title: "ID", dataIndex: "user_id", width: 90 },
@@ -2038,6 +2224,8 @@ const UsersAndRolesPanel = ({ messageApi, access }: { messageApi: MessageApi; ac
               size="small"
               dataSource={roles}
               pagination={false}
+              sticky
+              scroll={getAdminTableScroll(760, 280)}
               columns={[
                 { title: "ID", dataIndex: "role_id", width: 80 },
                 { title: t("admin.users.roleName"), dataIndex: "role_name" },
@@ -2143,17 +2331,45 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyticsSection, setAnalyticsSection] = useState<AnalyticsSection>("reports");
+  const [salesRangePreset, setSalesRangePreset] = useState<SalesRangePreset>("30");
+  const [customSalesRange, setCustomSalesRange] = useState<[Dayjs, Dayjs]>(getDefaultSalesRange);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
+
+  const summaryParams = useMemo<AdminSummaryParams>(() => {
+    const baseParams = {
+      collectionId: selectedCollectionId,
+      compare: true,
+    };
+
+    if (salesRangePreset === "custom") {
+      return {
+        ...baseParams,
+        startDate: customSalesRange[0].format("YYYY-MM-DD"),
+        endDate: customSalesRange[1].format("YYYY-MM-DD"),
+      };
+    }
+
+    return { ...baseParams, days: Number(salesRangePreset) };
+  }, [customSalesRange, salesRangePreset, selectedCollectionId]);
+
+  const salesRangeLabel = useMemo(() => {
+    if (salesRangePreset === "custom") {
+      return `${customSalesRange[0].format("DD.MM.YYYY")} - ${customSalesRange[1].format("DD.MM.YYYY")}`;
+    }
+
+    return t("admin.dashboard.lastDays", { count: Number(salesRangePreset) });
+  }, [customSalesRange, salesRangePreset, t]);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
     try {
-      setSummary(await getAdminSummary());
+      setSummary(await getAdminSummary(summaryParams));
     } catch {
       messageApi.error(t("admin.analytics.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [messageApi, t]);
+  }, [messageApi, summaryParams, t]);
 
   useEffect(() => {
     loadSummary();
@@ -2162,21 +2378,106 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   if (loading) return <Spin className="my-10" />;
   if (!summary) return <Empty description={t("admin.analytics.noData")} />;
 
+  const selectedCollection = summary.collections.find((item) => item.id === selectedCollectionId);
+  const comparison = summary.comparison;
+  const volumeDelta = Number(comparison?.delta.volume || 0);
+  const volumeDeltaLabel = volumeDelta >= 0
+    ? `+${formatTonNumber(volumeDelta, locale)}`
+    : formatTonNumber(volumeDelta, locale);
+  const volumeDeltaPercentLabel = comparison?.delta.volume_percent === null || comparison?.delta.volume_percent === undefined
+    ? null
+    : `${comparison.delta.volume_percent >= 0 ? "+" : ""}${comparison.delta.volume_percent.toFixed(1)}%`;
+
+  const handleExportCsv = () => {
+    const periodLabel = salesRangePreset === "custom"
+      ? `${summaryParams.startDate}_${summaryParams.endDate}`
+      : `${salesRangePreset}d`;
+    const collectionLabel = selectedCollection
+      ? selectedCollection.name.replace(/[^a-z0-9_-]+/gi, "_")
+      : "all_collections";
+    const comparisonRows = comparison?.sales_by_day || [];
+    downloadCsv(`moon_admin_analytics_${periodLabel}_${collectionLabel}.csv`, [
+      [t("admin.dashboard.date"), t("admin.dashboard.deals"), t("admin.dashboard.volume"), t("admin.dashboard.previousDate"), t("admin.dashboard.previousDeals"), t("admin.dashboard.previousVolume")],
+      ...summary.sales_by_day.map((item, index) => {
+        const previous = comparisonRows[index];
+        return [
+          item.day,
+          item.transactions,
+          item.volume,
+          previous?.previous_day || "",
+          previous?.previous_transactions ?? "",
+          previous?.previous_volume ?? "",
+        ];
+      }),
+      [],
+      [t("admin.dashboard.topCollectionsByVolume")],
+      [t("admin.dashboard.collection"), t("admin.dashboard.deals"), t("admin.dashboard.volume")],
+      ...summary.top_collections.map((item) => [item.collection_name, item.transactions, item.volume]),
+    ]);
+  };
+
   return (
     <Flex vertical gap={16}>
       <PanelShell className="!p-3">
         <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
-          <Segmented
-            value={analyticsSection}
-            options={[
-              { label: t("admin.analytics.reports"), value: "reports" },
-              { label: t("admin.analytics.roles"), value: "roles" },
-              { label: t("admin.analytics.sales"), value: "sales" },
-              { label: t("admin.analytics.collections"), value: "collections" },
-            ]}
-            onChange={(value) => setAnalyticsSection(value as AnalyticsSection)}
-          />
-          <Button icon={<ReloadOutlined />} onClick={loadSummary}>{t("admin.refresh")}</Button>
+          <Flex vertical gap={2}>
+            <Segmented
+              value={analyticsSection}
+              options={[
+                { label: t("admin.analytics.reports"), value: "reports" },
+                { label: t("admin.analytics.roles"), value: "roles" },
+                { label: t("admin.analytics.sales"), value: "sales" },
+                { label: t("admin.analytics.collections"), value: "collections" },
+              ]}
+              onChange={(value) => setAnalyticsSection(value as AnalyticsSection)}
+            />
+            <Text type="secondary" className="text-xs">
+              {selectedCollection ? `${salesRangeLabel} / ${selectedCollection.name}` : salesRangeLabel}
+            </Text>
+          </Flex>
+          <Flex gap={8} wrap="wrap" justify="flex-end">
+            <Select
+              allowClear
+              showSearch
+              value={selectedCollectionId ?? undefined}
+              placeholder={t("admin.dashboard.allCollections")}
+              optionFilterProp="label"
+              className="min-w-[220px]"
+              options={summary.collections.map((collection) => ({ value: collection.id, label: collection.name }))}
+              onChange={(value) => setSelectedCollectionId(value ?? null)}
+            />
+            <Segmented
+              value={salesRangePreset}
+              options={[
+                { label: t("admin.dashboard.days7"), value: "7" },
+                { label: t("admin.dashboard.days14"), value: "14" },
+                { label: t("admin.dashboard.days30"), value: "30" },
+                { label: t("admin.dashboard.customRange"), value: "custom" },
+              ]}
+              onChange={(value) => setSalesRangePreset(value as SalesRangePreset)}
+            />
+            {salesRangePreset === "custom" && (
+              <RangePicker
+                allowClear={false}
+                value={customSalesRange}
+                disabledDate={(current) => Boolean(current?.isAfter(dayjs(), "day"))}
+                onChange={(dates) => {
+                  if (!dates?.[0] || !dates?.[1]) return;
+
+                  if (dates[1].diff(dates[0], "day") > 89) {
+                    messageApi.warning(t("admin.dashboard.rangeTooLong"));
+                    return;
+                  }
+
+                  setCustomSalesRange([dates[0], dates[1]]);
+                }}
+              />
+            )}
+            <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>
+              {t("admin.dashboard.exportCsv")}
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={loadSummary}>{t("admin.refresh")}</Button>
+          </Flex>
         </Flex>
       </PanelShell>
 
@@ -2187,6 +2488,8 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             rowKey="status"
             size="small"
             pagination={false}
+            sticky
+            scroll={getAdminTableScroll(undefined, 280)}
             dataSource={summary.reports_by_status}
             columns={[
               {
@@ -2207,6 +2510,8 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             rowKey="role"
             size="small"
             pagination={false}
+            sticky
+            scroll={getAdminTableScroll(undefined, 280)}
             dataSource={summary.users_by_role}
             columns={[
               { title: t("admin.analytics.role"), dataIndex: "role" },
@@ -2217,20 +2522,50 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
       )}
 
       {analyticsSection === "sales" && (
-        <PanelShell className="!p-3">
-          <Title level={5} className="!mb-3">{t("admin.analytics.dailyDeals")}</Title>
-          <Table
-            rowKey="day"
-            size="small"
-            pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
-            dataSource={summary.sales_by_day}
-            columns={[
-              { title: t("admin.dashboard.date"), dataIndex: "day" },
-              { title: t("admin.analytics.deals"), dataIndex: "transactions", width: 100 },
-              { title: t("admin.analytics.volume"), dataIndex: "volume", render: (value: string) => formatTonNumber(value, locale), width: 120 },
-            ]}
-          />
-        </PanelShell>
+        <Flex vertical gap={12}>
+          {comparison && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.currentPeriod")}</Text>
+                <Title level={4} className="!mb-0">{formatTonNumber(comparison.current.volume, locale)} TON</Title>
+                <Text type="secondary" className="text-xs">{comparison.current.start_date} - {comparison.current.end_date}</Text>
+              </PanelShell>
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.previousPeriod")}</Text>
+                <Title level={4} className="!mb-0">{formatTonNumber(comparison.previous.volume, locale)} TON</Title>
+                <Text type="secondary" className="text-xs">{comparison.previous.start_date} - {comparison.previous.end_date}</Text>
+              </PanelShell>
+              <PanelShell className="!p-3">
+                <Text type="secondary" className="block text-xs">{t("admin.dashboard.periodChange")}</Text>
+                <Title level={4} className={`!mb-0 ${volumeDelta >= 0 ? "!text-[var(--green-accept)]" : "!text-[var(--red-fail)]"}`}>
+                  {volumeDeltaLabel} TON
+                </Title>
+                <Text type="secondary" className="text-xs">{volumeDeltaPercentLabel || t("admin.dashboard.noPreviousVolume")}</Text>
+              </PanelShell>
+            </div>
+          )}
+          {comparison ? (
+            <ComparisonVolumeChart data={comparison.sales_by_day} />
+          ) : (
+            <VerticalBarChart data={summary.sales_by_day} />
+          )}
+          <PanelShell className="!p-3">
+            <Title level={5} className="!mb-3">{t("admin.analytics.dailyDeals")}</Title>
+            <Table
+              rowKey="day"
+              size="small"
+              pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
+              sticky
+              scroll={getAdminTableScroll(undefined, 360)}
+              dataSource={summary.sales_by_day}
+              columns={[
+                { title: t("admin.dashboard.date"), dataIndex: "day" },
+                { title: t("admin.analytics.deals"), dataIndex: "transactions", width: 100 },
+                { title: t("admin.analytics.volume"), dataIndex: "volume", render: (value: string) => formatTonNumber(value, locale), width: 120 },
+              ]}
+            />
+          </PanelShell>
+        </Flex>
       )}
 
       {analyticsSection === "collections" && (
@@ -2240,6 +2575,8 @@ const AnalyticsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             rowKey="collection_name"
             size="small"
             pagination={{ pageSize: 8, showSizeChanger: false, size: "small" }}
+            sticky
+            scroll={getAdminTableScroll(undefined, 360)}
             dataSource={summary.top_collections}
             columns={[
               { title: t("admin.analytics.collection"), dataIndex: "collection_name" },

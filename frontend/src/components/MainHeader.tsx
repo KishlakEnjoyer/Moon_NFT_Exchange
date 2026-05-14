@@ -5,7 +5,7 @@ import {
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   BellOutlined,
@@ -197,21 +197,21 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     onWarningOpenChange?.(false);
   }, [onWarningOpenChange]);
 
-  const clearPolling = () => {
+  const clearPolling = useCallback(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-  };
+  }, []);
 
-  const clearQrTimeout = () => {
+  const clearQrTimeout = useCallback(() => {
     if (qrTimeoutRef.current) {
       clearTimeout(qrTimeoutRef.current);
       qrTimeoutRef.current = null;
     }
-  };
+  }, []);
 
-  const clearPendingAuth = () => {
+  const clearPendingAuth = useCallback(() => {
     localStorage.removeItem("auth_state");
     localStorage.removeItem("auth_link");
     localStorage.removeItem("auth_provider");
@@ -221,9 +221,9 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     setAuthStateValue("");
     setAuthLink("");
     setAuthInstruction("");
-  };
+  }, []);
 
-  const startAuthPolling = (state: string) => {
+  const startAuthPolling = useCallback((state: string) => {
     clearPolling();
 
     pollingRef.current = window.setInterval(async () => {
@@ -282,13 +282,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         console.error("Polling failed:", err);
       }
     }, 2000);
-  };
+  }, [clearPendingAuth, clearPolling, clearQrTimeout, messageApi, onAuthFail, onAuthSuccess, t]);
 
   const handleQrTimeout = () => {
     console.log("QR auth timeout reached");
   };
 
-  const restorePendingAuth = () => {
+  const restorePendingAuth = useCallback(() => {
     const savedState = localStorage.getItem("auth_state");
     const savedProvider = localStorage.getItem("auth_provider");
     const savedLink = localStorage.getItem("auth_link") || localStorage.getItem("auth_deep_link") || "";
@@ -305,7 +305,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     setAuthLink(savedLink);
     setAuthInstruction(savedInstruction);
     return true;
-  };
+  }, []);
 
   const startProviderAuth = async (provider: AuthProvider) => {
     try {
@@ -414,7 +414,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         initAbortRef.current = null;
       }
     };
-  }, [messageApi]);
+  }, [clearPolling, clearQrTimeout, messageApi, restorePendingAuth, startAuthPolling]);
 
   useEffect(() => {
     const syncCurrentUser = () => {

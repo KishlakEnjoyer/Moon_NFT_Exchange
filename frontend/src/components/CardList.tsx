@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 interface CardListProps<T> {
   items: T[];
@@ -6,6 +7,7 @@ interface CardListProps<T> {
 }
 
 const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
+  const { t } = useTranslation();
   const [visibleCount, setVisibleCount] = useState(36);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +42,7 @@ const CardList = <T,>({ items, renderCard }: CardListProps<T>) => {
           ref={sentinelRef}
           className="w-full text-center h-[var(--size-lg)] text-[var(--size-smm)] text-[var(--white-60)]"
         >
-          Загрузка...
+          {t("common.loading")}
         </div>
       )}
     </div>

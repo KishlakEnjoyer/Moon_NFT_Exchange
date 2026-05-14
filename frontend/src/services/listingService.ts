@@ -71,6 +71,7 @@ export interface ListingViewResponse {
 
 export interface TopSpender {
   user_id: number;
+  rank: number;
   username: string | null;
   profile_pic_url: string | null;
   profile_badge_achievement_id: number | null;
@@ -268,7 +269,7 @@ export const recordListingView = async (listingId: number): Promise<ListingViewR
 
 export const getTopSpenders = async (limit = 10): Promise<TopSpender[]> => {
   const searchParams = new URLSearchParams({ limit: String(limit) });
-  const res = await fetch(`${API_URL}/transactions/top-spenders?${searchParams.toString()}`);
+  const res = await authFetch(`${API_URL}/transactions/top-spenders?${searchParams.toString()}`);
   if (!res.ok) {
     const error = await res.json().catch(() => null);
     throw new Error(error?.detail || "Failed to load top users");

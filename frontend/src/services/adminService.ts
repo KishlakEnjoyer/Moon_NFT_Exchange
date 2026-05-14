@@ -117,7 +117,22 @@ export interface AdminSummary {
     pending_reports: number;
   };
   sales_by_day: { day: string; transactions: number; volume: string }[];
-  top_collections: { collection_name: string; transactions: number; volume: string }[];
+  collections: { id: number; name: string }[];
+  comparison?: {
+    enabled: boolean;
+    current: { start_date: string; end_date: string; transactions: number; volume: string; platform_fee: string };
+    previous: { start_date: string; end_date: string; transactions: number; volume: string; platform_fee: string };
+    delta: { transactions: number; volume: string; volume_percent: number | null };
+    sales_by_day: {
+      day: string;
+      transactions: number;
+      volume: string;
+      previous_day: string | null;
+      previous_transactions: number;
+      previous_volume: string;
+    }[];
+  };
+  top_collections: { collection_id?: number; collection_name: string; transactions: number; volume: string }[];
   reports_by_status: { status: string; count: number }[];
   users_by_role: { role: string; count: number }[];
 }
@@ -126,6 +141,8 @@ export interface AdminSummaryParams {
   days?: number;
   startDate?: string;
   endDate?: string;
+  collectionId?: number | null;
+  compare?: boolean;
 }
 
 export interface AdminReport {
@@ -300,6 +317,8 @@ export async function getAdminSummary(params: AdminSummaryParams = {}): Promise<
   if (params.days) searchParams.set("days", String(params.days));
   if (params.startDate) searchParams.set("start_date", params.startDate);
   if (params.endDate) searchParams.set("end_date", params.endDate);
+  if (params.collectionId) searchParams.set("collection_id", String(params.collectionId));
+  if (params.compare !== undefined) searchParams.set("compare", String(params.compare));
 
   const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
   const response = await authFetch(`${API_URL}/admin/summary${suffix}`);

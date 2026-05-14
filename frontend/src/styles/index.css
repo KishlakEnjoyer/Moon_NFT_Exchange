@@ -143,9 +143,12 @@ html[data-theme="dark"] {
   cursor: grab;
   touch-action: none;
   user-select: none;
-  border: 1px solid var(--black-transparent);
-  border-radius: var(--size-smm);
-  background: #070b14;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.86),
+    0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
 .moon-avatar-crop-stage:active {
@@ -163,29 +166,27 @@ html[data-theme="dark"] {
   user-select: none;
 }
 
-.moon-avatar-crop-vignette,
-.moon-avatar-crop-ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.moon-avatar-crop-vignette {
-  background: radial-gradient(circle at center, transparent 0 50%, rgba(0, 0, 0, 0.58) 51% 100%);
-}
-
-.moon-avatar-crop-ring {
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.24);
-}
-
 .moon-market-tabs .ant-tabs-nav {
   margin-bottom: 8px;
 }
 
 .moon-market-tabs .ant-tabs-tab {
   padding: 8px 0;
+}
+
+.moon-admin-panel {
+  height: 100%;
+}
+
+.moon-admin-panel .ant-table-wrapper,
+.moon-admin-panel .ant-spin-nested-loading,
+.moon-admin-panel .ant-spin-container {
+  min-width: 0;
+}
+
+.moon-admin-panel .ant-table {
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .moon-top-users-list {
@@ -198,7 +199,7 @@ html[data-theme="dark"] {
 
 .moon-top-user-row {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: 52px auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -209,13 +210,65 @@ html[data-theme="dark"] {
   -webkit-backdrop-filter: blur(var(--liquid-glass-blur));
 }
 
+.moon-top-user-row-current {
+  border-color: var(--accent-100);
+  background: linear-gradient(90deg, var(--accent-20), var(--liquid-glass-bg));
+  box-shadow: inset 0 0 0 1px var(--accent-50);
+}
+
+.moon-top-user-row-separated {
+  margin-top: 14px;
+  position: relative;
+}
+
+.moon-top-user-row-separated::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--black-transparent);
+  opacity: 0.35;
+}
+
 .moon-top-user-rank {
-  min-width: 44px;
-  margin-inline-end: 0;
-  display: inline-flex;
+  width: 52px;
+  height: 32px;
+  display: flex;
   justify-content: center;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  border: 1px solid var(--black-transparent);
+  border-radius: 8px;
+  background: var(--liquid-glass-bg-secondary);
+  color: inherit;
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.moon-top-user-rank-gold {
+  border-color: rgba(250, 204, 21, 0.58);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.28), rgba(180, 83, 9, 0.2));
+  color: #fde68a;
+}
+
+.moon-top-user-rank-silver {
+  border-color: rgba(203, 213, 225, 0.58);
+  background: linear-gradient(135deg, rgba(226, 232, 240, 0.26), rgba(100, 116, 139, 0.18));
+  color: #e2e8f0;
+}
+
+.moon-top-user-rank-bronze {
+  border-color: rgba(217, 119, 6, 0.58);
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.24), rgba(120, 53, 15, 0.2));
+  color: #fed7aa;
+}
+
+.moon-top-user-rank .anticon {
+  font-size: 12px;
 }
 
 .moon-top-user-main {
@@ -346,8 +399,3 @@ html[data-theme="dark"] {
     display: none;
   }
 }
-
-
-
-
-

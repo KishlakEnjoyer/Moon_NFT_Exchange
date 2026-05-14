@@ -145,12 +145,7 @@ def _save_profile_picture(data_url: str, current_filename: str | None) -> str:
     return filename
 
 
-def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
-    user = db.scalar(select(User).where(User.user_tg_id == tg_id))
-
-    if not user:
-        raise ValueError(f"User with tg_id={tg_id} not found")
-
+def _get_user_profile_stats(db: Session, user: User) -> dict:
     gifts_count = db.scalar(
         select(func.count())
         .select_from(CurrentOwner)
@@ -211,6 +206,24 @@ def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
         "native_balance": native_balance,
         "token_balance": token_balance,
     }
+
+
+def get_user_profile_stats_by_tg_id(db: Session, tg_id: int) -> dict:
+    user = db.scalar(select(User).where(User.user_tg_id == tg_id))
+
+    if not user:
+        raise ValueError(f"User with tg_id={tg_id} not found")
+
+    return _get_user_profile_stats(db, user)
+
+
+def get_user_profile_stats_by_vk_id(db: Session, vk_id: int) -> dict:
+    user = db.scalar(select(User).where(User.user_vk_id == vk_id))
+
+    if not user:
+        raise ValueError(f"User with vk_id={vk_id} not found")
+
+    return _get_user_profile_stats(db, user)
 
 
 def _can_view_private_socials(user: User, viewer_user_id: int | None) -> bool:

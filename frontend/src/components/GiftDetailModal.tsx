@@ -315,7 +315,7 @@ const GiftDetailModal = ({
       const collectionId = Number((detail as any).collection_id);
 
       if (!collectionId) {
-        throw new Error("У подарка не приходит collection_id, поэтому нельзя загрузить модели для рулетки");
+        throw new Error(t("giftDetail.missingCollectionForUpgrade"));
       }
 
       const [modelsRes, backgroundsRes] = await Promise.all([
@@ -324,11 +324,11 @@ const GiftDetailModal = ({
       ]);
 
       if (!modelsRes.ok) {
-        throw new Error("Не удалось загрузить модели для рулетки");
+        throw new Error(t("giftDetail.failedLoadRouletteModels"));
       }
 
       if (!backgroundsRes.ok) {
-        throw new Error("Не удалось загрузить фоны для рулетки");
+        throw new Error(t("giftDetail.failedLoadRouletteBackgrounds"));
       }
 
       const [modelsData, backgroundsData] = await Promise.all([
@@ -343,7 +343,7 @@ const GiftDetailModal = ({
       console.log("ROULETTE BACKGROUNDS", backgrounds);
 
       if (models.length === 0) {
-        throw new Error("Для этой коллекции не найдено моделей");
+        throw new Error(t("giftDetail.noRouletteModels"));
       }
 
       setModelOptions(models);
@@ -777,7 +777,7 @@ const GiftDetailModal = ({
                 disabled={!rouletteCanSkip}
                 onClick={finishRoulette}
               >
-                Пропустить
+                {t("giftDetail.skip")}
               </Button>
             )}
 

@@ -1,5 +1,5 @@
 import useDocumentTitle from "../hooks/useDocumentTitle";
-import { Avatar, FloatButton, Layout, Spin, Empty, Flex, Tag, Tabs, Typography, Modal } from "antd";
+import { Avatar, FloatButton, Layout, Spin, Empty, Flex, Tabs, Typography, Modal } from "antd";
 import { Content } from "antd/es/layout/layout";
 import FilterBar from "../components/FilterBar";
 import type { FilterState } from "../components/FilterBar";
@@ -28,6 +28,7 @@ import UserNameWithBadge from "../components/UserNameWithBadge";
 
 const { Text } = Typography;
 type MainTabKey = "all" | "for_you" | "most_viewed" | "top_users";
+const TOP_USERS_LIMIT = 10;
 
 const DEFAULT_LISTING_FILTERS: FilterState = {
   search: "",
@@ -113,7 +114,7 @@ const MainView = () => {
   const loadTopUsers = useCallback(async () => {
     setTopUsersLoading(true);
     try {
-      const data = await getTopSpenders(10);
+      const data = await getTopSpenders(TOP_USERS_LIMIT);
       setTopUsers(data);
     } catch (e: any) {
       setTopUsers([]);
@@ -160,7 +161,7 @@ const MainView = () => {
       return;
     }
     if (currentUserBlocked) {
-      messageApi.error("Аккаунт заблокирован");
+      messageApi.error(t("profile.accountBlocked"));
       return;
     }
     try {
@@ -178,7 +179,7 @@ const MainView = () => {
       return;
     }
     if (currentUserBlocked) {
-      messageApi.error("Аккаунт заблокирован");
+      messageApi.error(t("profile.accountBlocked"));
       return;
     }
 
@@ -205,7 +206,7 @@ const MainView = () => {
       return;
     }
     if (currentUserBlocked) {
-      messageApi.error("Аккаунт заблокирован");
+      messageApi.error(t("profile.accountBlocked"));
       return;
     }
 
@@ -302,8 +303,22 @@ const MainView = () => {
     return (
       <div className="moon-top-users-list">
         {topUsers.map((user, index) => {
+          const displayRank = Number.isFinite(Number(user.rank)) ? Number(user.rank) : index + 1;
           const username = user.username ? `@${user.username}` : `User #${user.user_id}`;
           const avatarUrl = user.profile_pic_url ? getSellerAvatarUrl(user.profile_pic_url) : undefined;
+          const isCurrentUserRow = currentUserId === user.user_id;
+          const isOutsideVisibleTop = displayRank > TOP_USERS_LIMIT;
+          const rowClassName = [
+            "moon-top-user-row",
+            isCurrentUserRow && isOutsideVisibleTop ? "moon-top-user-row-current" : "",
+            isCurrentUserRow && isOutsideVisibleTop ? "moon-top-user-row-separated" : "",
+          ].filter(Boolean).join(" ");
+          const rankClassName = [
+            "moon-top-user-rank",
+            displayRank === 1 ? "moon-top-user-rank-gold" : "",
+            displayRank === 2 ? "moon-top-user-rank-silver" : "",
+            displayRank === 3 ? "moon-top-user-rank-bronze" : "",
+          ].filter(Boolean).join(" ");
           const name = user.username ? (
             <Link className="moon-top-user-link" to={`/account/${encodeURIComponent(user.username)}`}>
               <UserNameWithBadge
@@ -325,11 +340,11 @@ const MainView = () => {
           );
 
           return (
-            <div className="moon-top-user-row" key={user.user_id}>
-              <Tag className="moon-top-user-rank" color={index < 3 ? "gold" : "default"}>
-                {index < 3 && <TrophyOutlined />}
-                {index + 1}
-              </Tag>
+            <div className={rowClassName} key={user.user_id}>
+              <span className={rankClassName}>
+                {displayRank <= 3 && <TrophyOutlined />}
+                {displayRank}
+              </span>
               <Avatar
                 size={44}
                 src={avatarUrl}
