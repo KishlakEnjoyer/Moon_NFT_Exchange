@@ -88,6 +88,7 @@ import {
   getDictionaryItems,
   getModerationQueue,
   getUserSanctions,
+  publishCollection,
   sendAdminReportWarning,
   setAchievementActive,
   setAdminUserActive,
@@ -149,24 +150,40 @@ const moderationImageUrl = (record: ModerationItem) => {
   if (!imageUrl) return undefined;
   if (isAbsoluteAssetUrl(imageUrl)) return imageUrl;
 
-  if (record.target_kind === "collections" || record.payload?.collection_id !== undefined) {
+  if (record.target_kind === "collections") {
     return `${IMAGES_URL}/collections/${withDefaultExtension(imageUrl, "webp")}`;
   }
 
-  if (record.target_kind === "models" || record.payload?.model_id !== undefined) {
+  if (record.target_kind === "models") {
     return `${IMAGES_URL}/models/${withDefaultExtension(imageUrl, "webp")}`;
   }
 
-  if (record.target_kind === "backgrounds" || record.payload?.background_id !== undefined) {
+  if (record.target_kind === "backgrounds") {
     return `${IMAGES_URL}/bgs/${withDefaultExtension(imageUrl, "png")}`;
   }
 
-  if (record.target_kind === "symbols" || record.payload?.symbol_id !== undefined) {
+  if (record.target_kind === "symbols") {
     return `${IMAGES_URL}/symbols/${withDefaultExtension(imageUrl, "webp")}`;
   }
 
   if (record.item_type === "profile_photo") {
     return `${IMAGES_URL}/pfps/${imageUrl}`;
+  }
+
+  if (record.payload?.model_id !== undefined) {
+    return `${IMAGES_URL}/models/${withDefaultExtension(imageUrl, "webp")}`;
+  }
+
+  if (record.payload?.background_id !== undefined) {
+    return `${IMAGES_URL}/bgs/${withDefaultExtension(imageUrl, "png")}`;
+  }
+
+  if (record.payload?.symbol_id !== undefined) {
+    return `${IMAGES_URL}/symbols/${withDefaultExtension(imageUrl, "webp")}`;
+  }
+
+  if (record.payload?.collection_id !== undefined) {
+    return `${IMAGES_URL}/collections/${withDefaultExtension(imageUrl, "webp")}`;
   }
 
   return `${IMAGES_URL}/pfps/${imageUrl}`;
@@ -576,7 +593,7 @@ const AdminView = () => {
         key: "moderation",
         label: t("admin.tabs.moderation"),
         icon: <FileSearchOutlined />,
-        children: <ModerationPanel messageApi={messageApi} />,
+        children: <ModerationPanel messageApi={messageApi} access={access} />,
       });
     }
     if (access && (hasPermission("users.manage") || hasPermission("roles.manage"))) {
@@ -1550,11 +1567,12 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
   );
 };
 
-const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
-  const { t } = useTranslation();
+const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; access: AdminAccess | null }) => {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<ModerationItem[]>([]);
   const [status, setStatus] = useState<ModerationStatusFilter>("pending");
   const [loading, setLoading] = useState(true);
+  const isRuLanguage = i18n.language.startsWith("ru");
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -1573,12 +1591,34 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
 
   const handleDecision = async (id: number, decision: "approve" | "reject") => {
     try {
-      await decideModerationItem(id, decision);
-      messageApi.success(decision === "approve" ? t("admin.moderation.approved") : t("admin.moderation.rejected"));
+      const result = await decideModerationItem(id, decision);
+      if (result.status === "pending") {
+        messageApi.success(isRuLanguage ? "Голос учтен, заявка ждет кворум" : "Vote saved; waiting for quorum");
+      } else {
+        messageApi.success(decision === "approve" ? t("admin.moderation.approved") : t("admin.moderation.rejected"));
+      }
       await loadItems();
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : t("admin.moderation.processFailed"));
     }
+  };
+
+  const renderVoteProgress = (record: ModerationItem) => {
+    if (record.item_type !== "dictionary_image" || !record.vote_counts) {
+      return null;
+    }
+
+    const counts = record.vote_counts;
+    return (
+      <Flex vertical gap={2}>
+        <Text className="text-xs">
+          {isRuLanguage ? "Одобрения админов" : "Admin approvals"}: {counts.admin_approvals}/2
+        </Text>
+        <Text className="text-xs" type="secondary">
+          {isRuLanguage ? "Отказы админов" : "Admin rejections"}: {counts.admin_rejections}/1
+        </Text>
+      </Flex>
+    );
   };
 
   return (
@@ -1602,12 +1642,13 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
           loading={loading}
           dataSource={items}
           sticky
-          scroll={getAdminTableScroll(980)}
+          scroll={getAdminTableScroll(1160)}
           columns={[
             { title: "ID", dataIndex: "moderation_id", width: 80 },
             { title: t("admin.moderation.type"), dataIndex: "item_type", width: 150 },
             { title: t("admin.moderation.action"), dataIndex: "action", width: 120 },
-            { title: t("admin.moderation.target"), render: (_, record) => `${record.target_kind || "-"} ${record.target_id || ""}`, width: 160 },
+            { title: t("admin.moderation.target"), render: (_, record) => `${record.target_kind || "-"} ${record.target_id || ""}`, width: 150 },
+            { title: isRuLanguage ? "Автор" : "Author", dataIndex: "submitted_by", width: 100 },
             {
               title: t("admin.moderation.preview"),
               width: 120,
@@ -1626,6 +1667,11 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
             },
             { title: "Payload", render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
             {
+              title: isRuLanguage ? "Голоса" : "Votes",
+              width: 190,
+              render: (_, record) => renderVoteProgress(record),
+            },
+            {
               title: t("admin.moderation.status"),
               dataIndex: "status",
               width: 110,
@@ -1635,12 +1681,40 @@ const ModerationPanel = ({ messageApi }: { messageApi: MessageApi }) => {
               title: t("admin.moderation.actions"),
               fixed: "right",
               width: 180,
-              render: (_, record) => record.status === "pending" ? (
-                <Flex gap={8}>
-                  <Button size="small" type="primary" onClick={() => handleDecision(record.moderation_id, "approve")}>OK</Button>
-                  <Button size="small" danger onClick={() => handleDecision(record.moderation_id, "reject")}>{t("admin.reports.reject")}</Button>
-                </Flex>
-              ) : null,
+              render: (_, record) => {
+                if (record.status !== "pending") return null;
+
+                const isOwnDictionaryRequest = record.item_type === "dictionary_image" && record.submitted_by === access?.user_id;
+                const hasVoted = Boolean(record.votes?.some((vote) => vote.user_id === access?.user_id));
+                const disabledReason = isOwnDictionaryRequest
+                  ? (isRuLanguage ? "Нельзя голосовать за свою заявку" : "You cannot vote on your own request")
+                  : hasVoted
+                    ? (isRuLanguage ? "Вы уже проголосовали" : "You have already voted")
+                    : "";
+
+                return (
+                  <Tooltip title={disabledReason}>
+                    <Flex gap={8}>
+                      <Button
+                        size="small"
+                        type="primary"
+                        disabled={isOwnDictionaryRequest || hasVoted}
+                        onClick={() => handleDecision(record.moderation_id, "approve")}
+                      >
+                        OK
+                      </Button>
+                      <Button
+                        size="small"
+                        danger
+                        disabled={isOwnDictionaryRequest || hasVoted}
+                        onClick={() => handleDecision(record.moderation_id, "reject")}
+                      >
+                        {t("admin.reports.reject")}
+                      </Button>
+                    </Flex>
+                  </Tooltip>
+                );
+              },
             },
           ]}
         />
@@ -1814,8 +1888,18 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
       await setDictionaryItemArchived(kind, item.id, archived);
       messageApi.success(archived ? t("admin.dictionaries.archived") : t("admin.dictionaries.restored"));
       await loadItems();
-    } catch {
-      messageApi.error(t("admin.dictionaries.archiveFailed"));
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("admin.dictionaries.archiveFailed"));
+    }
+  };
+
+  const handlePublish = async (item: DictionaryItem) => {
+    try {
+      await publishCollection(item.id);
+      messageApi.success(i18n.language.startsWith("ru") ? "Коллекция выпущена" : "Collection published");
+      await loadItems();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t("admin.dictionaries.archiveFailed"));
     }
   };
 
@@ -1869,12 +1953,12 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
               width: 120,
               render: (value: number) => value === 1
                 ? <Tag color="green">{t("admin.status.active")}</Tag>
-                : <Tag>{t("admin.status.archive")}</Tag>,
+                : <Tag>{kind === "collections" ? (i18n.language.startsWith("ru") ? "Черновик" : "Draft") : t("admin.status.archive")}</Tag>,
             },
             {
               title: t("admin.dictionaries.actions"),
               fixed: "right",
-              width: 230,
+              width: 250,
               render: (_, record: DictionaryItem) => (
                 <Flex gap={8}>
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
@@ -1883,6 +1967,10 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                   {record.is_active === 1 ? (
                     <Button size="small" danger onClick={() => handleArchive(record, true)}>
                       {t("admin.dictionaries.archive")}
+                    </Button>
+                  ) : kind === "collections" ? (
+                    <Button size="small" type="primary" icon={<UnlockOutlined />} onClick={() => handlePublish(record)}>
+                      {i18n.language.startsWith("ru") ? "Выпустить" : "Publish"}
                     </Button>
                   ) : (
                     <Button size="small" onClick={() => handleArchive(record, false)}>

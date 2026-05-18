@@ -67,6 +67,7 @@ IMAGE_EXTENSIONS = {
 }
 
 SCHEMA_READY = False
+MODERATION_VOTES_KEY = "decision_votes"
 
 
 
@@ -201,6 +202,37 @@ def parse_payload_json(value: str | None) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def get_moderation_votes(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    votes = payload.get(MODERATION_VOTES_KEY)
+    if not isinstance(votes, list):
+        return []
+
+    return [vote for vote in votes if isinstance(vote, dict)]
+
+
+def moderation_vote_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = {
+        "moderator_approvals": 0,
+        "admin_approvals": 0,
+        "moderator_rejections": 0,
+        "admin_rejections": 0,
+    }
+
+    for vote in get_moderation_votes(payload):
+        decision = str(vote.get("decision") or "").strip().lower()
+        role = str(vote.get("role") or "").strip().lower()
+
+        if role not in {"moderator", "admin"} or decision not in {"approve", "reject"}:
+            continue
+
+        key = f"{role}_{'approvals' if decision == 'approve' else 'rejections'}"
+        counts[key] += 1
+
+    counts["total_approvals"] = counts["moderator_approvals"] + counts["admin_approvals"]
+    counts["total_rejections"] = counts["moderator_rejections"] + counts["admin_rejections"]
+    return counts
+
+
 def get_profile_badge_achievement_id(db: Session, user_id: int) -> int | None:
     value = db.scalar(
         text("SELECT profile_badge_achievement_id FROM users WHERE user_id = :user_id"),
@@ -332,6 +364,8 @@ def save_image_data_url(data_url: str, folder: str, prefix: str) -> str:
 
 
 def moderation_to_dict(item: ModerationQueueItem) -> dict[str, Any]:
+    payload = parse_payload_json(item.payload_json)
+    votes = get_moderation_votes(payload)
     return {
         "moderation_id": item.moderation_id,
         "item_type": item.item_type,
@@ -342,7 +376,9 @@ def moderation_to_dict(item: ModerationQueueItem) -> dict[str, Any]:
         "reviewed_by": item.reviewed_by,
         "status": item.status,
         "image_data_url": item.image_data_url,
-        "payload": parse_payload_json(item.payload_json),
+        "payload": payload,
+        "votes": votes,
+        "vote_counts": moderation_vote_counts(payload),
         "reason": item.reason,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "reviewed_at": item.reviewed_at.isoformat() if item.reviewed_at else None,
@@ -448,4 +484,3 @@ def sanction_to_dict(item: UserSanction) -> dict[str, Any]:
         "report_id": item.report_id,
         "created_at": item.created_at.isoformat() if item.created_at else None,
     }
-

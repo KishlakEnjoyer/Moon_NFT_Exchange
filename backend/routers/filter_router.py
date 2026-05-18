@@ -57,7 +57,9 @@ def get_models(
     rows = (
         db.execute(
             select(Models.model_id, Models.model_name, Models.model_image_url)
+            .join(Collections, Models.collection_id == Collections.collection_id)
             .where(Models.collection_id.in_(ids))
+            .where(Collections.is_active == 1)
             .where(text("models.is_active = 1"))
             .order_by(Models.model_name)
         )

@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -43,11 +44,14 @@ from services.admin_platform_service import (
     PERMISSION_LABELS,
     MASTER_ROLE_ID,
     MASTER_ROLE_NAMES,
+    MODERATION_VOTES_KEY,
     audit_to_dict,
     create_moderation_item,
+    get_moderation_votes,
     get_visible_profile_badges,
     log_audit,
     moderation_to_dict,
+    moderation_vote_counts,
     parse_payload_json,
     record_sanction,
     require_permission,
@@ -76,6 +80,8 @@ MANAGER_ROLE_IDS = {2, 3}
 ADMIN_ROLE_NAMES = {"admin", "administrator", "администратор"}
 MANAGER_ROLE_NAMES = {"manager", "moderator", "менеджер", "модератор"} | ADMIN_ROLE_NAMES
 PENDING_STATUS_NAMES = {"pending", "new", "open", "created", "awaiting review", "ожидает", "новая", "на рассмотрении"}
+DICTIONARY_ADMIN_APPROVALS_REQUIRED = 2
+DICTIONARY_ADMIN_REJECTIONS_REQUIRED = 1
 archive_columns_checked = False
 
 
@@ -889,7 +895,7 @@ def create_dictionary_item(
             collection_limit=payload.collection_limit or 100,
             purchase_limit=payload.purchase_limit,
             base_price=payload.base_price or Decimal("100.00"),
-            is_active=1,
+            is_active=0,
         )
     elif kind == "models":
         if not payload.collection_id:
@@ -1014,6 +1020,27 @@ def restore_dictionary_item(
     return set_dictionary_item_active(kind, item_id, 1, db)
 
 
+@admin_router.patch("/dictionaries/collections/{item_id}/publish")
+def publish_collection(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin_permission("dictionaries.manage", current_user, db)
+    item = db.get(Collections, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    models_count = db.scalar(select(func.count(Models.model_id)).where(Models.collection_id == item_id)) or 0
+    if models_count <= 0:
+        raise HTTPException(status_code=400, detail="Add at least one model before publishing the collection")
+
+    item.is_active = 1
+    log_audit(db, current_user.user_id, "dictionary.publish", "collections", item_id, {"models_count": int(models_count)})
+    db.commit()
+    return {"ok": True}
+
+
 def set_dictionary_item_active(kind: str, item_id: int, is_active: int, db: Session) -> dict:
     kind = check_dictionary_kind(kind)
     ensure_archive_columns(db)
@@ -1070,7 +1097,7 @@ def apply_dictionary_moderation(db: Session, item: ModerationQueueItem, reviewer
                 collection_limit=int(payload.get("collection_limit") or 100),
                 purchase_limit=payload.get("purchase_limit"),
                 base_price=Decimal(str(payload.get("base_price") or "100")),
-                is_active=1,
+                is_active=0,
             )
             db.add(target)
             db.flush()
@@ -1155,6 +1182,100 @@ def apply_profile_photo_moderation(db: Session, item: ModerationQueueItem, revie
     )
     log_audit(db, reviewer.user_id, "moderation.approve", "moderation", item.moderation_id, {"target_kind": "users", "target_id": user.user_id})
     return {"ok": True, "target_id": user.user_id, "image_url": filename}
+
+
+def save_moderation_payload(item: ModerationQueueItem, payload: dict[str, Any]) -> None:
+    item.payload_json = json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def add_dictionary_moderation_vote(
+    item: ModerationQueueItem,
+    reviewer: User,
+    decision: str,
+    reason: str | None,
+) -> tuple[dict[str, Any], dict[str, int]]:
+    if item.submitted_by == reviewer.user_id:
+        raise HTTPException(status_code=403, detail="Cannot review your own moderation request")
+
+    if not user_is_admin(reviewer):
+        raise HTTPException(status_code=403, detail="Admin role is required to review dictionary moderation requests")
+
+    payload = parse_payload_json(item.payload_json)
+    votes = get_moderation_votes(payload)
+
+    if any(int(vote.get("user_id") or 0) == reviewer.user_id for vote in votes):
+        raise HTTPException(status_code=409, detail="You have already voted on this moderation request")
+
+    vote = {
+        "user_id": reviewer.user_id,
+        "role": "admin",
+        "decision": decision,
+        "reason": reason,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    payload[MODERATION_VOTES_KEY] = [*votes, vote]
+    save_moderation_payload(item, payload)
+    return payload, moderation_vote_counts(payload)
+
+
+def dictionary_moderation_is_rejected(vote_counts: dict[str, int]) -> bool:
+    return vote_counts["admin_rejections"] >= DICTIONARY_ADMIN_REJECTIONS_REQUIRED
+
+
+def dictionary_moderation_is_approved(vote_counts: dict[str, int]) -> bool:
+    return vote_counts["admin_approvals"] >= DICTIONARY_ADMIN_APPROVALS_REQUIRED
+
+
+def decide_dictionary_moderation_item(
+    db: Session,
+    item: ModerationQueueItem,
+    decision_payload: ModerationDecisionPayload,
+    reviewer: User,
+) -> dict:
+    payload, vote_counts = add_dictionary_moderation_vote(
+        item=item,
+        reviewer=reviewer,
+        decision=decision_payload.decision,
+        reason=decision_payload.reason,
+    )
+
+    if dictionary_moderation_is_rejected(vote_counts):
+        item.status = "rejected"
+        item.reason = decision_payload.reason
+        item.reviewed_by = reviewer.user_id
+        item.reviewed_at = datetime.utcnow()
+        log_audit(
+            db,
+            reviewer.user_id,
+            "moderation.reject",
+            "moderation",
+            item.moderation_id,
+            {"reason": decision_payload.reason, "vote_counts": vote_counts},
+        )
+        db.commit()
+        return {"ok": True, "status": "rejected", "vote_counts": vote_counts}
+
+    if dictionary_moderation_is_approved(vote_counts):
+        result = apply_dictionary_moderation(db, item, reviewer)
+        result["status"] = "approved"
+        result["vote_counts"] = vote_counts
+        db.commit()
+        return result
+
+    log_audit(
+        db,
+        reviewer.user_id,
+        "moderation.vote",
+        "moderation",
+        item.moderation_id,
+        {
+            "decision": decision_payload.decision,
+            "role": "admin",
+            "vote_counts": vote_counts,
+        },
+    )
+    db.commit()
+    return {"ok": True, "status": "pending", "vote_counts": vote_counts, "payload": payload}
 
 
 @admin_router.get("/achievements/rules")
@@ -1295,6 +1416,9 @@ def decide_moderation_item(
     if item.status != "pending":
         raise HTTPException(status_code=409, detail="Moderation item is already closed")
 
+    if item.item_type == "dictionary_image":
+        return decide_dictionary_moderation_item(db, item, payload, current_user)
+
     if payload.decision == "reject":
         item.status = "rejected"
         item.reason = payload.reason
@@ -1315,9 +1439,7 @@ def decide_moderation_item(
         db.commit()
         return {"ok": True}
 
-    if item.item_type == "dictionary_image":
-        result = apply_dictionary_moderation(db, item, current_user)
-    elif item.item_type == "profile_photo":
+    if item.item_type == "profile_photo":
         result = apply_profile_photo_moderation(db, item, current_user)
     else:
         raise HTTPException(status_code=400, detail="Unsupported moderation item")

@@ -66,13 +66,13 @@ export async function decideModerationItem(
   moderationId: number,
   decision: "approve" | "reject",
   reason?: string | null,
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; status?: string; vote_counts?: ModerationVoteCounts }> {
   const response = await authFetch(`${API_URL}/admin/moderation/${moderationId}/decision`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ decision, reason }),
   });
-  return parseResponse<{ ok: boolean }>(response, "Failed to process moderation item");
+  return parseResponse<{ ok: boolean; status?: string; vote_counts?: ModerationVoteCounts }>(response, "Failed to process moderation item");
 }
 
 export async function getAuditLogs(limit = 100): Promise<AuditLog[]> {
@@ -185,6 +185,23 @@ export interface DictionaryItem {
   updated_at?: string | null;
 }
 
+export interface ModerationVote {
+  user_id: number;
+  role: "moderator" | "admin";
+  decision: "approve" | "reject";
+  reason?: string | null;
+  created_at?: string | null;
+}
+
+export interface ModerationVoteCounts {
+  moderator_approvals: number;
+  admin_approvals: number;
+  moderator_rejections: number;
+  admin_rejections: number;
+  total_approvals: number;
+  total_rejections: number;
+}
+
 export interface DictionaryItemPayload {
   name: string;
   image_url?: string | null;
@@ -265,6 +282,8 @@ export interface ModerationItem {
   status: string;
   image_data_url: string | null;
   payload: Record<string, any>;
+  votes?: ModerationVote[];
+  vote_counts?: ModerationVoteCounts;
   reason: string | null;
   created_at: string | null;
   reviewed_at: string | null;
@@ -391,6 +410,13 @@ export async function setDictionaryItemArchived(
     method: "PATCH",
   });
   return parseResponse<{ ok: boolean }>(response, "Не удалось изменить архивность");
+}
+
+export async function publishCollection(collectionId: number): Promise<{ ok: boolean }> {
+  const response = await authFetch(`${API_URL}/admin/dictionaries/collections/${collectionId}/publish`, {
+    method: "PATCH",
+  });
+  return parseResponse<{ ok: boolean }>(response, "Failed to publish collection");
 }
 
 export async function getAdminRoles(): Promise<AdminRole[]> {
