@@ -25,6 +25,7 @@ import ModalPresentDetail from "../components/ModalPresentDetail";
 import { message } from "antd";
 import { useTranslation } from "react-i18next";
 import UserNameWithBadge from "../components/UserNameWithBadge";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text } = Typography;
 type MainTabKey = "all" | "for_you" | "most_viewed" | "top_users";
@@ -105,7 +106,7 @@ const MainView = () => {
       setListings(data);
     } catch (e: any) {
       setListings([]);
-      messageApi.error(e.message || t("marketplace.failedLoadListings"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "marketplace.failedLoadListings"));
     } finally {
       setLoading(false);
     }
@@ -118,7 +119,7 @@ const MainView = () => {
       setTopUsers(data);
     } catch (e: any) {
       setTopUsers([]);
-      messageApi.error(e.message || t("marketplace.failedLoadTopUsers"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "marketplace.failedLoadTopUsers"));
     } finally {
       setTopUsersLoading(false);
     }
@@ -169,7 +170,7 @@ const MainView = () => {
       await loadCart();
       messageApi.success(t("marketplace.addedToCart"));
     } catch (e: any) {
-      messageApi.error(e.message || t("marketplace.failedAddCart"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "marketplace.failedAddCart"));
     }
   };
 
@@ -194,7 +195,7 @@ const MainView = () => {
       }
       messageApi.success(t("marketplace.purchasedFor", { price: parseFloat(result.price).toFixed(2) }));
     } catch (e: any) {
-      messageApi.error(e.message || t("marketplace.failedBuyLot"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "marketplace.failedBuyLot"));
     } finally {
       setBuyingListingId(null);
     }

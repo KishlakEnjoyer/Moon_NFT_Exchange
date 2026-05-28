@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../services/auth";
 import { useTranslation } from "react-i18next";
 import UserNameWithBadge from "./UserNameWithBadge";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -179,7 +180,7 @@ const SendGiftModal = ({
       onClose();
     } catch (error) {
       console.error("Failed to send gift:", error);
-      messageApi.error(error instanceof Error ? error.message : t("sendGift.failedSendGift"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "sendGift.failedSendGift"));
     } finally {
       setIsSending(false);
     }

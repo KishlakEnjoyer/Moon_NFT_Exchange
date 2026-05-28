@@ -398,6 +398,7 @@
       "banned": "Banned",
       "visible": "Visible",
       "hidden": "Hidden",
+      "draft": "Draft",
       "notConnected": "Not connected",
       "archive": "Archive"
     },
@@ -526,7 +527,10 @@
         "unique_collections_at_least": "Own gifts from at least N collections",
         "complete_collection": "Own every minted gift in at least one collection",
         "early_collector": "Be among first N registered users",
-        "top_spender_rank": "Be in top N spenders"
+        "top_spender_rank": "Be in top N spenders",
+        "followers_count_at_least": "Get at least N followers",
+        "telegram_connected": "Connect Telegram account",
+        "vk_connected": "Connect VK account"
       }
     },
     "moderation": {
@@ -534,10 +538,18 @@
       "approved": "Approved",
       "rejected": "Rejected",
       "processFailed": "Failed to process request",
+      "voteSaved": "Vote saved; waiting for quorum",
       "type": "Type",
       "action": "Action",
       "target": "Target",
       "preview": "Preview",
+      "payload": "Payload",
+      "author": "Author",
+      "votes": "Votes",
+      "adminApprovals": "Admin approvals",
+      "adminRejections": "Admin rejections",
+      "cannotVoteOwn": "You cannot vote on your own request",
+      "alreadyVoted": "You have already voted",
       "status": "Status",
       "actions": "Actions"
     },
@@ -581,7 +593,10 @@
       "chooseFile": "Choose file",
       "moderationHint": "The new file will be saved only after approval in the moderation queue.",
       "uploadRequired": "Upload an image for moderation",
-      "sentToModeration": "Sent to moderation"
+      "sentToModeration": "Sent to moderation",
+      "collectionPublished": "Collection published",
+      "publish": "Publish",
+      "publishFailed": "Failed to publish collection"
     },
     "users": {
       "loadFailed": "Failed to load access settings",
@@ -649,6 +664,191 @@
       "volume": "Volume",
       "collectionsBySales": "Collections by Sales",
       "collection": "Collection"
+    }
+  },
+  "notifications": {
+    "summary": {
+      "allRead": "All caught up",
+      "new_one": "{{count}} new",
+      "new_few": "{{count}} new",
+      "new_many": "{{count}} new",
+      "new_other": "{{count}} new",
+      "empty": "Nothing here yet"
+    },
+    "date": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "default": {
+      "title": "Notification",
+      "description": "New account event."
+    },
+    "emptyDescription": "When something happens, it will show up here.",
+    "balanceFrozenTitle": "Balance frozen",
+    "balanceFrozenLabel": "Frozen",
+    "entity": {
+      "present": "Gift #{{id}}",
+      "listing": "Listing #{{id}}"
+    },
+    "types": {
+      "purchaseConfirmed": {
+        "title": "Purchase confirmed",
+        "description": "The lot is paid and added to your collection."
+      },
+      "listingSold": {
+        "title": "Gift sold",
+        "description": "The buyer paid for the lot, funds were added to your balance."
+      },
+      "upgradeCompleted": {
+        "title": "Upgrade completed",
+        "description": "The gift was upgraded and is ready for sale or collection."
+      },
+      "giftReceived": {
+        "title": "Gift received",
+        "description": "A new gift appeared in your collection."
+      },
+      "achievementUnlocked": {
+        "title": "Achievement unlocked",
+        "description": "A new badge appeared on your profile."
+      },
+      "listingCancelled": {
+        "title": "Listing cancelled",
+        "description": "The gift is no longer listed on the marketplace."
+      },
+      "walletTopup": {
+        "title": "Balance topped up",
+        "description": "Tokens were credited to your wallet."
+      },
+      "burnCompleted": {
+        "title": "Gift burned",
+        "description": "The refund was added to your balance."
+      },
+      "reportWarning": {
+        "title": "Report warning",
+        "description": "Moderation sent you a warning.",
+        "reason": "Reason: {{reason}}"
+      }
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "requestFailed": "Request failed. Please try again.",
+    "permissionRequired": "Permission required: {{permission}}",
+    "insufficientBalance": "Insufficient balance. Need {{need}}, have {{have}}",
+    "blockchainError": "Blockchain error: {{message}}",
+    "smartSearchUnavailable": "Smart search is unavailable right now",
+    "invalidField": "Invalid {{field}}",
+    "api": {
+      "userInactive": "Account blocked",
+      "notFound": "Not found",
+      "userNotFound": "User not found",
+      "presentNotFound": "Present not found",
+      "collectionNotFound": "Collection not found",
+      "listingNotFound": "Listing not found",
+      "activeListingNotFound": "Active listing not found",
+      "albumNotFound": "Album not found",
+      "notificationNotFound": "Notification not found",
+      "cartItemNotFound": "Cart item not found",
+      "cartEmpty": "Cart is empty",
+      "cannotAccessAnotherUsersCart": "Cannot access another user's cart",
+      "cannotModifyAnotherUsersCart": "Cannot modify another user's cart",
+      "cannotClearAnotherUsersCart": "Cannot clear another user's cart",
+      "cannotBuyAnotherUsersCart": "Cannot buy another user's cart",
+      "cannotAccessAnotherUsersNotifications": "Cannot access another user's notifications",
+      "cannotModifyAnotherUsersNotifications": "Cannot modify another user's notifications",
+      "cannotCreateAlbumsForAnotherUser": "Cannot create albums for another user",
+      "cannotAccessAnotherUsersAlbums": "Cannot access another user's albums",
+      "youDoNotOwnAlbum": "You do not own this album",
+      "youDoNotOwnPresent": "You do not own this present",
+      "cannotActAsAnotherUser": "Cannot act as another user",
+      "cannotAddOwnListingToCart": "Cannot add your own listing to cart",
+      "itemAlreadyInCart": "Item already in cart",
+      "onlyUpgradedPresentsCanBeListed": "Only upgraded presents can be listed for sale",
+      "burnedPresentsCannotBeListed": "Burned presents cannot be listed",
+      "presentAlreadyListedForSale": "Present is already listed for sale",
+      "invalidListingPrice": "Invalid listing price",
+      "priceMustBeGreaterThanZero": "Price must be greater than 0",
+      "priceMax": "Price must be less than or equal to 100000",
+      "priceRangeInvalid": "Minimum price cannot be greater than maximum price",
+      "cannotPinBurnedPresent": "Cannot pin burned present",
+      "pinLimit": "You can pin up to 7 gifts",
+      "cannotFollowYourself": "Cannot follow yourself",
+      "achievementNotAwarded": "Achievement is not awarded to this user",
+      "visibleAchievementsOnly": "Only visible achievements can be used as a profile badge",
+      "cannotReportYourself": "Cannot report yourself",
+      "reportAlreadySubmitted": "You have already submitted this report",
+      "cannotSubmitReportsAsAnotherUser": "Cannot submit reports as another user",
+      "receiverNotFound": "Receiver not found",
+      "receiverBlocked": "Receiver account is blocked",
+      "reportNotFound": "Report not found",
+      "reportAlreadyClosed": "Report is already closed",
+      "reportTargetNotFound": "Report target not found",
+      "reportTargetBlocked": "Report target account is blocked",
+      "stateExpired": "State expired or not found",
+      "authNoLongerActive": "This auth request is no longer active",
+      "authAlreadyConfirmed": "This auth request is already confirmed",
+      "telegramAlreadyLinked": "This Telegram account is already linked to another user",
+      "vkAlreadyLinked": "This VK account is already linked to another user",
+      "usernameEmpty": "Username cannot be empty",
+      "usernameInvalid": "Username must be 3-32 characters long and use only Russian/English letters, numbers, and underscores",
+      "usernameTaken": "Username is already taken",
+      "profileTextLinks": "Nickname and about me cannot contain links",
+      "profileTextForbidden": "Nickname or about me contains forbidden words",
+      "profileTextRejected": "Nickname or about me did not pass moderation",
+      "profileTextUnavailable": "Profile text moderation is unavailable",
+      "imageRequired": "Image is required",
+      "imageUploadRequired": "Image upload is required",
+      "imageInvalidType": "Image must be PNG, JPG, or WEBP",
+      "imageInvalidBase64": "Image is not valid base64 data",
+      "imageEmpty": "Image cannot be empty",
+      "imageTooLarge": "Image must be 5 MB or smaller",
+      "imageInvalidFile": "Image file is invalid",
+      "profileImageInvalidType": "Profile image must be a PNG, JPG, or WEBP file",
+      "profileImageInvalidBase64": "Profile image is not valid base64 data",
+      "profileImageEmpty": "Profile image cannot be empty",
+      "profileImageTooLarge": "Profile image must be 5 MB or smaller",
+      "walletNotFound": "User wallet not found",
+      "walletPrivateKeyNotFound": "Wallet private key not found",
+      "platformKeyMissing": "Platform key not configured",
+      "refundFailed": "Refund transaction failed",
+      "upgradePaymentFailed": "Upgrade payment transaction failed",
+      "burnAlreadyDone": "Present already burned",
+      "cannotBurnOnSale": "Cannot burn a present that is on sale",
+      "alreadyUpgraded": "Present is already upgraded",
+      "cannotUpgradeOnSale": "Cannot upgrade a present that is on sale",
+      "unknownAchievementRule": "Unknown achievement rule",
+      "achievementImageRequired": "Achievement image is required",
+      "achievementNotFound": "Achievement not found",
+      "dictionaryNotFound": "Dictionary not found",
+      "dictionaryItemNotFound": "Dictionary item not found",
+      "moderationPayloadMissingName": "Moderation payload is missing a name",
+      "moderationMissingImage": "Moderation item is missing an image",
+      "moderationItemNotFound": "Moderation item not found",
+      "moderationAlreadyClosed": "Moderation item is already closed",
+      "unsupportedModerationItem": "Unsupported moderation item",
+      "cannotReviewOwnModeration": "Cannot review your own moderation request",
+      "alreadyVotedModeration": "You have already voted on this moderation request",
+      "managerRequired": "Manager role is required",
+      "adminRequired": "Admin role is required",
+      "rolesManageRequired": "Permission required: roles.manage",
+      "masterAdminCreateRequired": "Only a master admin can create master admin roles",
+      "roleAlreadyExists": "Role already exists",
+      "roleNotFound": "Role not found",
+      "cannotEditMasterAdmin": "Cannot edit master admin role",
+      "cannotDeleteMasterAdmin": "Cannot delete master admin role",
+      "roleUsedByUsers": "Role is used by users",
+      "cannotChangeOwnRole": "Cannot change your own role",
+      "cannotChangeMasterAdminRole": "Cannot change a master admin role",
+      "cannotDeactivateSelf": "Cannot deactivate yourself",
+      "topupSecretMissing": "Top-up secret is not configured",
+      "topupSecretInvalid": "Invalid top-up secret",
+      "topupNotFound": "Top-up not found",
+      "topupSourceMismatch": "Top-up source mismatch",
+      "topupNotPending": "Top-up is not pending",
+      "topupAlreadyFailed": "Top-up already failed",
+      "paymentAmountMismatch": "Payment amount mismatch",
+      "paymentCurrencyMismatch": "Payment currency mismatch",
+      "paymentMetadataMismatch": "Payment metadata mismatch"
     }
   },
   "footer": {

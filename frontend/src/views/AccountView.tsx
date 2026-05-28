@@ -61,6 +61,7 @@ import {
 import { useNotifications } from "../hooks/useNotifications";
 import NotFound from "./NotFound";
 import { useTranslation } from "react-i18next";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text } = Typography;
 
@@ -355,7 +356,7 @@ const AccountView = () => {
       handleCancelAddingAlbum();
     } catch (error) {
       console.error("Failed to create album:", error);
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedCreateAlbum"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedCreateAlbum"));
     } finally {
       setIsCreatingAlbum(false);
     }
@@ -406,7 +407,7 @@ const AccountView = () => {
       handleCancelRenaming();
     } catch (error) {
       console.error("Failed to rename album:", error);
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedRenameAlbum"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedRenameAlbum"));
       setIsRenamingAlbum(false);
     }
   };
@@ -438,7 +439,7 @@ const AccountView = () => {
       updateUserAlbums(() => previousAlbums);
       setActiveAlbumId(previousActiveAlbumId);
       setVisibleCount(previousVisibleCount);
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedDeleteAlbum"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedDeleteAlbum"));
     }
   };
 
@@ -504,7 +505,7 @@ const AccountView = () => {
         following_count: result.following_count,
       } : prev);
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedToggleFollow"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedToggleFollow"));
     } finally {
       setFollowLoading(false);
     }
@@ -529,7 +530,7 @@ const AccountView = () => {
           : prev.profile_badge_achievement,
       } : prev);
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedToggleAchievementVisibility"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedToggleAchievementVisibility"));
     }
   };
 
@@ -544,7 +545,7 @@ const AccountView = () => {
       } : prev);
       messageApi.success(t("profile.badgeUpdated"));
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedUpdateBadge"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedUpdateBadge"));
     } finally {
       setBadgeSaving(false);
     }
@@ -561,7 +562,7 @@ const AccountView = () => {
       setSocialUsers(loadedUsers);
     } catch (error) {
       setSocialUsers([]);
-      messageApi.error(error instanceof Error ? error.message : t("profile.failedLoadSocialList"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "profile.failedLoadSocialList"));
     } finally {
       setSocialUsersLoading(false);
     }

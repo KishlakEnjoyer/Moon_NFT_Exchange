@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { FlagOutlined } from "@ant-design/icons";
 import { authFetch } from "../services/auth";
 import { useTranslation } from "react-i18next";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text, Title } = Typography;
 
@@ -64,7 +65,7 @@ const ReportModal = ({ open, senderId, receiverId, onClose }: ReportModalProps) 
       onClose();
     } catch (error) {
       console.error("Failed to submit report:", error);
-      messageApi.error(error instanceof Error ? error.message : t("report.failedSubmit"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "report.failedSubmit"));
     } finally {
       setIsSubmitting(false);
     }

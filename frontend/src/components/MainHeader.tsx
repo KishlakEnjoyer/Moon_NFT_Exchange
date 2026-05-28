@@ -33,7 +33,8 @@ import { useBalanceSocket } from "../hooks/useBalanceSocket";
 import { type AppNotification, useNotifications } from "../hooks/useNotifications";
 import PeopleSearchModal from "./PeopleSearchModal";
 import QrModal from "./QrModal";
-import { BLOCKED_ACCOUNT_MESSAGE, authFetch, clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
+import { authFetch, clearAuthSession, getAccessToken, setAuthSession } from "../services/auth";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 import { useTranslation } from "react-i18next";
 
 const { Text } = Typography;
@@ -66,21 +67,16 @@ const isSameCalendarDay = (first: Date, second: Date) => (
   first.getDate() === second.getDate()
 );
 
-const getRuPlural = (count: number, one: string, few: string, many: string) => {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
+const getUnreadLabel = (count: number, t: ReturnType<typeof useTranslation>["t"]) => {
+  if (count <= 0) return t("notifications.summary.allRead");
+  return t("notifications.summary.new", { count });
 };
 
-const getUnreadLabel = (count: number, isRu: boolean) => {
-  if (count <= 0) return isRu ? "Все прочитано" : "All caught up";
-  if (!isRu) return `${count} new`;
-  return `${count} ${getRuPlural(count, "новое", "новых", "новых")}`;
-};
-
-const formatNotificationTime = (value: string, language: string) => {
+const formatNotificationTime = (
+  value: string,
+  language: string,
+  t: ReturnType<typeof useTranslation>["t"],
+) => {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
 
@@ -92,11 +88,11 @@ const formatNotificationTime = (value: string, language: string) => {
   const time = date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 
   if (isSameCalendarDay(date, now)) {
-    return `${isRu ? "Сегодня" : "Today"}, ${time}`;
+    return `${t("notifications.date.today")}, ${time}`;
   }
 
   if (isSameCalendarDay(date, yesterday)) {
-    return `${isRu ? "Вчера" : "Yesterday"}, ${time}`;
+    return `${t("notifications.date.yesterday")}, ${time}`;
   }
 
   return date.toLocaleString(locale, {
@@ -108,8 +104,8 @@ const formatNotificationTime = (value: string, language: string) => {
   });
 };
 
-const humanizeNotificationType = (value: string | null | undefined, isRu: boolean) => {
-  if (!value) return isRu ? "Уведомление" : "Notification";
+const humanizeNotificationType = (value: string | null | undefined, fallback: string) => {
+  if (!value) return fallback;
   return value
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -257,7 +253,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           setQrModalOpen(false);
           window.dispatchEvent(new Event("storage"));
           if (data.user?.is_active === 0) {
-            messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+            messageApi.error(t("profile.accountBlocked"));
             window.dispatchEvent(new Event("accountBlocked"));
             onAuthFail?.();
           } else {
@@ -369,6 +365,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       setIsQrLoading(false);
       if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Request failed:", err);
+      messageApi.error(getLocalizedErrorMessage(err, t, "auth.error"));
     } finally {
       setIsConnecting(false);
     }
@@ -389,7 +386,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
           setBalance(updated.balance ?? 0);
           window.dispatchEvent(new Event("storage"));
           if (updated.is_active === 0) {
-            messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+            messageApi.error(t("profile.accountBlocked"));
             window.dispatchEvent(new Event("accountBlocked"));
           }
         })
@@ -414,7 +411,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
         initAbortRef.current = null;
       }
     };
-  }, [clearPolling, clearQrTimeout, messageApi, restorePendingAuth, startAuthPolling]);
+  }, [clearPolling, clearQrTimeout, messageApi, restorePendingAuth, startAuthPolling, t]);
 
   useEffect(() => {
     const syncCurrentUser = () => {
@@ -425,7 +422,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
     };
     const handleAccountBlocked = () => {
       syncCurrentUser();
-      messageApi.error(BLOCKED_ACCOUNT_MESSAGE);
+      messageApi.error(t("profile.accountBlocked"));
     };
 
     window.addEventListener("storage", syncCurrentUser);
@@ -435,7 +432,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       window.removeEventListener("storage", syncCurrentUser);
       window.removeEventListener("accountBlocked", handleAccountBlocked);
     };
-  }, [messageApi]);
+  }, [messageApi, t]);
 
   useBalanceSocket(
     isAuthenticated && !currentUserBlocked ? currentUser.user_id : null,
@@ -542,13 +539,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   const getNotificationMeta = (item: AppNotification) => {
     const key = normalizeNotificationType(item.type) || normalizeNotificationType(item.description);
-    const fallbackTitle = humanizeNotificationType(item.description || item.type, isRuLanguage);
+    const fallbackTitle = humanizeNotificationType(item.description || item.type, t("notifications.default.title"));
 
     switch (key) {
       case "purchase_confirmed":
         return {
-          title: isRuLanguage ? "Покупка подтверждена" : "Purchase confirmed",
-          description: isRuLanguage ? "Лот оплачен и уже добавлен в вашу коллекцию." : "The lot is paid and added to your collection.",
+          title: t("notifications.types.purchaseConfirmed.title"),
+          description: t("notifications.types.purchaseConfirmed.description"),
           icon: <CheckCircleOutlined />,
           color: "var(--green-accept)",
           background: "rgba(82, 196, 26, 0.14)",
@@ -556,8 +553,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       case "listing_sold":
       case "sale_completed":
         return {
-          title: isRuLanguage ? "Подарок продан" : "Gift sold",
-          description: isRuLanguage ? "Покупатель оплатил лот, средства начислены на баланс." : "The buyer paid for the lot, funds were added to your balance.",
+          title: t("notifications.types.listingSold.title"),
+          description: t("notifications.types.listingSold.description"),
           icon: <ShoppingOutlined />,
           color: "#4f7cff",
           background: "rgba(79, 124, 255, 0.14)",
@@ -565,48 +562,48 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       case "upgrade_completed":
       case "present_upgrade_completed":
         return {
-          title: isRuLanguage ? "Апгрейд завершен" : "Upgrade completed",
-          description: isRuLanguage ? "Подарок улучшен и готов к продаже или коллекции." : "The gift was upgraded and is ready for sale or collection.",
+          title: t("notifications.types.upgradeCompleted.title"),
+          description: t("notifications.types.upgradeCompleted.description"),
           icon: <ThunderboltOutlined />,
           color: "#faad14",
           background: "rgba(250, 173, 20, 0.16)",
         };
       case "gift_received":
         return {
-          title: isRuLanguage ? "Получен подарок" : "Gift received",
-          description: isRuLanguage ? "Новый подарок появился в вашей коллекции." : "A new gift appeared in your collection.",
+          title: t("notifications.types.giftReceived.title"),
+          description: t("notifications.types.giftReceived.description"),
           icon: <GiftOutlined />,
           color: "var(--accent-150)",
           background: "rgba(168, 185, 255, 0.16)",
         };
       case "achievement_unlocked":
         return {
-          title: item.payload?.title || (isRuLanguage ? "Достижение получено" : "Achievement unlocked"),
-          description: item.payload?.description || (isRuLanguage ? "Новый бейдж появился в профиле." : "A new badge appeared on your profile."),
+          title: item.payload?.title || t("notifications.types.achievementUnlocked.title"),
+          description: item.payload?.description || t("notifications.types.achievementUnlocked.description"),
           icon: <TrophyOutlined />,
           color: "#f5b301",
           background: "rgba(245, 179, 1, 0.16)",
         };
       case "listing_cancelled":
         return {
-          title: isRuLanguage ? "Лот снят с продажи" : "Listing cancelled",
-          description: isRuLanguage ? "Подарок больше не продается на маркетплейсе." : "The gift is no longer listed on the marketplace.",
+          title: t("notifications.types.listingCancelled.title"),
+          description: t("notifications.types.listingCancelled.description"),
           icon: <ShoppingCartOutlined />,
           color: "var(--white-60)",
           background: "rgba(158, 158, 158, 0.14)",
         };
       case "wallet_topup":
         return {
-          title: isRuLanguage ? "Баланс пополнен" : "Balance topped up",
-          description: isRuLanguage ? "Токены зачислены на ваш кошелек." : "Tokens were credited to your wallet.",
+          title: t("notifications.types.walletTopup.title"),
+          description: t("notifications.types.walletTopup.description"),
           icon: <CheckCircleOutlined />,
           color: "#13c2c2",
           background: "rgba(19, 194, 194, 0.14)",
         };
       case "burn_completed":
         return {
-          title: isRuLanguage ? "Подарок сожжен" : "Gift burned",
-          description: isRuLanguage ? "Возврат начислен на ваш баланс." : "The refund was added to your balance.",
+          title: t("notifications.types.burnCompleted.title"),
+          description: t("notifications.types.burnCompleted.description"),
           icon: <ThunderboltOutlined />,
           color: "var(--red-fail)",
           background: "rgba(181, 51, 51, 0.16)",
@@ -614,10 +611,10 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       case "report_warning": {
         const reason = getReportWarningReason(item, isRuLanguage);
         return {
-          title: isRuLanguage ? "Предупреждение по жалобе" : "Report warning",
+          title: t("notifications.types.reportWarning.title"),
           description: reason
-            ? (isRuLanguage ? `Причина: ${reason}` : `Reason: ${reason}`)
-            : (isRuLanguage ? "Администрация отправила вам предупреждение." : "Moderation sent you a warning."),
+            ? t("notifications.types.reportWarning.reason", { reason })
+            : t("notifications.types.reportWarning.description"),
           icon: <WarningOutlined />,
           color: "var(--red-fail)",
           background: "rgba(181, 51, 51, 0.18)",
@@ -626,7 +623,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       default:
         return {
           title: fallbackTitle,
-          description: isRuLanguage ? "Новое событие в аккаунте." : "New account event.",
+          description: t("notifications.default.description"),
           icon: <BellOutlined />,
           color: "var(--white-60)",
           background: "rgba(158, 158, 158, 0.12)",
@@ -637,8 +634,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const getNotificationEntityLabel = (item: AppNotification) => {
     if (!item.entity_id) return null;
     const entityType = normalizeNotificationType(item.entity_type);
-    if (entityType === "present") return isRuLanguage ? `Подарок #${item.entity_id}` : `Gift #${item.entity_id}`;
-    if (entityType === "listing") return isRuLanguage ? `Лот #${item.entity_id}` : `Listing #${item.entity_id}`;
+    if (entityType === "present") return t("notifications.entity.present", { id: item.entity_id });
+    if (entityType === "listing") return t("notifications.entity.listing", { id: item.entity_id });
     return `#${item.entity_id}`;
   };
 
@@ -665,8 +662,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   };
 
   const notificationSummary = notifications.length === 0
-    ? (isRuLanguage ? "Тут пока тихо" : "Nothing here yet")
-    : getUnreadLabel(unreadCount, isRuLanguage);
+    ? t("notifications.summary.empty")
+    : getUnreadLabel(unreadCount, t);
 
   const markAllReadButton = unreadCount > 0 ? (
     <Button
@@ -691,7 +688,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
       <Flex vertical gap={2}>
         <Text strong>{t("header.noNotifications")}</Text>
         <Text className="text-xs text-gray-400">
-          {isRuLanguage ? "Когда что-то произойдет, покажем это здесь." : "When something happens, it will show up here."}
+          {t("notifications.emptyDescription")}
         </Text>
       </Flex>
     </Flex>
@@ -744,7 +741,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               </Text>
               <span className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                 <Text className="text-[11px] text-gray-500">
-                  {formatNotificationTime(item.created_at, i18n.language)}
+                  {formatNotificationTime(item.created_at, i18n.language, t)}
                 </Text>
                 {entityLabel && (
                   <span className="max-w-full truncate rounded-full border border-solid border-[var(--black-transparent)] px-2 py-[1px] text-[11px] text-gray-400">
@@ -944,13 +941,13 @@ const MainHeader: React.FC<MainHeaderProps> = ({
               icon={<PlusOutlined />}
               iconPlacement={"end"}
               size="large"
-              title={currentUserBlocked ? "Баланс заморожен" : `${balance} TON`}
+              title={currentUserBlocked ? t("notifications.balanceFrozenTitle") : `${balance} TON`}
               disabled={currentUserBlocked}
               onClick={() => {
                 window.open(`https://t.me/moon_exchange_bot`, "_blank", "noopener,noreferrer");
               }}
             >
-              <span className="hidden sm:inline">{currentUserBlocked ? "Заморожен" : balanceLabel}</span>
+              <span className="hidden sm:inline">{currentUserBlocked ? t("notifications.balanceFrozenLabel") : balanceLabel}</span>
               <TONIcon />
             </Button>
           </div>

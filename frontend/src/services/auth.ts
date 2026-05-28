@@ -2,8 +2,6 @@ const ACCESS_TOKEN_KEY = "access_token";
 const TOKEN_TYPE_KEY = "token_type";
 const BLOCKED_DETAIL = "User is inactive";
 
-export const BLOCKED_ACCOUNT_MESSAGE = "Аккаунт заблокирован";
-
 export const getAccessToken = (): string | null => {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 };

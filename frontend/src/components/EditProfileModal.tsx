@@ -14,6 +14,7 @@ import { authFetch, setAuthSession } from "../services/auth";
 import { detectNsfwImage } from "../services/nsfwDetectorService";
 import { updateProfile, UpdateProfileResponse } from "../services/profileService";
 import { useTranslation } from "react-i18next";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -442,7 +443,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         return;
       }
       console.error("Failed to start linking:", error);
-      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedStartLinking"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "editProfile.failedStartLinking"));
     }
   };
 
@@ -625,7 +626,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
       }
     } catch (error) {
       console.error("Failed to read profile photo:", error);
-      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedReadImage"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "editProfile.failedReadImage"));
     }
   };
 
@@ -673,7 +674,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
         return;
       }
       console.error("Failed to crop or check profile photo:", error);
-      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedCheckPhoto"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "editProfile.failedCheckPhoto"));
     } finally {
       if (checkId === profilePhotoCheckIdRef.current) {
         profilePhotoCheckAbortRef.current = null;
@@ -717,7 +718,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
       onClose();
     } catch (error) {
       console.error("Failed to update profile:", error);
-      messageApi.error(error instanceof Error ? error.message : t("editProfile.failedUpdate"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "editProfile.failedUpdate"));
     } finally {
       setIsSaving(false);
     }
@@ -830,7 +831,7 @@ const EditProfileModal = ({ open, profile, onClose, onSaved, onLinked }: EditPro
                   disabled={isCheckingProfilePhoto}
                   className="!bg-[var(--liquid-glass-bg)]"
                 >
-                  {t("common.delete") || "Удалить"}
+                  {t("common.delete")}
                 </Button>
               )}
             </Flex>

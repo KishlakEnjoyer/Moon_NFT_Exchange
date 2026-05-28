@@ -4,6 +4,7 @@ import TONIcon from "./icons/TONIcon";
 import { CartItem, getCart, removeFromCart, clearCart, buyListing, buyCart } from "../services/listingService";
 import CartItemRow from "./CartItem";
 import { useTranslation } from "react-i18next";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text, Title } = Typography;
 
@@ -64,7 +65,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       await removeFromCart(cartItemId);
       setCartItems((prev) => prev.filter((item) => item.cart_item_id !== cartItemId));
     } catch (e: any) {
-      messageApi.error(e.message || t("cart.failedRemoveItem"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "cart.failedRemoveItem"));
     }
   };
 
@@ -74,7 +75,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       await clearCart(currentUserId);
       setCartItems([]);
     } catch (e: any) {
-      messageApi.error(e.message || t("cart.failedClearCart"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "cart.failedClearCart"));
     }
   };
 
@@ -101,7 +102,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
     } catch (e: any) {
       await loadCart();
       window.dispatchEvent(new Event("listingsChanged"));
-      messageApi.error(e.message || t("cart.failedBuyCart"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "cart.failedBuyCart"));
     } finally {
       setPurchasingCart(false);
     }
@@ -123,7 +124,7 @@ const ModalCart: React.FC<ModalCartProps> = ({ open, onClose, onOpen }) => {
       window.dispatchEvent(new Event("listingsChanged"));
       messageApi.success(t("cart.itemPurchased"));
     } catch (e: any) {
-      messageApi.error(e.message || t("cart.failedBuyItem"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "cart.failedBuyItem"));
       await loadCart();
     } finally {
       setPurchasingListingId(null);

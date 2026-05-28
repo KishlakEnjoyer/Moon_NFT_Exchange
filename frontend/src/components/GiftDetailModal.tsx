@@ -23,6 +23,7 @@ import { authFetch } from "../services/auth";
 import { buyListing, recordListingView } from "../services/listingService";
 import { useTranslation } from "react-i18next";
 import UserNameWithBadge from "./UserNameWithBadge";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text, Title } = Typography;
 
@@ -270,7 +271,7 @@ const GiftDetailModal = ({
       setDetail({ ...detail, is_visible: detail.is_visible === 1 ? 0 : 1 });
       onRefresh();
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedToggleVisibility"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedToggleVisibility"));
     }
   };
 
@@ -300,7 +301,7 @@ const GiftDetailModal = ({
       setDetail({ ...detail, is_burned: true });
       onRefresh();
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedBurn"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedBurn"));
     } finally {
       setSubmitting(false);
     }
@@ -375,7 +376,7 @@ const GiftDetailModal = ({
       } catch {
       }
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedUpgrade"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedUpgrade"));
     } finally {
       setSubmitting(false);
     }
@@ -411,7 +412,7 @@ const GiftDetailModal = ({
       onRefresh();
       messageApi.success(t("giftDetail.giftListed"));
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedCreateListing"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedCreateListing"));
     } finally {
       setSubmitting(false);
     }
@@ -450,7 +451,7 @@ const GiftDetailModal = ({
         }),
       );
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedBuyGift"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedBuyGift"));
     } finally {
       setSubmitting(false);
     }
@@ -473,7 +474,7 @@ const GiftDetailModal = ({
         setListingPrice((currentPrice) => currentPrice ?? roundedAvgPrice);
       }
     } catch (e: any) {
-      messageApi.warning(e.message || t("giftDetail.failedRecommendedPrice"));
+      messageApi.warning(getLocalizedErrorMessage(e, t, "giftDetail.failedRecommendedPrice"));
     } finally {
       setPriceEstimateLoading(false);
     }
@@ -497,7 +498,7 @@ const GiftDetailModal = ({
       onRefresh();
       messageApi.success(t("giftDetail.giftRemoved"));
     } catch (e: any) {
-      messageApi.error(e.message || t("giftDetail.failedRemoveListing"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "giftDetail.failedRemoveListing"));
     } finally {
       setSubmitting(false);
     }

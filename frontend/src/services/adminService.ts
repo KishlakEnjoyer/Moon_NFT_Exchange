@@ -328,7 +328,7 @@ async function parseResponse<T>(response: Response, fallback: string): Promise<T
 
 export async function getAdminAccess(): Promise<AdminAccess> {
   const response = await authFetch(`${API_URL}/admin/me`);
-  return parseResponse<AdminAccess>(response, "Нет доступа к админ-панели");
+  return parseResponse<AdminAccess>(response, "No access to admin panel");
 }
 
 export async function getAdminSummary(params: AdminSummaryParams = {}): Promise<AdminSummary> {
@@ -341,12 +341,12 @@ export async function getAdminSummary(params: AdminSummaryParams = {}): Promise<
 
   const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
   const response = await authFetch(`${API_URL}/admin/summary${suffix}`);
-  return parseResponse<AdminSummary>(response, "Не удалось загрузить статистику");
+  return parseResponse<AdminSummary>(response, "Failed to load statistics");
 }
 
 export async function getAdminReports(status: ReportStatusFilter): Promise<AdminReport[]> {
   const response = await authFetch(`${API_URL}/admin/reports?status=${status}`);
-  return parseResponse<AdminReport[]>(response, "Не удалось загрузить жалобы");
+  return parseResponse<AdminReport[]>(response, "Failed to load reports");
 }
 
 export async function decideAdminReport(reportId: number, decision: ReportDecision): Promise<AdminReport> {
@@ -355,7 +355,7 @@ export async function decideAdminReport(reportId: number, decision: ReportDecisi
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ decision }),
   });
-  return parseResponse<AdminReport>(response, "Не удалось обработать жалобу");
+  return parseResponse<AdminReport>(response, "Failed to process report");
 }
 
 export async function sendAdminReportWarning(
@@ -367,12 +367,12 @@ export async function sendAdminReportWarning(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseResponse<{ ok: boolean; notification: AdminNotification }>(response, "Не удалось отправить предупреждение");
+  return parseResponse<{ ok: boolean; notification: AdminNotification }>(response, "Failed to send warning");
 }
 
 export async function getDictionaryItems(kind: DictionaryKind): Promise<DictionaryItem[]> {
   const response = await authFetch(`${API_URL}/admin/dictionaries/${kind}`);
-  return parseResponse<DictionaryItem[]>(response, "Не удалось загрузить справочник");
+  return parseResponse<DictionaryItem[]>(response, "Failed to load dictionary");
 }
 
 export async function createDictionaryItem(
@@ -384,7 +384,7 @@ export async function createDictionaryItem(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseResponse<{ ok: boolean; id: number | null }>(response, "Не удалось создать запись");
+  return parseResponse<{ ok: boolean; id: number | null }>(response, "Failed to create entry");
 }
 
 export async function updateDictionaryItem(
@@ -397,7 +397,7 @@ export async function updateDictionaryItem(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось обновить запись");
+  return parseResponse<{ ok: boolean }>(response, "Failed to update entry");
 }
 
 export async function setDictionaryItemArchived(
@@ -409,7 +409,7 @@ export async function setDictionaryItemArchived(
   const response = await authFetch(`${API_URL}/admin/dictionaries/${kind}/${itemId}/${action}`, {
     method: "PATCH",
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось изменить архивность");
+  return parseResponse<{ ok: boolean }>(response, "Failed to change archive status");
 }
 
 export async function publishCollection(collectionId: number): Promise<{ ok: boolean }> {
@@ -421,7 +421,7 @@ export async function publishCollection(collectionId: number): Promise<{ ok: boo
 
 export async function getAdminRoles(): Promise<AdminRole[]> {
   const response = await authFetch(`${API_URL}/admin/roles`);
-  return parseResponse<AdminRole[]>(response, "Не удалось загрузить роли");
+  return parseResponse<AdminRole[]>(response, "Failed to load roles");
 }
 
 export async function createAdminRole(payload: { role_name: string; description?: string | null; permissions?: string[] }): Promise<AdminRole> {
@@ -430,7 +430,7 @@ export async function createAdminRole(payload: { role_name: string; description?
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseResponse<AdminRole>(response, "Не удалось создать роль");
+  return parseResponse<AdminRole>(response, "Failed to create role");
 }
 
 export async function updateAdminRole(
@@ -442,14 +442,14 @@ export async function updateAdminRole(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось обновить роль");
+  return parseResponse<{ ok: boolean }>(response, "Failed to update role");
 }
 
 export async function deleteAdminRole(roleId: number): Promise<{ ok: boolean }> {
   const response = await authFetch(`${API_URL}/admin/roles/${roleId}`, {
     method: "DELETE",
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось удалить роль");
+  return parseResponse<{ ok: boolean }>(response, "Failed to delete role");
 }
 
 export async function getAdminUsers(query = ""): Promise<AdminUser[]> {
@@ -457,7 +457,7 @@ export async function getAdminUsers(query = ""): Promise<AdminUser[]> {
   if (query.trim()) params.set("q", query.trim());
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const response = await authFetch(`${API_URL}/admin/users${suffix}`);
-  return parseResponse<AdminUser[]>(response, "Не удалось загрузить пользователей");
+  return parseResponse<AdminUser[]>(response, "Failed to load users");
 }
 
 export async function setAdminUserRole(userId: number, roleId: number): Promise<{ ok: boolean }> {
@@ -466,7 +466,7 @@ export async function setAdminUserRole(userId: number, roleId: number): Promise<
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role_id: roleId }),
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось изменить роль пользователя");
+  return parseResponse<{ ok: boolean }>(response, "Failed to change user role");
 }
 
 export async function setAdminUserActive(
@@ -479,5 +479,5 @@ export async function setAdminUserActive(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ is_active: isActive, reason }),
   });
-  return parseResponse<{ ok: boolean }>(response, "Не удалось изменить статус пользователя");
+  return parseResponse<{ ok: boolean }>(response, "Failed to change user status");
 }

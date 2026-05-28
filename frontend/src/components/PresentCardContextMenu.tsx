@@ -5,6 +5,7 @@ import { togglePresentVisibility } from "../services/presentService";
 import { addPresentToAlbum, removePresentFromAlbum, Album } from "../services/albumService";
 import { authFetch } from "../services/auth";
 import { useTranslation } from "react-i18next";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 interface PresentCardContextMenuProps {
   presentId: number;
@@ -47,7 +48,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, isPinne
       onRefresh();
       setRefreshKey(k => k + 1);
     } catch (e: any) {
-      messageApi.error(e.message || t("presentMenu.failed"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "presentMenu.failed"));
     }
   };
 
@@ -63,7 +64,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, isPinne
       onRefresh();
       setRefreshKey(k => k + 1);
     } catch (e: any) {
-      messageApi.error(e.message || t("presentMenu.failed"));
+      messageApi.error(getLocalizedErrorMessage(e, t, "presentMenu.failed"));
     }
   };
 
@@ -78,12 +79,12 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, isPinne
 
       if (!res.ok) {
         const error = await res.json().catch(() => null);
-        throw new Error(error?.detail || "Failed to pin gift");
+        throw new Error(error?.detail || t("presentMenu.failed"));
       }
 
       onRefresh();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "Failed to pin gift");
+      message.error(getLocalizedErrorMessage(error, t, "presentMenu.failed"));
     }
   };
 
@@ -131,7 +132,7 @@ const PresentCardContextMenu = ({ presentId, userId, isOwner, isVisible, isPinne
             onRefresh();
             setRefreshKey(k => k + 1);
           })
-          .catch((e: any) => messageApi.error(e.message || t("presentMenu.failed")));
+          .catch((e: any) => messageApi.error(getLocalizedErrorMessage(e, t, "presentMenu.failed")));
       },
     }] : []),
     { type: "divider" },

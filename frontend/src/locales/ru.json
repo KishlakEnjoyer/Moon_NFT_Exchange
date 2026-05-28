@@ -398,6 +398,7 @@
       "banned": "Забанен",
       "visible": "Виден",
       "hidden": "Скрыт",
+      "draft": "Черновик",
       "notConnected": "Не подключен",
       "archive": "Архив"
     },
@@ -526,7 +527,10 @@
         "unique_collections_at_least": "Иметь подарки минимум из N коллекций",
         "complete_collection": "Собрать все выпущенные подарки хотя бы в одной коллекции",
         "early_collector": "Быть среди первых N зарегистрированных пользователей",
-        "top_spender_rank": "Быть в топ-N покупателей по тратам"
+        "top_spender_rank": "Быть в топ-N покупателей по тратам",
+        "followers_count_at_least": "Получить минимум N подписчиков",
+        "telegram_connected": "Подключить аккаунт Telegram",
+        "vk_connected": "Подключить аккаунт VK"
       }
     },
     "moderation": {
@@ -534,10 +538,18 @@
       "approved": "Одобрено",
       "rejected": "Отклонено",
       "processFailed": "Не удалось обработать заявку",
+      "voteSaved": "Голос учтен, заявка ждет кворум",
       "type": "Тип",
       "action": "Действие",
       "target": "Цель",
       "preview": "Превью",
+      "payload": "Данные",
+      "author": "Автор",
+      "votes": "Голоса",
+      "adminApprovals": "Одобрения админов",
+      "adminRejections": "Отказы админов",
+      "cannotVoteOwn": "Нельзя голосовать за свою заявку",
+      "alreadyVoted": "Вы уже проголосовали",
       "status": "Статус",
       "actions": "Действия"
     },
@@ -581,7 +593,10 @@
       "chooseFile": "Выбрать файл",
       "moderationHint": "Новый файл сохранится только после одобрения в очереди модерации.",
       "uploadRequired": "Загрузите картинку для модерации",
-      "sentToModeration": "Отправлено на модерацию"
+      "sentToModeration": "Отправлено на модерацию",
+      "collectionPublished": "Коллекция выпущена",
+      "publish": "Выпустить",
+      "publishFailed": "Не удалось выпустить коллекцию"
     },
     "users": {
       "loadFailed": "Не удалось загрузить доступы",
@@ -649,6 +664,191 @@
       "volume": "Оборот",
       "collectionsBySales": "Коллекции по продажам",
       "collection": "Коллекция"
+    }
+  },
+  "notifications": {
+    "summary": {
+      "allRead": "Все прочитано",
+      "new_one": "{{count}} новое",
+      "new_few": "{{count}} новых",
+      "new_many": "{{count}} новых",
+      "new_other": "{{count}} новых",
+      "empty": "Тут пока тихо"
+    },
+    "date": {
+      "today": "Сегодня",
+      "yesterday": "Вчера"
+    },
+    "default": {
+      "title": "Уведомление",
+      "description": "Новое событие в аккаунте."
+    },
+    "emptyDescription": "Когда что-то произойдет, покажем это здесь.",
+    "balanceFrozenTitle": "Баланс заморожен",
+    "balanceFrozenLabel": "Заморожен",
+    "entity": {
+      "present": "Подарок #{{id}}",
+      "listing": "Лот #{{id}}"
+    },
+    "types": {
+      "purchaseConfirmed": {
+        "title": "Покупка подтверждена",
+        "description": "Лот оплачен и уже добавлен в вашу коллекцию."
+      },
+      "listingSold": {
+        "title": "Подарок продан",
+        "description": "Покупатель оплатил лот, средства начислены на баланс."
+      },
+      "upgradeCompleted": {
+        "title": "Апгрейд завершен",
+        "description": "Подарок улучшен и готов к продаже или коллекции."
+      },
+      "giftReceived": {
+        "title": "Получен подарок",
+        "description": "Новый подарок появился в вашей коллекции."
+      },
+      "achievementUnlocked": {
+        "title": "Достижение получено",
+        "description": "Новый бейдж появился в профиле."
+      },
+      "listingCancelled": {
+        "title": "Лот снят с продажи",
+        "description": "Подарок больше не продается на маркетплейсе."
+      },
+      "walletTopup": {
+        "title": "Баланс пополнен",
+        "description": "Токены зачислены на ваш кошелек."
+      },
+      "burnCompleted": {
+        "title": "Подарок сожжен",
+        "description": "Возврат начислен на ваш баланс."
+      },
+      "reportWarning": {
+        "title": "Предупреждение по жалобе",
+        "description": "Администрация отправила вам предупреждение.",
+        "reason": "Причина: {{reason}}"
+      }
+    }
+  },
+  "errors": {
+    "generic": "Что-то пошло не так",
+    "requestFailed": "Запрос не удался. Попробуйте еще раз.",
+    "permissionRequired": "Требуется право: {{permission}}",
+    "insufficientBalance": "Недостаточно средств. Нужно {{need}}, доступно {{have}}",
+    "blockchainError": "Ошибка блокчейна: {{message}}",
+    "smartSearchUnavailable": "Умный поиск сейчас недоступен",
+    "invalidField": "Некорректное поле: {{field}}",
+    "api": {
+      "userInactive": "Аккаунт заблокирован",
+      "notFound": "Не найдено",
+      "userNotFound": "Пользователь не найден",
+      "presentNotFound": "Подарок не найден",
+      "collectionNotFound": "Коллекция не найдена",
+      "listingNotFound": "Лот не найден",
+      "activeListingNotFound": "Активный лот не найден",
+      "albumNotFound": "Альбом не найден",
+      "notificationNotFound": "Уведомление не найдено",
+      "cartItemNotFound": "Лот в корзине не найден",
+      "cartEmpty": "Корзина пуста",
+      "cannotAccessAnotherUsersCart": "Нельзя открыть чужую корзину",
+      "cannotModifyAnotherUsersCart": "Нельзя изменить чужую корзину",
+      "cannotClearAnotherUsersCart": "Нельзя очистить чужую корзину",
+      "cannotBuyAnotherUsersCart": "Нельзя купить чужую корзину",
+      "cannotAccessAnotherUsersNotifications": "Нельзя открыть чужие уведомления",
+      "cannotModifyAnotherUsersNotifications": "Нельзя изменить чужие уведомления",
+      "cannotCreateAlbumsForAnotherUser": "Нельзя создавать альбомы для другого пользователя",
+      "cannotAccessAnotherUsersAlbums": "Нельзя открыть альбомы другого пользователя",
+      "youDoNotOwnAlbum": "Этот альбом вам не принадлежит",
+      "youDoNotOwnPresent": "Этот подарок вам не принадлежит",
+      "cannotActAsAnotherUser": "Нельзя действовать от имени другого пользователя",
+      "cannotAddOwnListingToCart": "Нельзя добавить свой лот в корзину",
+      "itemAlreadyInCart": "Лот уже в корзине",
+      "onlyUpgradedPresentsCanBeListed": "На продажу можно выставлять только улучшенные подарки",
+      "burnedPresentsCannotBeListed": "Сожженные подарки нельзя выставлять на продажу",
+      "presentAlreadyListedForSale": "Подарок уже выставлен на продажу",
+      "invalidListingPrice": "Некорректная цена лота",
+      "priceMustBeGreaterThanZero": "Цена должна быть больше 0",
+      "priceMax": "Цена должна быть не больше 100000",
+      "priceRangeInvalid": "Минимальная цена не может быть больше максимальной",
+      "cannotPinBurnedPresent": "Нельзя закрепить сожженный подарок",
+      "pinLimit": "Можно закрепить до 7 подарков",
+      "cannotFollowYourself": "Нельзя подписаться на себя",
+      "achievementNotAwarded": "Это достижение не выдано пользователю",
+      "visibleAchievementsOnly": "В качестве бейджа можно использовать только видимые достижения",
+      "cannotReportYourself": "Нельзя пожаловаться на себя",
+      "reportAlreadySubmitted": "Вы уже отправили такую жалобу",
+      "cannotSubmitReportsAsAnotherUser": "Нельзя отправлять жалобы от имени другого пользователя",
+      "receiverNotFound": "Получатель не найден",
+      "receiverBlocked": "Аккаунт получателя заблокирован",
+      "reportNotFound": "Жалоба не найдена",
+      "reportAlreadyClosed": "Жалоба уже закрыта",
+      "reportTargetNotFound": "Пользователь из жалобы не найден",
+      "reportTargetBlocked": "Аккаунт пользователя из жалобы заблокирован",
+      "stateExpired": "Состояние истекло или не найдено",
+      "authNoLongerActive": "Этот запрос авторизации больше не активен",
+      "authAlreadyConfirmed": "Этот запрос авторизации уже подтвержден",
+      "telegramAlreadyLinked": "Этот Telegram уже привязан к другому пользователю",
+      "vkAlreadyLinked": "Этот VK уже привязан к другому пользователю",
+      "usernameEmpty": "Никнейм не может быть пустым",
+      "usernameInvalid": "Никнейм должен быть 3-32 символа и содержать только русские/английские буквы, цифры и подчеркивания",
+      "usernameTaken": "Никнейм уже занят",
+      "profileTextLinks": "Никнейм и описание не должны содержать ссылки",
+      "profileTextForbidden": "Никнейм или описание содержит запрещенные слова",
+      "profileTextRejected": "Никнейм или описание не прошло модерацию",
+      "profileTextUnavailable": "Модерация текста профиля недоступна",
+      "imageRequired": "Изображение обязательно",
+      "imageUploadRequired": "Загрузите изображение",
+      "imageInvalidType": "Изображение должно быть PNG, JPG или WEBP",
+      "imageInvalidBase64": "Изображение не является корректными base64-данными",
+      "imageEmpty": "Изображение не может быть пустым",
+      "imageTooLarge": "Изображение должно быть не больше 5 МБ",
+      "imageInvalidFile": "Файл изображения некорректен",
+      "profileImageInvalidType": "Фото профиля должно быть PNG, JPG или WEBP",
+      "profileImageInvalidBase64": "Фото профиля не является корректными base64-данными",
+      "profileImageEmpty": "Фото профиля не может быть пустым",
+      "profileImageTooLarge": "Фото профиля должно быть не больше 5 МБ",
+      "walletNotFound": "Кошелек пользователя не найден",
+      "walletPrivateKeyNotFound": "Приватный ключ кошелька не найден",
+      "platformKeyMissing": "Ключ платформы не настроен",
+      "refundFailed": "Транзакция возврата не удалась",
+      "upgradePaymentFailed": "Транзакция оплаты апгрейда не удалась",
+      "burnAlreadyDone": "Подарок уже сожжен",
+      "cannotBurnOnSale": "Нельзя сжечь подарок, который выставлен на продажу",
+      "alreadyUpgraded": "Подарок уже улучшен",
+      "cannotUpgradeOnSale": "Нельзя улучшить подарок, который выставлен на продажу",
+      "unknownAchievementRule": "Неизвестное правило достижения",
+      "achievementImageRequired": "Загрузите изображение достижения",
+      "achievementNotFound": "Достижение не найдено",
+      "dictionaryNotFound": "Справочник не найден",
+      "dictionaryItemNotFound": "Запись справочника не найдена",
+      "moderationPayloadMissingName": "В заявке модерации нет названия",
+      "moderationMissingImage": "В заявке модерации нет изображения",
+      "moderationItemNotFound": "Заявка модерации не найдена",
+      "moderationAlreadyClosed": "Заявка модерации уже закрыта",
+      "unsupportedModerationItem": "Неподдерживаемая заявка модерации",
+      "cannotReviewOwnModeration": "Нельзя рассматривать свою заявку модерации",
+      "alreadyVotedModeration": "Вы уже голосовали по этой заявке модерации",
+      "managerRequired": "Требуется роль менеджера",
+      "adminRequired": "Требуется роль администратора",
+      "rolesManageRequired": "Требуется право: roles.manage",
+      "masterAdminCreateRequired": "Только мастер-админ может создавать роли мастер-админа",
+      "roleAlreadyExists": "Роль уже существует",
+      "roleNotFound": "Роль не найдена",
+      "cannotEditMasterAdmin": "Нельзя редактировать роль мастер-админа",
+      "cannotDeleteMasterAdmin": "Нельзя удалить роль мастер-админа",
+      "roleUsedByUsers": "Роль используется пользователями",
+      "cannotChangeOwnRole": "Нельзя изменить свою роль",
+      "cannotChangeMasterAdminRole": "Нельзя изменить роль мастер-админа",
+      "cannotDeactivateSelf": "Нельзя деактивировать себя",
+      "topupSecretMissing": "Секрет пополнения не настроен",
+      "topupSecretInvalid": "Некорректный секрет пополнения",
+      "topupNotFound": "Пополнение не найдено",
+      "topupSourceMismatch": "Источник пополнения не совпадает",
+      "topupNotPending": "Пополнение не ожидает обработки",
+      "topupAlreadyFailed": "Пополнение уже помечено как неудачное",
+      "paymentAmountMismatch": "Сумма платежа не совпадает",
+      "paymentCurrencyMismatch": "Валюта платежа не совпадает",
+      "paymentMetadataMismatch": "Метаданные платежа не совпадают"
     }
   },
   "footer": {

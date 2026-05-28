@@ -98,6 +98,7 @@ import {
   updateAchievement,
   updateDictionaryItem,
 } from "../services/adminService";
+import { getLocalizedErrorMessage } from "../utils/localizedError";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -1452,7 +1453,7 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
       setModalOpen(false);
       await loadAll();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("admin.achievements.saveFailed"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "admin.achievements.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -1568,11 +1569,10 @@ const AchievementsPanel = ({ messageApi }: { messageApi: MessageApi }) => {
 };
 
 const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; access: AdminAccess | null }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [items, setItems] = useState<ModerationItem[]>([]);
   const [status, setStatus] = useState<ModerationStatusFilter>("pending");
   const [loading, setLoading] = useState(true);
-  const isRuLanguage = i18n.language.startsWith("ru");
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -1593,13 +1593,13 @@ const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; acces
     try {
       const result = await decideModerationItem(id, decision);
       if (result.status === "pending") {
-        messageApi.success(isRuLanguage ? "Голос учтен, заявка ждет кворум" : "Vote saved; waiting for quorum");
+        messageApi.success(t("admin.moderation.voteSaved"));
       } else {
         messageApi.success(decision === "approve" ? t("admin.moderation.approved") : t("admin.moderation.rejected"));
       }
       await loadItems();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("admin.moderation.processFailed"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "admin.moderation.processFailed"));
     }
   };
 
@@ -1612,10 +1612,10 @@ const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; acces
     return (
       <Flex vertical gap={2}>
         <Text className="text-xs">
-          {isRuLanguage ? "Одобрения админов" : "Admin approvals"}: {counts.admin_approvals}/2
+          {t("admin.moderation.adminApprovals")}: {counts.admin_approvals}/2
         </Text>
         <Text className="text-xs" type="secondary">
-          {isRuLanguage ? "Отказы админов" : "Admin rejections"}: {counts.admin_rejections}/1
+          {t("admin.moderation.adminRejections")}: {counts.admin_rejections}/1
         </Text>
       </Flex>
     );
@@ -1648,7 +1648,7 @@ const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; acces
             { title: t("admin.moderation.type"), dataIndex: "item_type", width: 150 },
             { title: t("admin.moderation.action"), dataIndex: "action", width: 120 },
             { title: t("admin.moderation.target"), render: (_, record) => `${record.target_kind || "-"} ${record.target_id || ""}`, width: 150 },
-            { title: isRuLanguage ? "Автор" : "Author", dataIndex: "submitted_by", width: 100 },
+            { title: t("admin.moderation.author"), dataIndex: "submitted_by", width: 100 },
             {
               title: t("admin.moderation.preview"),
               width: 120,
@@ -1665,9 +1665,9 @@ const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; acces
                 ) : null;
               },
             },
-            { title: "Payload", render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
+            { title: t("admin.moderation.payload"), render: (_, record) => <Text className="text-xs">{JSON.stringify(record.payload)}</Text> },
             {
-              title: isRuLanguage ? "Голоса" : "Votes",
+              title: t("admin.moderation.votes"),
               width: 190,
               render: (_, record) => renderVoteProgress(record),
             },
@@ -1687,9 +1687,9 @@ const ModerationPanel = ({ messageApi, access }: { messageApi: MessageApi; acces
                 const isOwnDictionaryRequest = record.item_type === "dictionary_image" && record.submitted_by === access?.user_id;
                 const hasVoted = Boolean(record.votes?.some((vote) => vote.user_id === access?.user_id));
                 const disabledReason = isOwnDictionaryRequest
-                  ? (isRuLanguage ? "Нельзя голосовать за свою заявку" : "You cannot vote on your own request")
+                  ? t("admin.moderation.cannotVoteOwn")
                   : hasVoted
-                    ? (isRuLanguage ? "Вы уже проголосовали" : "You have already voted")
+                    ? t("admin.moderation.alreadyVoted")
                     : "";
 
                 return (
@@ -1889,17 +1889,17 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
       messageApi.success(archived ? t("admin.dictionaries.archived") : t("admin.dictionaries.restored"));
       await loadItems();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("admin.dictionaries.archiveFailed"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "admin.dictionaries.publishFailed"));
     }
   };
 
   const handlePublish = async (item: DictionaryItem) => {
     try {
       await publishCollection(item.id);
-      messageApi.success(i18n.language.startsWith("ru") ? "Коллекция выпущена" : "Collection published");
+      messageApi.success(t("admin.dictionaries.collectionPublished"));
       await loadItems();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t("admin.dictionaries.archiveFailed"));
+      messageApi.error(getLocalizedErrorMessage(error, t, "admin.dictionaries.archiveFailed"));
     }
   };
 
@@ -1953,7 +1953,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
               width: 120,
               render: (value: number) => value === 1
                 ? <Tag color="green">{t("admin.status.active")}</Tag>
-                : <Tag>{kind === "collections" ? (i18n.language.startsWith("ru") ? "Черновик" : "Draft") : t("admin.status.archive")}</Tag>,
+                : <Tag>{kind === "collections" ? t("admin.status.draft") : t("admin.status.archive")}</Tag>,
             },
             {
               title: t("admin.dictionaries.actions"),
@@ -1970,7 +1970,7 @@ const DictionariesPanel = ({ messageApi }: { messageApi: MessageApi }) => {
                     </Button>
                   ) : kind === "collections" ? (
                     <Button size="small" type="primary" icon={<UnlockOutlined />} onClick={() => handlePublish(record)}>
-                      {i18n.language.startsWith("ru") ? "Выпустить" : "Publish"}
+                      {t("admin.dictionaries.publish")}
                     </Button>
                   ) : (
                     <Button size="small" onClick={() => handleArchive(record, false)}>
